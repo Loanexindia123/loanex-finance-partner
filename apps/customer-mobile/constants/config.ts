@@ -9,7 +9,7 @@ const defaultServerUrl = __DEV__
       ios: 'http://localhost:4000',         // iOS simulator → host machine
       default: 'http://localhost:4000',
     }) || 'http://localhost:4000'
-  : 'http://localhost:4000';               // Production: replace with your deployed URL
+  : 'https://loanex-api.vercel.app';       // Release APK / production builds
 
 // Backend server (Express) that proxies Razorpay + IDSPay KYC
 // Set EXPO_PUBLIC_SERVER_URL in .env to override (e.g. http://192.168.1.100:4000 for physical devices)

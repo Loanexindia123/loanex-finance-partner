@@ -125,9 +125,11 @@ function serializeUser(user: any) {
 export class AdminController {
   /** GET /admin/users — every user with profile (customer + staff). */
   listUsers = async (_req: Request, res: Response) => {
-    // In source mode, refresh the users collection from Supabase (throttled)
-    // so dashboard-side edits surface here without a restart.
-    await jsonDb.refreshCatalogThrottled();
+    // Refresh users from Mongo so dashboard-side edits surface without a restart.
+    // (Catalog throttle is product/category only and must not be relied on here.)
+    await jsonDb.refreshCollection('users');
+    await jsonDb.ensureCollection('profiles');
+    await jsonDb.ensureCollection('roles');
     const users = jsonDb
       .findMany('users', {})
       .sort((a: any, b: any) =>
@@ -307,6 +309,7 @@ export class AdminController {
   /** GET /admin/suppliers|dealers|warehouses */
   listMaster = async (req: Request, res: Response) => {
     const collection = this.resolveMasterCollection(req.path);
+    await jsonDb.ensureCollection(collection);
     const items = jsonDb.findMany(collection, {});
     return sendSuccess(res, items, 'Master data fetched');
   };
@@ -314,6 +317,7 @@ export class AdminController {
   /** POST /admin/suppliers|dealers|warehouses */
   createMaster = async (req: Request, res: Response) => {
     const collection = this.resolveMasterCollection(req.path);
+    await jsonDb.ensureCollection(collection);
     const created = jsonDb.insert(collection, req.body ?? {});
     return sendSuccess(res, created, 'Master record created', 201);
   };
@@ -321,6 +325,7 @@ export class AdminController {
   /** PUT /admin/suppliers|dealers|warehouses/:id */
   updateMaster = async (req: Request, res: Response) => {
     const collection = this.resolveMasterCollection(req.path);
+    await jsonDb.ensureCollection(collection);
     const id = String(req.params.id ?? '');
     const existing = jsonDb.findOne(collection, { id });
     if (!existing) {
@@ -333,6 +338,7 @@ export class AdminController {
   /** DELETE /admin/suppliers|dealers|warehouses/:id */
   deleteMaster = async (req: Request, res: Response) => {
     const collection = this.resolveMasterCollection(req.path);
+    await jsonDb.ensureCollection(collection);
     const id = String(req.params.id ?? '');
     const existing = jsonDb.findOne(collection, { id });
     if (!existing) {

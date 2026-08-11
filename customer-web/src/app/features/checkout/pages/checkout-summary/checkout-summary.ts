@@ -8,6 +8,7 @@ import {
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { formatInr } from '../../../../shared/utils/currency';
+import { CartService } from '../../../cart/services/cart.service';
 import { EmiPlanSelectionService } from '../../../emi/services/emi-plan-selection.service';
 import { CheckoutIntentService } from '../../services/checkout-intent.service';
 import {
@@ -30,6 +31,7 @@ export class CheckoutSummaryComponent implements OnInit {
   private readonly checkoutApi = inject(CheckoutApiService);
   private readonly checkoutIntent = inject(CheckoutIntentService);
   private readonly emiPlan = inject(EmiPlanSelectionService);
+  private readonly cartApi = inject(CartService);
 
   readonly formatInr = formatInr;
   readonly loading = signal(true);
@@ -220,6 +222,8 @@ export class CheckoutSummaryComponent implements OnInit {
     }).subscribe({
       next: (result) => {
         this.submitting.set(false);
+        // COD order consumes cart items server-side — don't reuse Shell cache.
+        this.cartApi.invalidate();
         // The order is placed — land on the order confirmation page.
         void this.router.navigate(['/orders', result.order.orderNumber || result.order.id], {
           queryParams: { placed: 'true' },

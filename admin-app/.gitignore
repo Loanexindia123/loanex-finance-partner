@@ -1,6 +1,9 @@
 node_modules/
 .expo/
 .env
+.env.local
+.env.production
+.env.development
 dist/
 build/
 .vercel

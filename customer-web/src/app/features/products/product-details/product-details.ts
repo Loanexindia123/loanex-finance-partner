@@ -38,6 +38,10 @@ import { ProductInfoComponent } from './components/product-info/product-info';
 import { RelatedProductsComponent } from './components/related-products/related-products';
 import { SpecificationComponent, RatingSummary } from './components/specification/specification';
 
+/** UUID route params use getById; anything else is treated as a slug. */
+const PRODUCT_ROUTE_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 @Component({
   selector: 'app-product-details',
   imports: [
@@ -234,37 +238,42 @@ export class ProductDetails {
     this.relatedProducts.set([]);
     this.productsApi.clearError();
 
-    this.productsApi
-      .getById(id)
-      .pipe(
-        catchError(() => this.productsApi.getBySlug(id)),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe({
-        next: (detail) => {
-          const mapped = mapProductDetails(detail);
-          this.product.set(mapped);
-          this.loading.set(false);
-          this.error.set(null);
+    const routeParam = id.trim();
+    // Avoid the slug→UUID 404 waterfall: pick the matching endpoint first.
+    // Keep the opposite call only as a rare fallback if the primary misses.
+    const detail$ = PRODUCT_ROUTE_UUID.test(routeParam)
+      ? this.productsApi
+          .getById(routeParam)
+          .pipe(catchError(() => this.productsApi.getBySlug(routeParam)))
+      : this.productsApi
+          .getBySlug(routeParam)
+          .pipe(catchError(() => this.productsApi.getById(routeParam)));
 
-          this.layoutUi.setBreadcrumbs(
-            mapped.breadcrumbs.map((item: BreadcrumbTrailItem) => ({
-              label: item.label,
-              path: item.path,
-            })),
-          );
-          this.codToastShown = false;
-          this.checkCodWarning(mapped);
-          this.loadWishlistStatus(mapped.id, mapped.selectedVariantId ?? undefined);
-          this.loadRelatedProducts(detail.id, detail.category);
-        },
-        error: () => {
-          this.loading.set(false);
-          this.error.set(this.productsApi.error() ?? 'Unable to load product.');
-          this.product.set(null);
-          this.relatedProducts.set([]);
-        },
-      });
+    detail$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (detail) => {
+        const mapped = mapProductDetails(detail);
+        this.product.set(mapped);
+        this.loading.set(false);
+        this.error.set(null);
+
+        this.layoutUi.setBreadcrumbs(
+          mapped.breadcrumbs.map((item: BreadcrumbTrailItem) => ({
+            label: item.label,
+            path: item.path,
+          })),
+        );
+        this.codToastShown = false;
+        this.checkCodWarning(mapped);
+        this.loadWishlistStatus(mapped.id, mapped.selectedVariantId ?? undefined);
+        this.loadRelatedProducts(detail.id, detail.category);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.error.set(this.productsApi.error() ?? 'Unable to load product.');
+        this.product.set(null);
+        this.relatedProducts.set([]);
+      },
+    });
   }
 
   /**

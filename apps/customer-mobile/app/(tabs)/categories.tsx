@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Pressable,
   ActivityIndicator, RefreshControl,
@@ -10,17 +10,22 @@ import { Colors, Fonts, Spacing, Radius, Shadow } from '../../constants/theme';
 import { getCategories } from '../../services/categoryService';
 import { Category } from '../../types';
 
+/** Skip focus refetch when categories were loaded recently (pull-to-refresh always fetches). */
+const CATEGORIES_FOCUS_TTL_MS = 60_000;
+
 export default function CategoriesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const lastFetchedAt = useRef(0);
 
   const fetchCats = useCallback(async () => {
     try {
       const cats = await getCategories();
       setCategories(cats || []);
+      lastFetchedAt.current = Date.now();
     } catch {
       setCategories([]);
     } finally {
@@ -31,8 +36,11 @@ export default function CategoriesScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchCats();
-    }, [fetchCats])
+      const stale = Date.now() - lastFetchedAt.current > CATEGORIES_FOCUS_TTL_MS;
+      if (categories.length === 0 || stale) {
+        fetchCats();
+      }
+    }, [fetchCats, categories.length])
   );
 
   const onRefresh = () => {

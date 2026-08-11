@@ -7,11 +7,19 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Fonts, Spacing, Radius, Shadow } from '../constants/theme';
-import { APP_CONFIG } from '../constants/config';
 import { ProductCard } from '../components/feature/ProductCard';
-import { filterAndSortProducts, getAllBrands, getPriceRange, SortOption, FilterOptions } from '../services/productService';
+import {
+  applyProductFilters,
+  brandsFromProducts,
+  getProducts,
+  priceRangeFromProducts,
+  SortOption,
+  FilterOptions,
+} from '../services/productService';
 import { getCategories } from '../services/categoryService';
 import { Product, Category } from '../types';
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 const SORT_OPTIONS: { key: SortOption; label: string; icon: string }[] = [
   { key: 'relevance', label: 'Relevance', icon: 'auto-awesome' },
@@ -40,6 +48,7 @@ export default function SearchScreen() {
   const { q: initialQ = '', category: initialCat = '' } = useLocalSearchParams<{ q?: string; category?: string }>();
 
   const [query, setQuery] = useState(initialQ);
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQ);
   const [showFilters, setShowFilters] = useState(false);
   const [activeSort, setActiveSort] = useState<SortOption>('relevance');
 
@@ -52,26 +61,37 @@ export default function SearchScreen() {
   const [emiOnly, setEmiOnly] = useState(false);
   const [minRating, setMinRating] = useState<number | null>(null);
 
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [allBrands, setAllBrands] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState({ min: 0, max: 999999 });
   const [results, setResults] = useState<Product[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [searching, setSearching] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
 
   const inputRef = useRef<TextInput>(null);
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
 
+  // Single GET /products for brands, price range, and results (was 2–3 identical calls).
   useEffect(() => {
+    let cancelled = false;
     Promise.all([
-      getAllBrands(),
-      getPriceRange(),
-      getCategories(),
-    ]).then(([brands, pr, cats]) => {
-      setAllBrands(brands);
-      setPriceRange(pr);
+      getProducts().catch(() => [] as Product[]),
+      getCategories().catch(() => [] as Category[]),
+    ]).then(([products, cats]) => {
+      if (cancelled) return;
+      setAllProducts(products);
+      setAllBrands(brandsFromProducts(products));
+      setPriceRange(priceRangeFromProducts(products));
       setCategories(cats);
     });
+    return () => { cancelled = true; };
   }, []);
+
+  // Debounce search text so typing does not re-filter on every keystroke.
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [query]);
 
   const activeFilterCount = useMemo(() => {
     let c = 0;
@@ -86,7 +106,7 @@ export default function SearchScreen() {
   const filterOpts: FilterOptions = useMemo(() => {
     const preset = pricePreset !== null ? PRICE_PRESETS[pricePreset] : null;
     return {
-      query,
+      query: debouncedQuery,
       categoryIds: selectedCats.length ? selectedCats : undefined,
       brands: selectedBrands.length ? selectedBrands : undefined,
       minPrice: preset ? preset.min : (minPrice ? parseInt(minPrice) : undefined),
@@ -95,19 +115,14 @@ export default function SearchScreen() {
       minRating: minRating ?? undefined,
       sort: activeSort,
     };
-  }, [query, selectedCats, selectedBrands, pricePreset, minPrice, maxPrice, emiOnly, minRating, activeSort]);
+  }, [debouncedQuery, selectedCats, selectedBrands, pricePreset, minPrice, maxPrice, emiOnly, minRating, activeSort]);
 
   useEffect(() => {
-    let cancelled = false;
     setSearching(true);
-    filterAndSortProducts(filterOpts).then(r => {
-      if (!cancelled) {
-        setResults(r);
-        setSearching(false);
-      }
-    });
-    return () => { cancelled = true; };
-  }, [filterOpts]);
+    const next = applyProductFilters(allProducts, filterOpts);
+    setResults(next);
+    setSearching(false);
+  }, [allProducts, filterOpts]);
 
   const activeSortLabel = SORT_OPTIONS.find(s => s.key === activeSort)?.label ?? 'Sort';
 

@@ -14,6 +14,7 @@ import {
   PendingCheckoutService,
 } from '../../../checkout/services/pending-checkout.service';
 import { CartItem, CartResponse, CartService } from '../../services/cart.service';
+import { WishlistService } from '../../../wishlist/services/wishlist.service';
 
 @Component({
   selector: 'app-cart',
@@ -24,6 +25,7 @@ import { CartItem, CartResponse, CartService } from '../../services/cart.service
 })
 export class CartComponent implements OnInit {
   private readonly cartApi = inject(CartService);
+  private readonly wishlistApi = inject(WishlistService);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly checkoutIntent = inject(CheckoutIntentService);
@@ -95,6 +97,8 @@ export class CartComponent implements OnInit {
       next: (data) => {
         this.acting.set(false);
         this.cart.set(data);
+        // Server moved an item into wishlist — list cache is stale.
+        this.wishlistApi.invalidate();
         this.info.set('Item moved to wishlist.');
       },
       error: () => {

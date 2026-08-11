@@ -15,6 +15,7 @@ import { ProductCardComponent } from '../../../../shared/components/product-card
 import { ProductCardItem } from '../../../../shared/models/product-card.model';
 import { formatInr } from '../../../../shared/utils/currency';
 import { ProductListResponse, ProductsApiService } from '../../services/products-api.service';
+import { ShopCatalogCacheService } from '../../services/shop-catalog-cache.service';
 import { toProductCardItem } from '../../utils/map-catalog-product-card';
 
 type AvailabilityFilter = 'ALL' | 'IN_STOCK' | 'OUT_OF_STOCK';
@@ -29,6 +30,7 @@ type SortOption = 'latest' | 'price_asc' | 'price_desc' | 'name';
 })
 export class ProductCatalogComponent implements OnInit {
   private readonly productsApi = inject(ProductsApiService);
+  private readonly catalogCache = inject(ShopCatalogCacheService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
@@ -138,34 +140,34 @@ export class ProductCatalogComponent implements OnInit {
     // Wishlist toggle handled on PDP; catalog cards are browse-only.
   }
 
-  private loadCatalog(page: number): void {
+  private loadCatalog(page: number, options?: { force?: boolean }): void {
     const value = this.filterForm.getRawValue();
     this.loading.set(true);
     this.error.set(null);
 
-    this.productsApi
-      .list({
-        search: value.search.trim() || undefined,
-        brand: value.brand || undefined,
-        category: value.category || undefined,
-        minPrice: value.minPrice ? Number(value.minPrice) : undefined,
-        maxPrice: value.maxPrice ? Number(value.maxPrice) : undefined,
-        availability: value.availability,
-        emiAvailable: value.emiAvailable || undefined,
-        sort: value.sort,
-        page,
-        limit: 12,
-      })
-      .subscribe({
-        next: (data) => {
-          this.loading.set(false);
-          this.catalog.set(data);
-          this.cardItems.set(data.items.map((item) => toProductCardItem(item)));
-        },
-        error: () => {
-          this.loading.set(false);
-          this.error.set(this.productsApi.error() ?? 'Unable to load products.');
-        },
-      });
+    const params: Record<string, string | number | boolean | undefined> = {
+      search: value.search.trim() || undefined,
+      brand: value.brand || undefined,
+      category: value.category || undefined,
+      minPrice: value.minPrice ? Number(value.minPrice) : undefined,
+      maxPrice: value.maxPrice ? Number(value.maxPrice) : undefined,
+      availability: value.availability,
+      emiAvailable: value.emiAvailable || undefined,
+      sort: value.sort,
+      page,
+      limit: 12,
+    };
+
+    this.catalogCache.list(params, { force: options?.force === true }).subscribe({
+      next: (data) => {
+        this.loading.set(false);
+        this.catalog.set(data);
+        this.cardItems.set(data.items.map((item) => toProductCardItem(item)));
+      },
+      error: () => {
+        this.loading.set(false);
+        this.error.set(this.productsApi.error() ?? 'Unable to load products.');
+      },
+    });
   }
 }

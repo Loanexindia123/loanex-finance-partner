@@ -3,6 +3,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '../../../common/errors/app-error';
+import { jsonDb } from '../../../config/json-db';
 import type { CreateReviewBody, UpdateReviewBody } from '../dto/reviews.dto';
 import { reviewsRepository } from '../repository/reviews.repository';
 
@@ -32,6 +33,7 @@ function mapReviewItem(
 
 export class ReviewsService {
   async create(userId: string, input: CreateReviewBody) {
+    await jsonDb.ensureCollection('reviews');
     const product = await reviewsRepository.productExists(input.productId);
     if (!product) {
       throw new NotFoundError('Product not found.');
@@ -63,6 +65,7 @@ export class ReviewsService {
   }
 
   async listByProduct(productIdOrSlug: string, currentUserId?: string) {
+    await jsonDb.ensureCollection('reviews');
     const product = await reviewsRepository.productExists(productIdOrSlug);
     if (!product) {
       throw new NotFoundError('Product not found.');
@@ -89,6 +92,7 @@ export class ReviewsService {
   }
 
   async update(userId: string, reviewId: string, input: UpdateReviewBody) {
+    await jsonDb.ensureCollection('reviews');
     const existing = await reviewsRepository.findById(reviewId);
     if (!existing) {
       throw new NotFoundError('Review not found.');
@@ -107,6 +111,7 @@ export class ReviewsService {
   }
 
   async delete(userId: string, reviewId: string) {
+    await jsonDb.ensureCollection('reviews');
     const existing = await reviewsRepository.findById(reviewId);
     if (!existing) {
       throw new NotFoundError('Review not found.');

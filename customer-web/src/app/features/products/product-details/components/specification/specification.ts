@@ -69,6 +69,10 @@ export class SpecificationComponent {
       this.activeTab.set(value);
       if (value === 'reviews') {
         const id = this.resolvedProductId();
+        // Same endpoint/params as the initial effect load — reuse when already loaded.
+        if (id && this.reviewsData()?.productId === id) {
+          return;
+        }
         if (id) {
           this.loadReviews(id);
         }
@@ -127,7 +131,7 @@ export class SpecificationComponent {
             this.editingReview.set(false);
             this.reviewForm.reset({ rating: 5, review: '' });
             this.reviewsInfo.set('Review updated.');
-            this.loadReviews(productId);
+            this.loadReviews(productId, true);
           },
           error: () => {
             this.submitting.set(false);
@@ -148,7 +152,7 @@ export class SpecificationComponent {
           this.submitting.set(false);
           this.reviewForm.reset({ rating: 5, review: '' });
           this.reviewsInfo.set('Review submitted. Thank you!');
-          this.loadReviews(productId);
+          this.loadReviews(productId, true);
         },
         error: () => {
           this.submitting.set(false);
@@ -170,7 +174,7 @@ export class SpecificationComponent {
         this.editingReview.set(false);
         this.reviewForm.reset({ rating: 5, review: '' });
         this.reviewsInfo.set('Review deleted.');
-        this.loadReviews(this.resolvedProductId());
+        this.loadReviews(this.resolvedProductId(), true);
       },
       error: () => {
         this.submitting.set(false);
@@ -201,8 +205,13 @@ export class SpecificationComponent {
     return this.productId()?.trim() || '';
   }
 
-  private loadReviews(productId: string): void {
+  private loadReviews(productId: string, force = false): void {
     if (!productId?.trim()) return;
+
+    // In-memory reuse keyed by productId (tab open / same-product effect re-runs).
+    if (!force && this.reviewsData()?.productId === productId) {
+      return;
+    }
 
     this.reviewsLoading.set(true);
     this.reviewsError.set(null);

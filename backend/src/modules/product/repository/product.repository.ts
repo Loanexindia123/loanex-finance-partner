@@ -212,9 +212,20 @@ export class ProductRepository {
     if (productIds.length === 0)
       return new Map<string, { averageRating: number; reviewCount: number }>();
 
+    await jsonDb.ensureCollection('reviews');
+    const allReviews = jsonDb.getCollection('reviews');
+    const byProduct = new Map<string, any[]>();
+    for (const review of allReviews) {
+      const pid = String(review.productId ?? '');
+      if (!pid) continue;
+      const bucket = byProduct.get(pid);
+      if (bucket) bucket.push(review);
+      else byProduct.set(pid, [review]);
+    }
+
     const map = new Map<string, { averageRating: number; reviewCount: number }>();
     for (const pid of productIds) {
-      const reviews = jsonDb.findMany('reviews', { productId: pid });
+      const reviews = byProduct.get(pid) ?? [];
       if (reviews.length === 0) {
         map.set(pid, { averageRating: 0, reviewCount: 0 });
       } else {

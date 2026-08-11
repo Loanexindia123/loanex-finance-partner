@@ -10,8 +10,9 @@ import {
 import { isPlatformBrowser } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { CatalogProduct, ProductsApiService } from '../../../products/services/products-api.service';
+import { CatalogProduct } from '../../../products/services/products-api.service';
 import { HomeCategory } from '../../models/catalog.models';
+import { HomeDataCacheService } from '../../services/home-data-cache.service';
 
 @Component({
   selector: 'app-categories',
@@ -22,7 +23,7 @@ import { HomeCategory } from '../../models/catalog.models';
 })
 export class Categories {
   private readonly platformId = inject(PLATFORM_ID);
-  private readonly productsApi = inject(ProductsApiService);
+  private readonly homeCache = inject(HomeDataCacheService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly loading = signal(true);
@@ -35,8 +36,9 @@ export class Categories {
         return;
       }
 
-      this.productsApi
-        .list({ limit: 50 })
+      // Shared with Popular / New Arrivals — one Home catalog HTTP call.
+      this.homeCache
+        .getCatalog(50)
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: (data) => {
@@ -45,7 +47,7 @@ export class Categories {
           },
           error: () => {
             this.loading.set(false);
-            this.error.set(this.productsApi.error() ?? 'Unable to load categories.');
+            this.error.set('Unable to load categories.');
             this.categories.set([]);
           },
         });

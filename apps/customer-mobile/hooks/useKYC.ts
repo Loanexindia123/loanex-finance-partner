@@ -5,20 +5,31 @@ import { CustomerKYC } from '../types';
 
 export function useKYC() {
   const { user } = useAuth();
+  const userId = user?.id;
   const [kyc, setKYC] = useState<CustomerKYC | null>(null);
   const [kycLoading, setKycLoading] = useState(true);
 
+  // Keyed by user id — not the whole user object — so Auth refreshUser()
+  // recreating the same user from AsyncStorage does not re-fetch KYC.
   const refresh = useCallback(async () => {
-    if (!user) { setKYC(null); setKycLoading(false); return; }
+    if (!userId) {
+      setKYC(null);
+      setKycLoading(false);
+      return;
+    }
     setKycLoading(true);
     try {
-      const data = await getKYC(user.id);
+      const data = await getKYC(userId);
       setKYC(data);
-    } catch { setKYC(null); }
+    } catch {
+      setKYC(null);
+    }
     setKycLoading(false);
-  }, [user]);
+  }, [userId]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   const isKYCComplete = kyc?.kycCompleted === true;
 

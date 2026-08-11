@@ -181,6 +181,7 @@ export class DownPaymentComponent implements OnInit {
         this.paying.set(false);
         // Down payment landed — no unfinished checkout left to resume.
         this.pendingCheckout.clear();
+        this.cartService.invalidate();
         const orderRef = result.orderNumber || result.orderId;
         if (orderRef) {
           void this.router.navigate(['/orders', orderRef], {

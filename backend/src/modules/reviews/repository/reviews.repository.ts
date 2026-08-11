@@ -34,6 +34,7 @@ export class ReviewsRepository {
   }
 
   async hasEligibleOrder(userId: string, productId: string) {
+    await jsonDb.ensureCollection('orders');
     const order = jsonDb.findOne('orders', { userId, productId });
     return order ? { id: order.id } : null;
   }

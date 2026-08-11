@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, catchError, map, tap, throwError } from 'rxjs';
+import { Observable, catchError, map, of, tap, throwError } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ApiSuccess } from '../../../core/models/auth.models';
 import { LayoutUiService } from '../../../layout/services/layout-ui.service';
@@ -54,12 +54,27 @@ export class CartService {
   private readonly loadingSignal = signal(false);
   private readonly errorSignal = signal<string | null>(null);
   private readonly cartSignal = signal<CartResponse | null>(null);
+  /** True after a successful GET/mutation response — enables Shell→Cart reuse. */
+  private loaded = false;
 
   readonly loading = this.loadingSignal.asReadonly();
   readonly error = this.errorSignal.asReadonly();
   readonly cart = this.cartSignal.asReadonly();
 
-  getCart(): Observable<CartResponse> {
+  /** Whether a full cart payload is available for in-memory reuse. */
+  hasLoaded(): boolean {
+    return this.loaded && this.cartSignal() !== null;
+  }
+
+  /**
+   * Load cart. Reuses the in-memory payload when Shell (or a prior call) already
+   * loaded it. Pass `{ force: true }` for an explicit network refresh.
+   */
+  getCart(options?: { force?: boolean }): Observable<CartResponse> {
+    if (!options?.force && this.hasLoaded()) {
+      return of(this.cartSignal()!);
+    }
+
     return this.wrap(this.http.get<ApiSuccess<CartResponse>>(this.baseUrl)).pipe(
       tap((data) => this.applyCart(data)),
     );
@@ -107,12 +122,18 @@ export class CartService {
     );
   }
 
+  /** Mark in-memory cart stale so the next getCart() hits the network. */
+  invalidate(): void {
+    this.loaded = false;
+  }
+
   clearError(): void {
     this.errorSignal.set(null);
   }
 
   private applyCart(data: CartResponse): void {
     this.cartSignal.set(data);
+    this.loaded = true;
     this.layoutUi.cartCount.set(data.summary.totalItems);
   }
 

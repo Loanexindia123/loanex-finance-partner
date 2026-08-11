@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, catchError, map, tap, throwError } from 'rxjs';
+import { Observable, catchError, map, shareReplay, tap, throwError } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ApiSuccess } from '../../../core/models/auth.models';
 
@@ -159,6 +159,11 @@ export interface RazorpayVerifyPayload {
 
 const SESSION_KEY = 'loanex.checkoutSessionId';
 
+/** Short TTL for advisory PDP COD checks — keyed by amount only. */
+const COD_RULES_TTL_MS = 45_000;
+
+type CodRules = { maxAmount: number; codAllowed: boolean; totalAmount: number };
+
 @Injectable({ providedIn: 'root' })
 export class CheckoutApiService {
   private readonly http = inject(HttpClient);
@@ -168,6 +173,11 @@ export class CheckoutApiService {
   private readonly errorSignal = signal<string | null>(null);
   private readonly errorCodeSignal = signal<string | null>(null);
 
+  private readonly codRulesCache = new Map<
+    number,
+    { expiresAt: number; request$: Observable<CodRules> }
+  >();
+
   readonly loading = this.loadingSignal.asReadonly();
   readonly error = this.errorSignal.asReadonly();
   readonly errorCode = this.errorCodeSignal.asReadonly();
@@ -176,15 +186,42 @@ export class CheckoutApiService {
    * COD availability for a given cart total — same codRules the checkout
    * summary derives from (backend COD_MAX_AMOUNT). Lightweight call that does
    * not touch the shared loading/error signals.
+   *
+   * Short in-memory reuse for identical amounts (PDP advisory toast). Checkout
+   * summary still loads its own `codRules` via getSummary — unchanged.
    */
-  getCodRules(amount: number): Observable<{ maxAmount: number; codAllowed: boolean; totalAmount: number }> {
-    const params = new HttpParams().set('amount', String(Math.round(amount)));
-    return this.http
-      .get<ApiSuccess<{ maxAmount: number; codAllowed: boolean; totalAmount: number }>>(
-        `${this.baseUrl}/cod-rules`,
-        { params },
-      )
-      .pipe(map((res) => res.data));
+  getCodRules(amount: number): Observable<CodRules> {
+    const key = Math.round(amount);
+    const now = Date.now();
+    const hit = this.codRulesCache.get(key);
+    if (hit && now < hit.expiresAt) {
+      return hit.request$;
+    }
+
+    const params = new HttpParams().set('amount', String(key));
+    const request$ = this.http
+      .get<ApiSuccess<CodRules>>(`${this.baseUrl}/cod-rules`, { params })
+      .pipe(
+        map((res) => res.data),
+        tap({
+          error: () => {
+            this.codRulesCache.delete(key);
+          },
+        }),
+        shareReplay({ bufferSize: 1, refCount: false }),
+      );
+
+    this.codRulesCache.set(key, {
+      expiresAt: now + COD_RULES_TTL_MS,
+      request$,
+    });
+
+    if (this.codRulesCache.size > 20) {
+      const oldest = this.codRulesCache.keys().next().value;
+      if (oldest !== undefined) this.codRulesCache.delete(oldest);
+    }
+
+    return request$;
   }
 
   getSummary(productId: string, quantity = 1, variantId?: string, mode?: string): Observable<CheckoutSummary> {

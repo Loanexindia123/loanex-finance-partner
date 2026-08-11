@@ -7,6 +7,7 @@ import { corsOrigins, env } from './config/env';
 import { jsonDb } from './config/json-db';
 import { setupSwagger } from './config/swagger';
 import { errorHandler, notFoundHandler } from './common/middleware/error-handler';
+import { awaitDeferredHydration } from './common/middleware/await-deferred-hydration';
 import { createRateLimiter } from './common/middleware/rate-limiter';
 import { asyncHandler } from './common/utils/async-handler';
 import { runEmiReminderPass } from './modules/notifications';
@@ -60,6 +61,9 @@ export function createApp() {
       'http://127.0.0.1:4200',
       'http://localhost:3000',
       'http://127.0.0.1:3000',
+      // Expo Metro (customer mobile web / Expo Go debugger)
+      'http://localhost:8081',
+      'http://127.0.0.1:8081',
     ]) {
       allowedOrigins.add(origin);
     }
@@ -121,6 +125,9 @@ export function createApp() {
         env: env.NODE_ENV,
         timestamp: new Date().toISOString(),
         hydrateMs: jsonDb.lastHydrateMs || null,
+        deferredHydrateMs: jsonDb.lastDeferredHydrateMs || null,
+        hydrateLoaded: jsonDb.lastHydrateLoadedCount || null,
+        hydrateTarget: jsonDb.lastHydrateTargetCount || null,
       },
     });
   });
@@ -147,35 +154,38 @@ export function createApp() {
     }),
   );
 
+  // Catalog + cart/wishlist only need critical hydrate (jsonDb.ready).
   app.use(`${env.API_PREFIX}/auth`, authRouter);
-  app.use(`${env.API_PREFIX}/verification`, verificationRouter);
-  app.use(`${env.API_PREFIX}/verification/pan`, panVerificationRouter);
-  app.use(`${env.API_PREFIX}/verification/bank`, bankVerificationRouter);
-  app.use(`${env.API_PREFIX}/audit-log`, auditLogRouter);
-  app.use(`${env.API_PREFIX}/emi/applications`, emiApplicationRouter);
-  app.use(`${env.API_PREFIX}/payments`, paymentRouter);
-  app.use(`${env.API_PREFIX}/orders`, orderRouter);
-  app.use(`${env.API_PREFIX}/loans`, loanRouter);
-  app.use(`${env.API_PREFIX}/emi/payments`, emiPaymentRouter);
-  app.use(`${env.API_PREFIX}/emi/payment-history`, emiPaymentHistoryRouter);
-  app.use(`${env.API_PREFIX}/emi/statement`, emiStatementRouter);
-  app.use(`${env.API_PREFIX}/autopay`, autopayRouter);
-  app.use(`${env.API_PREFIX}/notifications`, notificationRouter);
-  app.use(`${env.API_PREFIX}/profile`, profileRouter);
-  app.use(`${env.API_PREFIX}/checkout`, checkoutRouter);
   app.use(`${env.API_PREFIX}/cart`, cartRouter);
   app.use(`${env.API_PREFIX}/wishlist`, wishlistRouter);
   app.use(`${env.API_PREFIX}/products`, productRouter);
   app.use(`${env.API_PREFIX}/categories`, categoryRouter);
   app.use(`${env.API_PREFIX}/reviews`, reviewsRouter);
   app.use(`${env.API_PREFIX}/banners`, bannerRouter);
-  app.use(`${env.API_PREFIX}/jobs`, jobsRouter);
-  app.use(`${env.API_PREFIX}/job-applications`, jobApplicationsRouter);
-  app.use(`${env.API_PREFIX}/general-applications`, generalApplicationsRouter);
-  app.use(`${env.API_PREFIX}/support`, supportRouter);
-  app.use(`${env.API_PREFIX}/admin`, adminRouter);
-  app.use(`${env.API_PREFIX}/admin/roles`, rolesRouter);
-  app.use(`${env.API_PREFIX}/reports`, reportsRouter);
+  app.use(`${env.API_PREFIX}/profile`, profileRouter);
+
+  // Orders / EMI / KYC / admin / careers need deferred collections.
+  app.use(`${env.API_PREFIX}/verification`, awaitDeferredHydration, verificationRouter);
+  app.use(`${env.API_PREFIX}/verification/pan`, awaitDeferredHydration, panVerificationRouter);
+  app.use(`${env.API_PREFIX}/verification/bank`, awaitDeferredHydration, bankVerificationRouter);
+  app.use(`${env.API_PREFIX}/audit-log`, awaitDeferredHydration, auditLogRouter);
+  app.use(`${env.API_PREFIX}/emi/applications`, awaitDeferredHydration, emiApplicationRouter);
+  app.use(`${env.API_PREFIX}/payments`, awaitDeferredHydration, paymentRouter);
+  app.use(`${env.API_PREFIX}/orders`, awaitDeferredHydration, orderRouter);
+  app.use(`${env.API_PREFIX}/loans`, awaitDeferredHydration, loanRouter);
+  app.use(`${env.API_PREFIX}/emi/payments`, awaitDeferredHydration, emiPaymentRouter);
+  app.use(`${env.API_PREFIX}/emi/payment-history`, awaitDeferredHydration, emiPaymentHistoryRouter);
+  app.use(`${env.API_PREFIX}/emi/statement`, awaitDeferredHydration, emiStatementRouter);
+  app.use(`${env.API_PREFIX}/autopay`, awaitDeferredHydration, autopayRouter);
+  app.use(`${env.API_PREFIX}/notifications`, awaitDeferredHydration, notificationRouter);
+  app.use(`${env.API_PREFIX}/checkout`, awaitDeferredHydration, checkoutRouter);
+  app.use(`${env.API_PREFIX}/jobs`, awaitDeferredHydration, jobsRouter);
+  app.use(`${env.API_PREFIX}/job-applications`, awaitDeferredHydration, jobApplicationsRouter);
+  app.use(`${env.API_PREFIX}/general-applications`, awaitDeferredHydration, generalApplicationsRouter);
+  app.use(`${env.API_PREFIX}/support`, awaitDeferredHydration, supportRouter);
+  app.use(`${env.API_PREFIX}/admin`, awaitDeferredHydration, adminRouter);
+  app.use(`${env.API_PREFIX}/admin/roles`, awaitDeferredHydration, rolesRouter);
+  app.use(`${env.API_PREFIX}/reports`, awaitDeferredHydration, reportsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

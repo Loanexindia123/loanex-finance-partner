@@ -637,21 +637,73 @@ const DEFAULT_INITIAL_DATA: LocalDatabaseSchema = {
 };
 
 /**
- * Collections hydrated on cold start from MongoDB (the single source of
- * truth). Fixed whitelist — OpenAPI enumeration pulls ~58 paths (including
- * casing duplicates) and sequential selects measured at ~19s locally.
+ * Dead / unused collection names previously listed for hydrate.
+ * Verified zero runtime consumers in backend/src (aliases or schema-only).
+ * Kept out of cold-start to avoid wasted Mongo round-trips.
  */
-const HYDRATE_COLLECTIONS = Array.from(
+const DEAD_HYDRATE_NAMES = new Set([
+  'support_tickets', // code uses `supportTicket`
+  'emiDetail', // unused; EMI detail lives in loan/emi_schedules paths
+  'bank_accounts', // unused
+  'order_items', // orders embed line items; no separate reads
+  'emi_details', // unused schema/map leftover
+  'experian_reports', // Experian payload stored on customer_kyc
+  'notifications', // code uses `notification`
+]);
+
+/**
+ * Admin master collections — not required for customer catalog/auth cold paths.
+ * Loaded on demand via ensureCollection() from admin master endpoints.
+ */
+export const ADMIN_LAZY_COLLECTIONS = [
+  'brands',
+  'sub_categories',
+  'dealers',
+  'suppliers',
+  'manufacturers',
+  'warehouses',
+  'branches',
+  'pincodes',
+  'wholesalers',
+  'delivery_partners',
+  'delivery_zones',
+] as const;
+
+const ADMIN_LAZY_SET = new Set<string>(ADMIN_LAZY_COLLECTIONS);
+
+/**
+ * Collections required before the process may serve catalog / auth / cart.
+ * `jsonDb.ready` resolves after this set is hydrated.
+ */
+const CRITICAL_HYDRATE_COLLECTIONS = [
+  'products',
+  'categories',
+  'banners',
+  'product_emi_plans',
+  'cart_items',
+  'wishlist_items',
+  'users',
+  'profiles',
+  'roles',
+  'otps',
+  'refresh_tokens',
+  'settings',
+  'addresses',
+] as const;
+
+/**
+ * Remaining non-admin collections — hydrated in the background after `ready`.
+ * Routes that need them await `jsonDb.deferredReady` (see middleware).
+ */
+const DEFERRED_HYDRATE_COLLECTIONS = Array.from(
   new Set([
     ...Object.keys(DEFAULT_INITIAL_DATA),
     'otps',
     'refresh_tokens',
     'audit_log',
     'supportTicket',
-    'support_tickets',
     'emi_applications',
     'emiApplication',
-    'emiDetail',
     'paymentTransaction',
     'orderTracking',
     'panVerification',
@@ -666,19 +718,20 @@ const HYDRATE_COLLECTIONS = Array.from(
     'mobileVerification',
     'autopayMandate',
     'fi_cases',
-    'bank_accounts',
-    'bankVerification',
-    'customerVerification',
-    'panVerification',
     'roles',
     'job_openings',
     'job_applications',
     'general_applications',
     'settings',
   ]),
+).filter(
+  (name) =>
+    !DEAD_HYDRATE_NAMES.has(name) &&
+    !ADMIN_LAZY_SET.has(name) &&
+    !(CRITICAL_HYDRATE_COLLECTIONS as readonly string[]).includes(name),
 );
 
-const HYDRATE_CONCURRENCY = 8;
+const HYDRATE_CONCURRENCY = 12;
 
 function cloneValue<T>(value: T): T {
   return value == null ? value : (JSON.parse(JSON.stringify(value)) as T);
@@ -689,28 +742,13 @@ function cloneRows<T>(rows: T[]): T[] {
   return JSON.parse(JSON.stringify(rows)) as T[];
 }
 
-/** Catalog collections re-fetched on a throttle so direct Supabase inserts
- * (e.g. a product added via the Supabase dashboard) show up without a restart. */
+/** Catalog collections re-fetched on a throttle so Atlas/dashboard inserts
+ * surface in product list/detail without a process restart.
+ * Kept to the minimum set product list/PDP actually reads from jsonDb. */
 const CATALOG_REFRESH_COLLECTIONS = [
   'products',
-  'product_emi_plans',
-  'roles',
-  // Users too — staff/customer accounts created or edited directly in the
-  // Supabase dashboard surface in the admin portal without a process restart.
-  'users',
   'categories',
-  'sub_categories',
-  'brands',
-  'dealers',
-  'suppliers',
-  'manufacturers',
-  'warehouses',
-  'branches',
-  'pincodes',
-  'wholesalers',
-  'delivery_partners',
-  'delivery_zones',
-  'banners',
+  'product_emi_plans',
 ];
 const CATALOG_REFRESH_TTL_MS = 15_000;
 
@@ -718,14 +756,29 @@ class LocalDatabaseEngine {
   private data: LocalDatabaseSchema;
   private readonly warned = new Set<string>();
   private readonly lastRefreshAt = new Map<string, number>();
+  /** Collections successfully loaded from Mongo (boot or ensureCollection). */
+  private readonly mongoLoaded = new Set<string>();
+  private readonly ensureInflight = new Map<string, Promise<void>>();
+  /** Resolves when critical (catalog/auth/cart) collections are hydrated. */
   public readonly ready: Promise<void>;
-  /** Last cold-start hydrate duration in ms (0 if not yet measured). */
+  /** Resolves when deferred (orders/EMI/KYC/…) collections are hydrated. */
+  public readonly deferredReady: Promise<void>;
+  /** Last critical hydrate duration in ms (0 if not yet measured). */
   public lastHydrateMs = 0;
+  /** Last deferred hydrate duration in ms (0 if not yet measured). */
+  public lastDeferredHydrateMs = 0;
+  /** Number of collections targeted on the last critical hydrate. */
+  public lastHydrateTargetCount = 0;
+  /** Collections actually loaded from Mongo on the last critical hydrate. */
+  public lastHydrateLoadedCount = 0;
 
   constructor() {
     this.data = this.loadData();
-    // MongoDB is the single source of truth — hydrate every collection at boot.
-    this.ready = this.hydrateFromMongo();
+    // Critical first so catalog APIs can serve; deferred continues in background.
+    this.ready = this.hydrateFromMongo(CRITICAL_HYDRATE_COLLECTIONS as unknown as string[], 'critical');
+    this.deferredReady = this.ready.then(() =>
+      this.hydrateFromMongo(DEFERRED_HYDRATE_COLLECTIONS, 'deferred'),
+    );
   }
 
   private normalizeHydratedRow(name: string, row: Record<string, any>): Record<string, any> {
@@ -763,24 +816,41 @@ class LocalDatabaseEngine {
     return;
   }
 
+  private existingMongoNames: Set<string> | null = null;
+
+  private async getExistingMongoNames(): Promise<Set<string>> {
+    if (this.existingMongoNames) return this.existingMongoNames;
+    const db = await getMongoDb();
+    this.existingMongoNames = new Set(
+      (await db.listCollections({}, { nameOnly: true }).toArray()).map((c) => c.name),
+    );
+    return this.existingMongoNames;
+  }
+
   /**
-   * Replace local collections from MongoDB (Atlas) at boot.
+   * Replace local collections from MongoDB (Atlas).
    * Collections that do not exist in Mongo keep their local/bootstrap data.
    */
-  private async hydrateFromMongo(): Promise<void> {
+  private async hydrateFromMongo(
+    names: string[],
+    phase: 'critical' | 'deferred',
+  ): Promise<void> {
     const started = Date.now();
-    const names = HYDRATE_COLLECTIONS;
+    if (phase === 'critical') {
+      this.lastHydrateTargetCount = names.length;
+    }
     let loaded = 0;
     let skipped = 0;
     let failed = 0;
     let rows = 0;
+    const successfullyHydrated = new Set<string>();
 
     try {
       const db = await getMongoDb();
+      const existingNames = await this.getExistingMongoNames();
       const hydrateOne = async (name: string): Promise<void> => {
         try {
-          const exists = await db.listCollections({ name }, { nameOnly: true }).hasNext();
-          if (!exists) {
+          if (!existingNames.has(name)) {
             skipped += 1;
             return;
           }
@@ -792,6 +862,8 @@ class LocalDatabaseEngine {
           (this.data as any)[name] = normalized;
           loaded += 1;
           rows += normalized.length;
+          successfullyHydrated.add(name);
+          this.mongoLoaded.add(name);
         } catch (e) {
           failed += 1;
           console.error(`[MongoDB] hydrate "${name}" failed:`, e);
@@ -803,21 +875,64 @@ class LocalDatabaseEngine {
         await Promise.all(batch.map((name) => hydrateOne(name)));
       }
     } catch (e) {
-      console.error('[MongoDB] hydrate boot failed:', e);
+      console.error(`[MongoDB] hydrate ${phase} failed:`, e);
       throw e;
     }
 
-    this.lastHydrateMs = Date.now() - started;
-    console.info(
-      `[MongoDB] hydrated ${loaded}/${names.length} collections in ${this.lastHydrateMs}ms ` +
-        `(rows=${rows}, skipped=${skipped}, failed=${failed}, concurrency=${HYDRATE_CONCURRENCY})`,
-    );
+    const elapsed = Date.now() - started;
+    if (phase === 'critical') {
+      this.lastHydrateMs = elapsed;
+      this.lastHydrateLoadedCount = loaded;
+      // Boot already loaded catalog collections — avoid an immediate full re-fetch
+      // on the first GET /products. TTL still applies from this timestamp.
+      const seededAt = Date.now();
+      let catalogSeeded = 0;
+      for (const name of CATALOG_REFRESH_COLLECTIONS) {
+        if (successfullyHydrated.has(name)) {
+          this.lastRefreshAt.set(name, seededAt);
+          catalogSeeded += 1;
+        }
+      }
+      console.info(
+        `[MongoDB] critical hydrated ${loaded}/${names.length} collections in ${elapsed}ms ` +
+          `(rows=${rows}, skipped=${skipped}, failed=${failed}, concurrency=${HYDRATE_CONCURRENCY}, ` +
+          `catalogRefreshSeeded=${catalogSeeded}/${CATALOG_REFRESH_COLLECTIONS.length}, ` +
+          `deferredPending=${DEFERRED_HYDRATE_COLLECTIONS.length}, adminLazy=${ADMIN_LAZY_COLLECTIONS.length}, ` +
+          `deadExcluded=${DEAD_HYDRATE_NAMES.size})`,
+      );
+    } else {
+      this.lastDeferredHydrateMs = elapsed;
+      console.info(
+        `[MongoDB] deferred hydrated ${loaded}/${names.length} collections in ${elapsed}ms ` +
+          `(rows=${rows}, skipped=${skipped}, failed=${failed}, concurrency=${HYDRATE_CONCURRENCY})`,
+      );
+    }
+  }
+
+  /**
+   * Ensure a collection has been loaded from Mongo at least once in this process.
+   * Used for admin-lazy masters and any deferred collection. Concurrent callers
+   * share a single in-flight refresh.
+   */
+  public async ensureCollection(name: string): Promise<void> {
+    if (this.mongoLoaded.has(name)) return;
+    const inflight = this.ensureInflight.get(name);
+    if (inflight) {
+      await inflight;
+      return;
+    }
+    const work = (async () => {
+      await this.refreshCollection(name);
+    })().finally(() => {
+      this.ensureInflight.delete(name);
+    });
+    this.ensureInflight.set(name, work);
+    await work;
   }
 
   /**
    * Re-fetch catalog collections from MongoDB on a throttle so records added
-   * directly in Atlas (products, categories, banners, …) surface in the API
-   * without a process restart.
+   * directly in Atlas surface in the API without a process restart.
    */
   public async refreshCatalogThrottled(): Promise<void> {
     const now = Date.now();
@@ -834,6 +949,7 @@ class LocalDatabaseEngine {
             const data = await db.collection(name).find({}).limit(10000).toArray();
             (this.data as any)[name] = data.map((row) => this.stripMongoId(row as any));
             this.lastRefreshAt.set(name, now);
+            this.mongoLoaded.add(name);
           } catch (e) {
             console.error(`[MongoDB] catalog refresh "${name}" failed:`, e);
           }
@@ -943,6 +1059,7 @@ class LocalDatabaseEngine {
         return this.normalizeHydratedRow(name, clean);
       });
       (this.data as any)[name] = normalized;
+      this.mongoLoaded.add(name);
     } catch (e) {
       this.logMirrorError(name, 'refresh', String(e));
     }

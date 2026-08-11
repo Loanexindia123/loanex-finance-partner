@@ -8,11 +8,10 @@ import { Colors, Fonts, Spacing, Radius, Shadow } from '../../constants/theme';
 import { ProductCard } from '../../components/feature/ProductCard';
 import { useAuth } from '../../hooks/useAuth';
 import { getCategories } from '../../services/categoryService';
-import { getFeaturedProducts, getDeals, getTrendingProducts, getRecommendedProducts, getNewArrivals } from '../../services/productService';
+import { getProducts } from '../../services/productService';
 import { getBanners } from '../../services/bannerService';
-import { Banner as BannerType } from '../../types';
 import { getUnreadCount } from '../../services/notificationService';
-import { Category, Product } from '../../types';
+import { Banner as BannerType, Category, Product } from '../../types';
 
 const W = Dimensions.get('window').width;
 
@@ -43,22 +42,19 @@ export default function HomeScreen() {
   }, [user]));
 
   useEffect(() => {
+    // One GET /products for all home sections (aliases previously each re-fetched the same list).
     Promise.all([
       getCategories().catch(() => [] as Category[]),
-      getFeaturedProducts().catch(() => [] as Product[]),
-      getDeals().catch(() => [] as Product[]),
+      getProducts().catch(() => [] as Product[]),
       getBanners().catch(() => [] as BannerType[]),
-      getTrendingProducts().catch(() => [] as Product[]),
-      getRecommendedProducts().catch(() => [] as Product[]),
-      getNewArrivals().catch(() => [] as Product[]),
-    ]).then(([cats, feat, d, b, trend, rec, newArr]) => {
+    ]).then(([cats, products, b]) => {
       setCategories(cats);
-      setFeatured(feat);
-      setDeals(d.slice(0, 3));
+      setFeatured(products);
+      setDeals(products.slice(0, 3));
       setBanners(b.length ? b : FALLBACK_BANNERS);
-      setTrending(trend);
-      setRecommended(rec);
-      setNewArrivals(newArr);
+      setTrending(products);
+      setRecommended(products);
+      setNewArrivals(products);
     }).finally(() => setLoading(false));
   }, []);
 

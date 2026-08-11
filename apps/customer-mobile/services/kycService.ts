@@ -1,31 +1,50 @@
 import { CustomerKYC } from '../types';
 import { api } from '../lib/apiClient';
 
+/** In-flight single-flight for GET /verification/status — keyed by userId. No TTL cache. */
+const kycInFlight = new Map<string, Promise<CustomerKYC | null>>();
+
 /**
  * Fetch the customer's KYC row from the real backend aggregate
  * (GET /verification/status). Returns the raw customer_kyc record with
  * completion derived from the server-side verification flags, so the UI's
  * "KYC verified" state matches what the website shows.
+ *
+ * Concurrent callers for the same userId share one HTTP request; different
+ * userIds never share. After settle, the in-flight entry is cleared so the
+ * next call issues a fresh network request.
  */
 export async function getKYC(userId: string): Promise<CustomerKYC | null> {
-  try {
-    const res = await api.get('/verification/status');
-    const status = res.data ?? {};
-    const kyc: any = status.kyc ?? null;
-    if (!kyc) return null;
-    const completed =
-      kyc.kycCompleted === true ||
-      status.kycCompleted === true ||
-      status.verificationStatus === 'COMPLETED';
-    return {
-      ...kyc,
-      userId,
-      kycCompleted: completed,
-      kycCompletedAt: kyc.kycCompletedAt ?? (completed ? kyc.updatedAt ?? null : null),
-    };
-  } catch {
-    return null;
-  }
+  if (!userId) return null;
+
+  const existing = kycInFlight.get(userId);
+  if (existing) return existing;
+
+  const request = (async (): Promise<CustomerKYC | null> => {
+    try {
+      const res = await api.get('/verification/status');
+      const status = res.data ?? {};
+      const kyc: any = status.kyc ?? null;
+      if (!kyc) return null;
+      const completed =
+        kyc.kycCompleted === true ||
+        status.kycCompleted === true ||
+        status.verificationStatus === 'COMPLETED';
+      return {
+        ...kyc,
+        userId,
+        kycCompleted: completed,
+        kycCompletedAt: kyc.kycCompletedAt ?? (completed ? kyc.updatedAt ?? null : null),
+      };
+    } catch {
+      return null;
+    } finally {
+      kycInFlight.delete(userId);
+    }
+  })();
+
+  kycInFlight.set(userId, request);
+  return request;
 }
 
 /**

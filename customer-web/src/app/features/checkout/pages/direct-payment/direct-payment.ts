@@ -171,6 +171,8 @@ export class DirectPaymentComponent implements OnInit {
     this.checkoutApi.verifyPayment(this.sessionId, payload).subscribe({
       next: (result) => {
         this.processing.set(false);
+        // Payment landed — cart may be cleared server-side; drop in-memory reuse.
+        this.cartService.invalidate();
         // Payment landed — no unfinished checkout left to resume.
         this.pendingCheckout.clear();
         this.goToOrder(result, payload.razorpayPaymentId);

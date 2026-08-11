@@ -14,22 +14,33 @@ export interface FilterOptions {
   sort?: SortOption;
 }
 
+/** Coalesce concurrent getProducts() callers onto one in-flight request. */
+let productsInFlight: Promise<Product[]> | null = null;
+
 export async function getProducts(): Promise<Product[]> {
-  try {
-    const res = await api.get('/products');
-    const items = res.data?.items || res.data || [];
-    return items.map((p: any) => ({
-      ...p,
-      image: p.image || p.imageUrl || p.thumbnail || (p.images && p.images[0]) || '',
-      originalPrice: p.originalPrice || p.mrp || p.price,
-      price: p.discountPrice || p.price,
-      reviews: p.reviewCount || p.totalReviews || p.reviews || 0,
-      rating: p.averageRating || p.rating || 0,
-    }));
-  } catch (err: any) {
-    console.error('Error fetching products:', err.message);
-    return [];
-  }
+  if (productsInFlight) return productsInFlight;
+
+  productsInFlight = (async () => {
+    try {
+      const res = await api.get('/products');
+      const items = res.data?.items || res.data || [];
+      return items.map((p: any) => ({
+        ...p,
+        image: p.image || p.imageUrl || p.thumbnail || (p.images && p.images[0]) || '',
+        originalPrice: p.originalPrice || p.mrp || p.price,
+        price: p.discountPrice || p.price,
+        reviews: p.reviewCount || p.totalReviews || p.reviews || 0,
+        rating: p.averageRating || p.rating || 0,
+      }));
+    } catch (err: any) {
+      console.error('Error fetching products:', err.message);
+      return [];
+    } finally {
+      productsInFlight = null;
+    }
+  })();
+
+  return productsInFlight;
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
@@ -55,12 +66,13 @@ export async function getProductById(id: string): Promise<Product | null> {
   }
 }
 
-export async function filterAndSortProducts(opts: FilterOptions): Promise<Product[]> {
-  let products = await getProducts();
+/** Pure client-side filter/sort — same rules as before, no network. */
+export function applyProductFilters(products: Product[], opts: FilterOptions): Product[] {
+  let rows = products.slice();
 
   if (opts.query?.trim()) {
     const q = opts.query.toLowerCase().trim();
-    products = products.filter(p =>
+    rows = rows.filter(p =>
       p.name.toLowerCase().includes(q) ||
       (p.brand && p.brand.toLowerCase().includes(q)) ||
       (p.category && p.category.toLowerCase().includes(q)) ||
@@ -70,7 +82,7 @@ export async function filterAndSortProducts(opts: FilterOptions): Promise<Produc
 
   if (opts.categoryIds?.length) {
     const cats = opts.categoryIds.map(c => c.toLowerCase());
-    products = products.filter(p =>
+    rows = rows.filter(p =>
       cats.includes((p.categoryId || '').toLowerCase()) ||
       cats.includes((p.category || '').toLowerCase()) ||
       cats.includes((p.slug || '').toLowerCase()) ||
@@ -80,52 +92,55 @@ export async function filterAndSortProducts(opts: FilterOptions): Promise<Produc
 
   if (opts.brands?.length) {
     const brands = opts.brands.map(b => b.toLowerCase());
-    products = products.filter(p =>
+    rows = rows.filter(p =>
       brands.includes((p.brand || '').toLowerCase()) ||
       brands.includes((p.brandId || '').toLowerCase())
     );
   }
 
   if (opts.minPrice !== undefined) {
-    products = products.filter(p => p.price >= opts.minPrice!);
+    rows = rows.filter(p => p.price >= opts.minPrice!);
   }
   if (opts.maxPrice !== undefined) {
-    products = products.filter(p => p.price <= opts.maxPrice!);
+    rows = rows.filter(p => p.price <= opts.maxPrice!);
   }
 
   if (opts.emiOnly) {
-    products = products.filter(p => p.emiAvailable);
+    rows = rows.filter(p => p.emiAvailable);
   }
 
   if (opts.minRating !== undefined) {
-    products = products.filter(p => p.rating >= opts.minRating!);
+    rows = rows.filter(p => p.rating >= opts.minRating!);
   }
 
   if (opts.sort) {
     switch (opts.sort) {
       case 'price_asc':
-        products.sort((a, b) => a.price - b.price);
+        rows.sort((a, b) => a.price - b.price);
         break;
       case 'price_desc':
-        products.sort((a, b) => b.price - a.price);
+        rows.sort((a, b) => b.price - a.price);
         break;
       case 'rating':
-        products.sort((a, b) => b.rating - a.rating);
+        rows.sort((a, b) => b.rating - a.rating);
         break;
       case 'newest':
-        products.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        rows.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         break;
       case 'discount':
-        products.sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
+        rows.sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
         break;
     }
   }
 
-  return products;
+  return rows;
 }
 
-export async function getAllBrands(): Promise<string[]> {
-  const products = await getProducts();
+export async function filterAndSortProducts(opts: FilterOptions): Promise<Product[]> {
+  return applyProductFilters(await getProducts(), opts);
+}
+
+export function brandsFromProducts(products: Product[]): string[] {
   const brands = new Set<string>();
   for (const p of products) {
     if (p.brand) brands.add(p.brand);
@@ -133,14 +148,21 @@ export async function getAllBrands(): Promise<string[]> {
   return Array.from(brands).sort();
 }
 
-export async function getPriceRange(): Promise<{ min: number; max: number }> {
-  const products = await getProducts();
+export function priceRangeFromProducts(products: Product[]): { min: number; max: number } {
   if (products.length === 0) return { min: 0, max: 100000 };
   const prices = products.map(p => p.price);
   return {
     min: Math.min(...prices),
     max: Math.max(...prices),
   };
+}
+
+export async function getAllBrands(): Promise<string[]> {
+  return brandsFromProducts(await getProducts());
+}
+
+export async function getPriceRange(): Promise<{ min: number; max: number }> {
+  return priceRangeFromProducts(await getProducts());
 }
 
 export async function searchProducts(query: string): Promise<Product[]> {

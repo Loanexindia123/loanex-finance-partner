@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, catchError, map, tap, throwError } from 'rxjs';
+import { Observable, catchError, map, of, tap, throwError } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ApiSuccess } from '../../../core/models/auth.models';
 import { LayoutUiService } from '../../../layout/services/layout-ui.service';
@@ -49,12 +49,27 @@ export class WishlistService {
   private readonly loadingSignal = signal(false);
   private readonly errorSignal = signal<string | null>(null);
   private readonly wishlistSignal = signal<WishlistResponse | null>(null);
+  /** True after a successful GET/mutation response — enables Shell→Wishlist reuse. */
+  private loaded = false;
 
   readonly loading = this.loadingSignal.asReadonly();
   readonly error = this.errorSignal.asReadonly();
   readonly wishlist = this.wishlistSignal.asReadonly();
 
-  getWishlist(): Observable<WishlistResponse> {
+  /** Whether a full wishlist payload is available for in-memory reuse. */
+  hasLoaded(): boolean {
+    return this.loaded && this.wishlistSignal() !== null;
+  }
+
+  /**
+   * Load wishlist. Reuses the in-memory payload when Shell (or a prior call)
+   * already loaded it. Pass `{ force: true }` for an explicit network refresh.
+   */
+  getWishlist(options?: { force?: boolean }): Observable<WishlistResponse> {
+    if (!options?.force && this.hasLoaded()) {
+      return of(this.wishlistSignal()!);
+    }
+
     return this.wrap(this.http.get<ApiSuccess<WishlistResponse>>(this.baseUrl)).pipe(
       tap((data) => this.applyWishlist(data)),
     );
@@ -96,12 +111,18 @@ export class WishlistService {
     );
   }
 
+  /** Mark in-memory wishlist stale so the next getWishlist() hits the network. */
+  invalidate(): void {
+    this.loaded = false;
+  }
+
   clearError(): void {
     this.errorSignal.set(null);
   }
 
   private applyWishlist(data: WishlistResponse): void {
     this.wishlistSignal.set(data);
+    this.loaded = true;
     this.layoutUi.wishlistCount.set(data.totalItems);
   }
 

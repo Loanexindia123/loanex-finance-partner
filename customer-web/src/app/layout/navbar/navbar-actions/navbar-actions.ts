@@ -11,6 +11,9 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { AuthUser } from '../../../core/models/auth.models';
 import { AuthService } from '../../../core/services/auth.service';
+import { CartService } from '../../../features/cart/services/cart.service';
+import { ProfileService } from '../../../features/checkout/services/profile.service';
+import { WishlistService } from '../../../features/wishlist/services/wishlist.service';
 
 @Component({
   selector: 'app-navbar-actions',
@@ -23,6 +26,9 @@ export class NavbarActions {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly cartApi = inject(CartService);
+  private readonly wishlistApi = inject(WishlistService);
+  private readonly profileApi = inject(ProfileService);
 
   readonly wishlistCount = input(0);
   readonly cartCount = input(0);
@@ -51,8 +57,18 @@ export class NavbarActions {
   logout(): void {
     this.closeMenu();
     this.auth.logout().subscribe({
-      next: () => void this.router.navigateByUrl('/auth/login'),
-      error: () => void this.router.navigateByUrl('/auth/login'),
+      next: () => {
+        this.cartApi.invalidate();
+        this.wishlistApi.invalidate();
+        this.profileApi.invalidate();
+        void this.router.navigateByUrl('/auth/login');
+      },
+      error: () => {
+        this.cartApi.invalidate();
+        this.wishlistApi.invalidate();
+        this.profileApi.invalidate();
+        void this.router.navigateByUrl('/auth/login');
+      },
     });
   }
 

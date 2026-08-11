@@ -48,6 +48,7 @@ export async function runEmiReminderPass(asOf: Date = new Date()): Promise<{
   dueTomorrow: number;
   overdue: number;
 }> {
+  await jsonDb.deferredReady;
   const today = startOfDay(asOf);
   const tomorrow = addDays(today, 1);
   const dayAfter = addDays(today, 2);

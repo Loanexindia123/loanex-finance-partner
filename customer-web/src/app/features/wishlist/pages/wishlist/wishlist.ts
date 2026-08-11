@@ -71,7 +71,9 @@ export class WishlistComponent implements OnInit {
         this.acting.set(false);
         this.wishlist.set(data);
         this.info.set('Item moved to cart.');
-        this.cartApi.getCart().subscribe({ error: () => undefined });
+        // Server mutated cart outside CartService — force a fresh GET.
+        this.cartApi.invalidate();
+        this.cartApi.getCart({ force: true }).subscribe({ error: () => undefined });
       },
       error: () => {
         this.acting.set(false);

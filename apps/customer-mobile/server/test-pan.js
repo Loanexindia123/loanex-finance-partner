@@ -1,8 +1,8 @@
 require('dotenv').config();
 
-const API_ID = 'APID2523';
-const API_KEY = '7eda7351-a536-46d8-aac5-86fb72ffe341';
-const TOKEN_ID = 'wL86mDhe3DScB97V2969GoBk6G1sTY3h';
+const API_ID = process.env.IDSPAY_API_ID;
+const API_KEY = process.env.IDSPAY_API_KEY;
+const TOKEN_ID = process.env.IDSPAY_TOKEN_ID;
 const PROD_URL = 'https://javabackend.idspay.in/api/v1/prod/pan/verification';
 
 async function testPanVerification(pan) {

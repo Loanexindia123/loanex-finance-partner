@@ -14,7 +14,7 @@
       },
       "package": "com.tousifkhansteam.lloanex"
     },
-    "owner": "strever",
+    "owner": "tousif_khan",
     "plugins": [
       [
         "expo-build-properties",
@@ -27,7 +27,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "8dd6d885-0cb7-4feb-87e6-b690eb6731db"
+        "projectId": "ba9658a2-de86-42e0-9e1a-e49abf4c18b6"
       }
     }
   }

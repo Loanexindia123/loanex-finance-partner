@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, catchError, map, of, tap } from 'rxjs';
+import { Observable, catchError, map, of, shareReplay, tap } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ApiSuccess } from '../../../core/models/auth.models';
 
@@ -19,6 +19,9 @@ export interface StoreBanner {
   createdAt?: string;
 }
 
+/** Soft-navigation TTL for Home banners (in-memory only). */
+const HOME_BANNERS_TTL_MS = 45_000;
+
 @Injectable({ providedIn: 'root' })
 export class BannersApiService {
   private readonly http = inject(HttpClient);
@@ -30,16 +33,25 @@ export class BannersApiService {
   /** True after the primary Home Hero `list()` finishes (success or error). */
   private readonly loadedSignal = signal(false);
 
+  private list$: Observable<StoreBanner[]> | null = null;
+  private listExpiresAt = 0;
+
   readonly loading = this.loadingSignal.asReadonly();
   readonly error = this.errorSignal.asReadonly();
   readonly banners = this.bannersSignal.asReadonly();
   readonly loaded = this.loadedSignal.asReadonly();
 
   list(): Observable<StoreBanner[]> {
+    const now = Date.now();
+    if (this.list$ && now < this.listExpiresAt) {
+      return this.list$;
+    }
+
     this.loadingSignal.set(true);
     this.errorSignal.set(null);
+    this.listExpiresAt = now + HOME_BANNERS_TTL_MS;
 
-    return this.http.get<ApiSuccess<StoreBanner[]>>(this.baseUrl).pipe(
+    this.list$ = this.http.get<ApiSuccess<StoreBanner[]>>(this.baseUrl).pipe(
       map((res) =>
         (res.data ?? [])
           .filter(
@@ -61,9 +73,20 @@ export class BannersApiService {
         this.errorSignal.set('Unable to load banners.');
         this.bannersSignal.set([]);
         this.loadedSignal.set(true);
+        this.list$ = null;
+        this.listExpiresAt = 0;
         return of([]);
       }),
+      shareReplay({ bufferSize: 1, refCount: false }),
     );
+
+    return this.list$;
+  }
+
+  /** Drop cached banners so the next `list()` hits the network. */
+  invalidate(): void {
+    this.list$ = null;
+    this.listExpiresAt = 0;
   }
 
   byPlacement(placement: BannerPlacement): Observable<StoreBanner[]> {
