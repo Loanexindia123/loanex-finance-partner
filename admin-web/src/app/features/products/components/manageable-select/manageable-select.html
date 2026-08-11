@@ -1,0 +1,115 @@
+<div class="manageable" [class.manageable--disabled]="disabled()">
+  @if (label()) {
+    <label>{{ label() }}</label>
+  }
+  <div class="manageable__row">
+    <p-select
+      [options]="selectOptions()"
+      [ngModel]="value()"
+      (ngModelChange)="onSelect($event)"
+      optionLabel="label"
+      optionValue="value"
+      [placeholder]="placeholder()"
+      [disabled]="disabled()"
+      [showClear]="true"
+      [filter]="true"
+      filterBy="label"
+      appendTo="body"
+      panelStyleClass="catalog-filter-panel"
+      [checkmark]="false"
+      scrollHeight="240px"
+    />
+    <button
+      pButton
+      type="button"
+      size="small"
+      [rounded]="true"
+      icon="pi pi-plus"
+      [disabled]="disabled()"
+      [pTooltip]="'Add new ' + entityName()"
+      [tooltipOptions]="actionTooltip"
+      (click)="openAdd()"
+    ></button>
+    <button
+      pButton
+      type="button"
+      size="small"
+      [rounded]="true"
+      severity="secondary"
+      icon="pi pi-cog"
+      [disabled]="disabled()"
+      [pTooltip]="'Manage ' + plural()"
+      [tooltipOptions]="actionTooltip"
+      (click)="openManage()"
+    ></button>
+  </div>
+  @if (hint()) {
+    <small class="field-hint">{{ hint() }}</small>
+  }
+  @if (note()) {
+    <small class="field-hint">{{ note() }}</small>
+  }
+</div>
+
+<p-dialog
+  [header]="'Add New ' + entityName()"
+  [visible]="addOpen()"
+  (visibleChange)="addOpen.set($event)"
+  [modal]="true"
+  [draggable]="false"
+  appendTo="body"
+  styleClass="admin-dialog"
+  [style]="{ width: 'min(440px, calc(100vw - 2rem))' }"
+>
+  <div class="field">
+    <label>{{ entityName() }} name</label>
+    <input pInputText [ngModel]="draft()" (ngModelChange)="draft.set($event)" [placeholder]="'Enter ' + entityName().toLowerCase() + ' name'" />
+  </div>
+  <ng-template pTemplate="footer">
+    <button pButton type="button" [rounded]="true" severity="secondary" [outlined]="true" label="Cancel" (click)="addOpen.set(false)"></button>
+    <button pButton type="button" [rounded]="true" label="Add" icon="pi pi-plus" (click)="submitAdd()"></button>
+  </ng-template>
+</p-dialog>
+
+<p-dialog
+  [header]="'Manage ' + plural()"
+  [visible]="manageOpen()"
+  (visibleChange)="manageOpen.set($event)"
+  [modal]="true"
+  [draggable]="false"
+  appendTo="body"
+  styleClass="admin-dialog"
+  [style]="{ width: 'min(560px, calc(100vw - 2rem))' }"
+>
+  @if (options().length === 0) {
+    <p class="muted">No {{ plural().toLowerCase() }} yet. Add one to get started.</p>
+  }
+  <ul class="manage-list">
+    @for (name of options(); track name) {
+      <li>
+        @if (renameFrom() === name) {
+          <input pInputText [ngModel]="renameTo()" (ngModelChange)="renameTo.set($event)" />
+          <button pButton type="button" [rounded]="true" size="small" label="Save" (click)="submitRename()"></button>
+          <button pButton type="button" [rounded]="true" size="small" [text]="true" label="Cancel" (click)="renameFrom.set('')"></button>
+        } @else {
+          <span>{{ name }}</span>
+          <button pButton type="button" [rounded]="true" size="small" [text]="true" icon="pi pi-pencil" (click)="startRename(name)"></button>
+          <button pButton type="button" [rounded]="true" size="small" [text]="true" severity="danger" icon="pi pi-trash" (click)="deleteItem(name)"></button>
+        }
+      </li>
+    }
+  </ul>
+  <ng-template pTemplate="footer">
+    <button
+      pButton
+      type="button"
+      [rounded]="true"
+      severity="secondary"
+      [outlined]="true"
+      icon="pi pi-plus"
+      [label]="'Add ' + entityName()"
+      (click)="manageOpen.set(false); openAdd()"
+    ></button>
+    <button pButton type="button" [rounded]="true" label="Done" (click)="manageOpen.set(false)"></button>
+  </ng-template>
+</p-dialog>

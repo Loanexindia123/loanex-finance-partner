@@ -1,9 +1,11 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 
 import { createRateLimiter } from '../../../common/middleware/rate-limiter';
 import { authenticate } from '../../../common/middleware/authenticate';
 import { optionalAuthenticate } from '../../../common/middleware/optional-authenticate';
 import { requirePermission } from '../../../common/middleware/require-permission';
+import { BadRequestError } from '../../../common/errors/app-error';
 
 import { validateRequest } from '../../../common/middleware/validate';
 
@@ -12,13 +14,35 @@ import { asyncHandler } from '../../../common/utils/async-handler';
 import { env } from '../../../config/env';
 
 import { productController } from '../controller/product.controller';
+import { PRODUCT_IMAGE_MAX_BYTES } from '../service/product-image.service';
 
 import {
   listProductsQuerySchema,
   productIdParamSchema,
+  productImageIdParamSchema,
   productSlugParamSchema,
   createProductBodySchema,
 } from '../validator/product.validator';
+
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: PRODUCT_IMAGE_MAX_BYTES },
+});
+
+function handleImageMulterError(err: unknown, _req: Request, _res: Response, next: NextFunction) {
+  if (!err) return next();
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return next(new BadRequestError('Image must be 5MB or smaller.'));
+    }
+    return next(new BadRequestError(`Image upload failed: ${err.message}`));
+  }
+  return next(err);
+}
+
+function uploadProductImage(req: Request, res: Response, next: NextFunction) {
+  imageUpload.single('image')(req, res, (err: unknown) => handleImageMulterError(err, req, res, next));
+}
 
 
 
@@ -59,6 +83,19 @@ productRouter.post(
   requirePermission('products.create'),
   validateRequest(createProductBodySchema, 'body'),
   asyncHandler(productController.create),
+);
+
+productRouter.post(
+  '/images',
+  authenticate,
+  uploadProductImage,
+  asyncHandler(productController.uploadImage),
+);
+
+productRouter.get(
+  '/images/:imageId',
+  validateRequest(productImageIdParamSchema, 'params'),
+  asyncHandler(productController.streamImage),
 );
 
 productRouter.get(

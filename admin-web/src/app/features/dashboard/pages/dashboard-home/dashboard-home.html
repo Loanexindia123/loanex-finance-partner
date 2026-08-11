@@ -1,0 +1,376 @@
+<header class="dash-header">
+  <div>
+    <h1>Dashboard</h1>
+    <p>Overview of your LoanEx operations and business activity.</p>
+  </div>
+  <div class="dash-header__meta">
+    <time class="dash-header__date" [attr.datetime]="today.toISOString()">
+      {{ today | date: 'EEEE, d MMMM y' }}
+    </time>
+    <button
+      type="button"
+      class="dash-refresh"
+      pButton
+      icon="pi pi-refresh"
+      [rounded]="true"
+      [text]="true"
+      [loading]="refreshing()"
+      aria-label="Refresh dashboard"
+      (click)="load()"
+    ></button>
+  </div>
+</header>
+
+@if (initialLoading()) {
+  <app-branded-loader message="Loading Dashboard..." />
+} @else {
+<section class="kpi-grid" aria-label="Key metrics">
+  <article class="kpi-card">
+    <div class="kpi-card__top">
+      <span class="kpi-card__label">Products</span>
+      <span class="kpi-card__icon kpi-card__icon--navy" aria-hidden="true">
+        <i class="pi pi-box"></i>
+      </span>
+    </div>
+    @if (products().loading && !products().data) {
+      <p-skeleton width="46%" height="2rem" styleClass="kpi-skel" />
+      <p-skeleton width="58%" height="0.75rem" />
+    } @else if (products().error) {
+      <p class="kpi-card__error">Unable to load</p>
+    } @else if (products().data; as data) {
+      <strong class="kpi-card__value">{{ data.total | number }}</strong>
+      <span class="kpi-card__hint">Total products</span>
+    }
+  </article>
+
+  <article class="kpi-card">
+    <div class="kpi-card__top">
+      <span class="kpi-card__label">Customers</span>
+      <span class="kpi-card__icon kpi-card__icon--blue" aria-hidden="true">
+        <i class="pi pi-users"></i>
+      </span>
+    </div>
+    @if (customers().loading && !customers().data) {
+      <p-skeleton width="46%" height="2rem" styleClass="kpi-skel" />
+      <p-skeleton width="58%" height="0.75rem" />
+    } @else if (customers().error) {
+      <p class="kpi-card__error">Unable to load</p>
+    } @else if (customers().data; as data) {
+      <strong class="kpi-card__value">{{ data.total | number }}</strong>
+      <span class="kpi-card__hint">Registered customers</span>
+    }
+  </article>
+
+  <article class="kpi-card">
+    <div class="kpi-card__top">
+      <span class="kpi-card__label">Orders</span>
+      <span class="kpi-card__icon kpi-card__icon--gold" aria-hidden="true">
+        <i class="pi pi-shopping-cart"></i>
+      </span>
+    </div>
+    @if (orders().loading && !orders().data) {
+      <p-skeleton width="46%" height="2rem" styleClass="kpi-skel" />
+      <p-skeleton width="58%" height="0.75rem" />
+    } @else if (orders().error) {
+      <p class="kpi-card__error">Unable to load</p>
+    } @else if (orders().data; as data) {
+      <strong class="kpi-card__value">{{ data.total | number }}</strong>
+      <span class="kpi-card__hint">Total orders</span>
+    }
+  </article>
+
+  <article class="kpi-card">
+    <div class="kpi-card__top">
+      <span class="kpi-card__label">EMI applications</span>
+      <span class="kpi-card__icon kpi-card__icon--navy" aria-hidden="true">
+        <i class="pi pi-credit-card"></i>
+      </span>
+    </div>
+    @if (emi().loading && !emi().data) {
+      <p-skeleton width="46%" height="2rem" styleClass="kpi-skel" />
+      <p-skeleton width="58%" height="0.75rem" />
+    } @else if (emi().error) {
+      <p class="kpi-card__error">Unable to load</p>
+    } @else if (emi().data; as data) {
+      <strong class="kpi-card__value">{{ data.total | number }}</strong>
+      <span class="kpi-card__hint">{{ data.pending | number }} pending review</span>
+    }
+  </article>
+
+  <article class="kpi-card">
+    <div class="kpi-card__top">
+      <span class="kpi-card__label">Loans</span>
+      <span class="kpi-card__icon kpi-card__icon--blue" aria-hidden="true">
+        <i class="pi pi-wallet"></i>
+      </span>
+    </div>
+    @if (loans().loading && !loans().data) {
+      <p-skeleton width="46%" height="2rem" styleClass="kpi-skel" />
+      <p-skeleton width="58%" height="0.75rem" />
+    } @else if (loans().error) {
+      <p class="kpi-card__error">Unable to load</p>
+    } @else if (loans().data; as data) {
+      <strong class="kpi-card__value">{{ data.total | number }}</strong>
+      <span class="kpi-card__hint">{{ data.active | number }} active</span>
+    }
+  </article>
+
+  <article class="kpi-card">
+    <div class="kpi-card__top">
+      <span class="kpi-card__label">FI cases</span>
+      <span class="kpi-card__icon kpi-card__icon--gold" aria-hidden="true">
+        <i class="pi pi-map-marker"></i>
+      </span>
+    </div>
+    @if (fi().loading && !fi().data) {
+      <p-skeleton width="46%" height="2rem" styleClass="kpi-skel" />
+      <p-skeleton width="58%" height="0.75rem" />
+    } @else if (fi().error) {
+      <p class="kpi-card__error">Unable to load</p>
+    } @else if (fi().data; as data) {
+      <strong class="kpi-card__value">{{ data.total | number }}</strong>
+      <span class="kpi-card__hint">{{ data.pending | number }} pending</span>
+    }
+  </article>
+</section>
+
+<section class="panel-grid panel-grid--primary">
+  <article class="panel">
+    <header class="panel__head">
+      <div>
+        <h2>Recent orders</h2>
+        <p>Latest activity from the orders queue.</p>
+      </div>
+      <button type="button" pButton [text]="true" size="small" label="View all orders" icon="pi pi-arrow-right" iconPos="right" (click)="goTo('/orders')"></button>
+    </header>
+
+    @if (orders().loading && !orders().data) {
+      <div class="skel-stack">
+        @for (row of [1, 2, 3, 4, 5]; track row) {
+          <p-skeleton height="2.4rem" />
+        }
+      </div>
+    } @else if (orders().error) {
+      <div class="inline-error">
+        <p>Unable to load recent orders.</p>
+        <button type="button" pButton size="small" label="Retry" (click)="load()"></button>
+      </div>
+    } @else if (orders().data?.recent?.length === 0) {
+      <div class="empty-inline">
+        <i class="pi pi-shopping-cart" aria-hidden="true"></i>
+        <p>No orders yet</p>
+      </div>
+    } @else if (orders().data; as data) {
+      <div class="table-wrap">
+        <table class="data-table">
+          <caption class="sr-only">Recent orders</caption>
+          <thead>
+            <tr>
+              <th scope="col">Order ID</th>
+              <th scope="col">Customer</th>
+              <th scope="col">Amount</th>
+              <th scope="col">Status</th>
+              <th scope="col">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (order of data.recent; track order.id) {
+              <tr tabindex="0" (click)="goTo('/orders/' + order.id)" (keydown.enter)="goTo('/orders/' + order.id)">
+                <td class="mono">{{ orderLabel(order) }}</td>
+                <td>{{ order.customerName || '—' }}</td>
+                <td>₹{{ order.totalAmount | number }}</td>
+                <td><app-status-badge [status]="order.status" /></td>
+                <td>{{ order.createdAt ? (order.createdAt | date: 'mediumDate') : '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </article>
+
+  <article class="panel">
+    <header class="panel__head">
+      <div>
+        <h2>Order status</h2>
+        <p>Live breakdown of the current queue.</p>
+      </div>
+    </header>
+
+    @if (orders().loading && !orders().data) {
+      <div class="donut-skel">
+        <p-skeleton shape="circle" size="10rem" />
+        <p-skeleton height="6rem" />
+      </div>
+    } @else if (orders().error) {
+      <div class="inline-error">
+        <p>Unable to load order status.</p>
+      </div>
+    } @else if (orders().data; as data) {
+      <app-status-donut
+        [slices]="orderSlices(data)"
+        [total]="data.total"
+        centerLabel="Orders"
+        caption="Order status breakdown"
+      />
+    }
+  </article>
+</section>
+
+<section class="panel-grid panel-grid--donuts" aria-label="Lending and investigation status">
+  <article class="panel">
+    <header class="panel__head">
+      <div>
+        <h2>EMI applications</h2>
+        <p>Status mix from live applications.</p>
+      </div>
+      <button type="button" pButton [text]="true" size="small" label="Open" (click)="goTo('/emi')"></button>
+    </header>
+    @if (emi().loading && !emi().data) {
+      <div class="donut-skel"><p-skeleton shape="circle" size="10rem" /><p-skeleton height="6rem" /></div>
+    } @else if (emi().error) {
+      <div class="inline-error"><p>Unable to load EMI applications.</p></div>
+    } @else if (emi().data; as data) {
+      <app-status-donut
+        [slices]="emiSlices(data)"
+        [total]="data.total"
+        centerLabel="Applications"
+        caption="EMI application status"
+      />
+    }
+  </article>
+
+  <article class="panel">
+    <header class="panel__head">
+      <div>
+        <h2>Loan status</h2>
+        <p>Active book versus closed accounts.</p>
+      </div>
+      <button type="button" pButton [text]="true" size="small" label="Open" (click)="goTo('/loans')"></button>
+    </header>
+    @if (loans().loading && !loans().data) {
+      <div class="donut-skel"><p-skeleton shape="circle" size="10rem" /><p-skeleton height="6rem" /></div>
+    } @else if (loans().error) {
+      <div class="inline-error"><p>Unable to load loans.</p></div>
+    } @else if (loans().data; as data) {
+      <app-status-donut
+        [slices]="loanSlices(data)"
+        [total]="data.total"
+        centerLabel="Loans"
+        caption="Loan status"
+      />
+    }
+  </article>
+
+  <article class="panel">
+    <header class="panel__head">
+      <div>
+        <h2>FI cases</h2>
+        <p>Field investigation workload.</p>
+      </div>
+      <button type="button" pButton [text]="true" size="small" label="Open" (click)="goTo('/fi')"></button>
+    </header>
+    @if (fi().loading && !fi().data) {
+      <div class="donut-skel"><p-skeleton shape="circle" size="10rem" /><p-skeleton height="6rem" /></div>
+    } @else if (fi().error) {
+      <div class="inline-error"><p>Unable to load FI cases.</p></div>
+    } @else if (fi().data; as data) {
+      <app-status-donut
+        [slices]="fiSlices(data)"
+        [total]="data.total"
+        centerLabel="Cases"
+        caption="FI case status"
+      />
+    }
+  </article>
+</section>
+
+<section class="panel-grid panel-grid--secondary">
+  <article class="panel">
+    <header class="panel__head">
+      <div>
+        <h2>Product overview</h2>
+        <p>Catalogue health from the products API.</p>
+      </div>
+      <button type="button" pButton [text]="true" size="small" label="View all products" icon="pi pi-arrow-right" iconPos="right" (click)="goTo('/products')"></button>
+    </header>
+
+    @if (products().loading && !products().data) {
+      <div class="metric-grid">
+        @for (row of [1, 2, 3, 4]; track row) {
+          <p-skeleton height="4.5rem" />
+        }
+      </div>
+    } @else if (products().error) {
+      <div class="inline-error">
+        <p>Unable to load product overview.</p>
+      </div>
+    } @else if (products().data; as data) {
+      <div class="metric-grid">
+        <div class="metric">
+          <span>Total</span>
+          <strong>{{ data.total | number }}</strong>
+        </div>
+        @if (data.active !== null) {
+          <div class="metric">
+            <span>Active</span>
+            <strong>{{ data.active | number }}</strong>
+          </div>
+        }
+        @if (data.outOfStock !== null) {
+          <div class="metric">
+            <span>Out of stock</span>
+            <strong>{{ data.outOfStock | number }}</strong>
+          </div>
+        }
+        @if (data.lowStock !== null) {
+          <div class="metric">
+            <span>Low stock</span>
+            <strong>{{ data.lowStock | number }}</strong>
+          </div>
+        }
+      </div>
+
+      <h3 class="panel__subhead">Low stock products</h3>
+      @if (data.lowStockProducts.length === 0) {
+        <div class="empty-inline empty-inline--compact">
+          <i class="pi pi-check-circle" aria-hidden="true"></i>
+          <p>No low-stock products in the loaded catalogue.</p>
+        </div>
+      } @else {
+        <ul class="stock-list">
+          @for (product of data.lowStockProducts; track product.id) {
+            <li>
+              <button type="button" class="stock-list__item" (click)="goTo('/products/' + product.id)">
+                <span>{{ product.name }}</span>
+                <strong>{{ (product.availableStock ?? product.stock ?? 0) | number }}</strong>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    }
+  </article>
+
+  <article class="panel">
+    <header class="panel__head">
+      <div>
+        <h2>Payment status</h2>
+        <p>Collection state from order payment records.</p>
+      </div>
+    </header>
+    @if (orders().loading && !orders().data) {
+      <div class="donut-skel"><p-skeleton shape="circle" size="10rem" /><p-skeleton height="6rem" /></div>
+    } @else if (orders().error) {
+      <div class="inline-error"><p>Unable to load payment status.</p></div>
+    } @else if (orders().data; as data) {
+      <app-status-donut
+        [slices]="paymentSlices(data)"
+        [total]="data.total"
+        centerLabel="Payments"
+        caption="Order payment status"
+      />
+    }
+  </article>
+</section>
+}

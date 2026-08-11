@@ -1,0 +1,36 @@
+// Design tokens for LoanEx Admin — deliberately distinct from customer-web's
+// brand palette (indigo/slate "control room" look vs. the storefront navy/gold).
+:root {
+  // Brand
+  --admin-primary: #4f46e5;
+  --admin-primary-hover: #4338ca;
+  --admin-primary-active: #3730a3;
+  --admin-sidebar-bg: #0f172a;
+  --admin-sidebar-bg-hover: #1e293b;
+  --admin-sidebar-border: #1e293b;
+  --admin-sidebar-text: #cbd5e1;
+  --admin-sidebar-text-active: #ffffff;
+
+  // Surfaces
+  --admin-surface: #ffffff;
+  --admin-surface-alt: #f8fafc;
+  --admin-surface-border: #e2e8f0;
+
+  // Text
+  --admin-text: #0f172a;
+  --admin-text-muted: #64748b;
+
+  // Status
+  --admin-success: #16a34a;
+  --admin-warning: #d97706;
+  --admin-danger: #dc2626;
+  --admin-info: #0284c7;
+
+  // Layout
+  --admin-sidebar-width: 264px;
+  --admin-sidebar-width-collapsed: 72px;
+  --admin-topbar-height: 64px;
+  --admin-radius: 10px;
+  --admin-shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.06);
+  --admin-shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.08);
+}

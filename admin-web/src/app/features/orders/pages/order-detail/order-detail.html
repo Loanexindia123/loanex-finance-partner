@@ -1,0 +1,63 @@
+<app-page-header title="Order {{ orderId }}" subtitle="Order details, items, and status.">
+  <div actions>
+    <button pButton icon="pi pi-arrow-left" label="Back to orders" [text]="true" (click)="back()"></button>
+  </div>
+</app-page-header>
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="6" />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (order(); as o) {
+  <div class="detail-grid">
+    <section class="card">
+      <h3>Summary</h3>
+      <dl>
+        <div><dt>Amount</dt><dd>₹{{ o.totalAmount | number }}</dd></div>
+        <div><dt>Payment method</dt><dd>{{ o.paymentMethod || '—' }}</dd></div>
+        <div><dt>Payment status</dt><dd><app-status-badge [status]="o.paymentStatus" /></dd></div>
+        <div><dt>Order status</dt><dd><app-status-badge [status]="o.status" /></dd></div>
+        <div><dt>Placed</dt><dd>{{ o.createdAt | date: 'medium' }}</dd></div>
+      </dl>
+
+      <h3 class="mt">Items</h3>
+      @if (o.items.length === 0) {
+        <p class="muted">No items recorded on this order.</p>
+      } @else {
+        <table class="items-table">
+          <thead><tr><th>Product</th><th>Qty</th><th>Unit price</th></tr></thead>
+          <tbody>
+            @for (item of o.items; track item.productId) {
+              <tr>
+                <td>{{ item.productName || item.productId }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>₹{{ item.unitPrice | number }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </section>
+
+    <section class="card" *appCan="'orders.edit'">
+      <h3>Update status</h3>
+      <div class="field">
+        <label>Status</label>
+        <p-select [options]="statusOptions" [ngModel]="nextStatus()" (ngModelChange)="nextStatus.set($event)" optionLabel="label" optionValue="value" />
+      </div>
+      <div class="field">
+        <label>Courier partner</label>
+        <input pInputText [ngModel]="courierPartner()" (ngModelChange)="courierPartner.set($event)" />
+      </div>
+      <div class="field">
+        <label>Tracking number</label>
+        <input pInputText [ngModel]="trackingNumber()" (ngModelChange)="trackingNumber.set($event)" />
+      </div>
+      <div class="field">
+        <label>Remarks</label>
+        <textarea pTextarea rows="3" [ngModel]="remarks()" (ngModelChange)="remarks.set($event)"></textarea>
+      </div>
+      <button pButton label="Update order" [loading]="updating()" (click)="updateStatus()"></button>
+    </section>
+  </div>
+}

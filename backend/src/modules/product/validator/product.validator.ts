@@ -1,1 +1,7 @@
-export { listProductsQuerySchema, productIdParamSchema, productSlugParamSchema, createProductBodySchema } from '../dto/product.dto';
+export {
+  listProductsQuerySchema,
+  productIdParamSchema,
+  productImageIdParamSchema,
+  productSlugParamSchema,
+  createProductBodySchema,
+} from '../dto/product.dto';

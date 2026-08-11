@@ -1,0 +1,18 @@
+.toolbar {
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+.toolbar__search {
+  flex: 1;
+  max-width: 360px;
+
+  input {
+    width: 100%;
+  }
+}
+
+.muted {
+  color: var(--admin-text-muted);
+  font-size: 0.8125rem;
+}

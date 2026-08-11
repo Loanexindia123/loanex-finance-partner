@@ -91,7 +91,7 @@ export function createApp() {
   // Capture raw body for Razorpay webhook signature verification.
   app.use(
     express.json({
-      limit: '1mb',
+      limit: '50mb',
       verify: (req, _res, buf) => {
         if (req.url?.includes('/payments/webhook')) {
           (req as express.Request & { rawBody?: Buffer }).rawBody = buf;

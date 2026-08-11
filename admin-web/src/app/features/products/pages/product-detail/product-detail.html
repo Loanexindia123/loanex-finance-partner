@@ -1,0 +1,102 @@
+<app-page-header
+  [title]="product()?.name || 'Product'"
+  subtitle="Complete catalogue record from the product API"
+>
+  <div actions>
+    <button pButton type="button" icon="pi pi-arrow-left" label="Back" [outlined]="true" severity="secondary" (click)="back()"></button>
+    <button
+      *appCan="'products.edit'"
+      pButton
+      type="button"
+      icon="pi pi-pencil"
+      label="Edit Product"
+      [disabled]="!product()"
+      (click)="edit()"
+    ></button>
+  </div>
+</app-page-header>
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="8" />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (product(); as product) {
+  <div class="detail">
+    <section class="hero">
+      <div class="gallery">
+        <div class="gallery__main">
+          @if (gallery()[activeImage()]; as src) {
+            <img [src]="src" [alt]="product.name" />
+          } @else {
+            <div class="gallery__empty">
+              <i class="pi pi-image" aria-hidden="true"></i>
+              <span>No product image</span>
+            </div>
+          }
+        </div>
+        @if (gallery().length > 1) {
+          <div class="gallery__thumbs" role="list">
+            @for (src of gallery(); track src; let i = $index) {
+              <button
+                type="button"
+                class="gallery__thumb"
+                [class.gallery__thumb--active]="activeImage() === i"
+                (click)="selectImage(i)"
+              >
+                <img [src]="src" [alt]="'Image ' + (i + 1)" />
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="summary">
+        <div class="summary__badges">
+          <app-status-badge [status]="product.status" />
+          <span class="stock-pill" [attr.data-state]="stockState()">{{ stockLabel() }}</span>
+        </div>
+        <h2>{{ product.name }}</h2>
+        <dl class="summary__facts">
+          @if (product.brand) {
+            <div><dt>Brand</dt><dd>{{ product.brand }}</dd></div>
+          }
+          @if (product.sku) {
+            <div><dt>SKU</dt><dd>{{ product.sku }}</dd></div>
+          }
+          @if (categoryLabel()) {
+            <div><dt>Category</dt><dd>{{ categoryLabel() }}</dd></div>
+          }
+          @if (displayPrice() !== null) {
+            <div>
+              <dt>Price</dt>
+              <dd class="summary__price">{{ displayPrice()! | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+            </div>
+          }
+          <div>
+            <dt>Stock</dt>
+            <dd>{{ stockQty() }}</dd>
+          </div>
+        </dl>
+        @if (product.shortDescription || wizard()?.shortDescription) {
+          <p class="summary__copy">{{ product.shortDescription || wizard()?.shortDescription }}</p>
+        }
+      </div>
+    </section>
+
+    <div class="sections">
+      @for (section of sections(); track section.title) {
+        <section class="card">
+          <h3>{{ section.title }}</h3>
+          <dl>
+            @for (item of section.fields; track item.label) {
+              <div>
+                <dt>{{ item.label }}</dt>
+                <dd>{{ item.value }}</dd>
+              </div>
+            }
+          </dl>
+        </section>
+      }
+    </div>
+  </div>
+}

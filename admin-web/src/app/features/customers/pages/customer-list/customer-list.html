@@ -1,0 +1,43 @@
+<app-page-header title="Customers" subtitle="Registered customers and their KYC status." />
+
+<div class="toolbar">
+  <span class="p-input-icon-left toolbar__search">
+    <i class="pi pi-search"></i>
+    <input
+      pInputText
+      type="text"
+      placeholder="Search by name, phone, or email…"
+      [ngModel]="searchTerm()"
+      (ngModelChange)="searchTerm.set($event)"
+    />
+  </span>
+</div>
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="6" />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (filtered().length === 0) {
+  <app-empty-state icon="pi-users" title="No customers found" />
+} @else {
+  <p-table [value]="filtered()" [paginator]="true" [rows]="20" dataKey="id" styleClass="p-datatable-sm" [rowHover]="true">
+    <ng-template pTemplate="header">
+      <tr><th>Name</th><th>Phone</th><th>Email</th><th>KYC status</th><th>Joined</th></tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-customer>
+      <tr (click)="view(customer)" style="cursor: pointer">
+        <td>{{ customer.profile?.fullName || '—' }}</td>
+        <td>{{ customer.phone }}</td>
+        <td>{{ customer.email || '—' }}</td>
+        <td>
+          @if (customer.kyc || customer.profile?.kyc_status) {
+            <app-status-badge [status]="customer.profile?.kyc_status || 'Pending'" />
+          } @else {
+            <span class="muted">Not started</span>
+          }
+        </td>
+        <td>{{ customer.created_at | date: 'mediumDate' }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+}

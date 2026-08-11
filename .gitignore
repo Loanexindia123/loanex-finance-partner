@@ -13,3 +13,4 @@ backend/data/
 # DB dumps contain customer data — never commit
 backups/
 backend/backups/
+.vercel

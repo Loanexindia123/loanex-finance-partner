@@ -1,0 +1,48 @@
+@if (layout.mobileSidebarOpen()) {
+  <div class="sidebar__scrim" (click)="layout.closeMobileSidebar()"></div>
+}
+
+<aside
+  class="sidebar"
+  [class.sidebar--collapsed]="collapsed()"
+  [class.sidebar--mobile-open]="layout.mobileSidebarOpen()"
+  [attr.aria-label]="'LoanEx Admin navigation'"
+>
+  <div class="sidebar__brand">
+    <div class="sidebar__brand-plate">
+      <img
+        class="sidebar__brand-logo"
+        src="assets/logo-loanex.jpg"
+        alt="LoanEx"
+      />
+    </div>
+    @if (!collapsed()) {
+      <div class="sidebar__brand-copy">
+        <span class="sidebar__brand-name">LoanEx Admin</span>
+        <span class="sidebar__brand-tag">Administration Portal</span>
+      </div>
+    }
+  </div>
+
+  <nav class="sidebar__nav" aria-label="Admin modules">
+    @for (group of groups(); track $index) {
+      <div class="sidebar__group">
+        @for (item of group; track item.route) {
+          <a
+            class="sidebar__link"
+            [routerLink]="item.route"
+            routerLinkActive="sidebar__link--active"
+            [pTooltip]="collapsed() ? item.label : ''"
+            tooltipPosition="right"
+            (click)="onLinkClick()"
+          >
+            <i [class]="item.icon" aria-hidden="true"></i>
+            @if (!collapsed()) {
+              <span>{{ item.label }}</span>
+            }
+          </a>
+        }
+      </div>
+    }
+  </nav>
+</aside>

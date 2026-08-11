@@ -1,0 +1,107 @@
+<div class="login">
+  <section class="login__brand" aria-label="LoanEx branding">
+    <div class="login__aurora" aria-hidden="true"></div>
+    <div class="login__grid" aria-hidden="true"></div>
+    <div class="login__brand-inner">
+      <div class="login__mark">
+        <img
+          class="login__logo"
+          src="assets/logo-loanex.jpg"
+          alt="LoanEx — Unlock Your Financial Freedom"
+        />
+      </div>
+      <p class="login__portal">Admin Portal</p>
+      <p class="login__brand-copy">Manage LoanEx operations from one secure workspace.</p>
+    </div>
+  </section>
+
+  <section class="login__panel">
+    <div class="login__glow" aria-hidden="true"></div>
+    <div class="login__surface">
+      <header class="login__header">
+        <h1>Welcome back</h1>
+        <p>Sign in to your admin workspace</p>
+      </header>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" class="login__form" novalidate>
+        @if (errorMessage()) {
+          <div class="login__alert" role="alert">{{ errorMessage() }}</div>
+        }
+
+        <div class="login__field">
+          <input
+            id="email"
+            class="login__input"
+            type="text"
+            formControlName="email"
+            autocomplete="username"
+            placeholder=" "
+            [class.login__input--invalid]="showFieldError('email')"
+          />
+          <label for="email">Email</label>
+          @if (showFieldError('email')) {
+            <span class="login__field-error">Email or mobile is required.</span>
+          }
+        </div>
+
+        <div class="login__field login__field--password">
+          <input
+            id="password"
+            class="login__input"
+            [type]="showPassword() ? 'text' : 'password'"
+            formControlName="password"
+            autocomplete="current-password"
+            placeholder=" "
+            [class.login__input--invalid]="showFieldError('password')"
+          />
+          <label for="password">Password</label>
+          <button
+            type="button"
+            class="login__eye"
+            (click)="togglePassword()"
+            [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
+            [attr.aria-pressed]="showPassword()"
+          >
+            @if (showPassword()) {
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+                />
+              </svg>
+            } @else {
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zm-1.07 2.02 3.15 3.15.02-.17c0-1.66-1.34-3-3-3l-.17.02zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2z"
+                />
+              </svg>
+            }
+          </button>
+          @if (showFieldError('password')) {
+            <span class="login__field-error">Password is required.</span>
+          }
+        </div>
+
+        <div class="login__meta">
+          <label class="login__remember">
+            <input type="checkbox" formControlName="rememberMe" />
+            <span class="login__check" aria-hidden="true"></span>
+            <span>Remember me</span>
+          </label>
+        </div>
+
+        <p class="login__reset-note">Forgot your password? Please contact your Super Admin.</p>
+
+        <button type="submit" class="login__submit" [disabled]="submitting()">
+          @if (submitting()) {
+            <span class="login__spinner" aria-hidden="true"></span>
+            Signing in…
+          } @else {
+            Sign in
+          }
+        </button>
+      </form>
+    </div>
+  </section>
+</div>

@@ -1,0 +1,38 @@
+<p-toast />
+<p-confirmDialog styleClass="admin-dialog" />
+
+<div
+  class="admin-shell"
+  [class.admin-shell--sidebar-collapsed]="layout.sidebarCollapsed()"
+>
+  <app-sidebar />
+  <button
+    type="button"
+    class="admin-shell__sidebar-toggle"
+    (click)="layout.toggleSidebarCollapsed()"
+    [attr.aria-expanded]="!layout.sidebarCollapsed()"
+    [attr.aria-label]="layout.sidebarCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
+  >
+    @if (layout.sidebarCollapsed()) {
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M6.3 3.2a.75.75 0 0 1 1.05.05l4.4 4.75a.75.75 0 0 1 0 1l-4.4 4.75a.75.75 0 1 1-1.1-1.02L10.2 8 6.25 4.22a.75.75 0 0 1 .05-1.02z"
+        />
+      </svg>
+    } @else {
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M9.7 3.2a.75.75 0 0 0-1.05.05L4.25 8l4.4 4.75a.75.75 0 1 0 1.1-1.02L5.8 8l3.95-3.78a.75.75 0 0 0-.05-1.02z"
+        />
+      </svg>
+    }
+  </button>
+  <div class="admin-shell__main">
+    <app-topbar />
+    <main class="admin-shell__content">
+      <router-outlet />
+    </main>
+  </div>
+</div>

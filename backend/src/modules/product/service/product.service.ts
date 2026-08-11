@@ -5,6 +5,7 @@ import { calculateEmiBreakdown } from '../../loan/service/emi-calculator.service
 import { stockState } from '../../../common/utils/inventory';
 import type { ListProductsQuery } from '../dto/product.dto';
 import { productRepository } from '../repository/product.repository';
+import { deleteOrphanedProductImages, persistInlineProductImages } from './product-image.service';
 import {
   isCustomerVisibleProduct,
   resolveCustomerFacingName,
@@ -901,6 +902,7 @@ export class ProductService {
   }
 
   async create(data: any) {
+    data = await persistInlineProductImages(data);
     const mapped = this.mapPayloadToPrisma(data);
     if (!mapped.id) {
       mapped.id = data.id && isUuid(String(data.id)) ? String(data.id) : randomUUID();
@@ -924,6 +926,7 @@ export class ProductService {
     if (!existing) {
       throw new NotFoundError('Product not found.');
     }
+    data = await persistInlineProductImages(data);
     const mapped = this.mapPayloadToPrisma(data);
     // Preserve marketing flags when this request didn't explicitly set them
     // (the wizard never sends them, so re-saving a featured product must not
@@ -971,6 +974,7 @@ export class ProductService {
       mapped.discountPrice = mapped.price;
     }
     const updated = await productRepository.update(id, mapped);
+    await deleteOrphanedProductImages(existing, updated, id);
     // Only touch the plans collection when the request actually carries plans;
     // partial updates (e.g. a marketing-flag toggle) must not wipe previously
     // saved plans.
@@ -1018,6 +1022,7 @@ export class ProductService {
       throw new NotFoundError('Product not found.');
     }
     await productRepository.remove(id);
+    await deleteOrphanedProductImages(existing, null, id);
     return { id };
   }
 }

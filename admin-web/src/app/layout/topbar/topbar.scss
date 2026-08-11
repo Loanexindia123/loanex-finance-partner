@@ -1,0 +1,342 @@
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: var(--admin-topbar-height);
+  padding: 0 16px;
+  background: var(--admin-surface);
+  border-bottom: 1px solid var(--admin-surface-border);
+  flex-shrink: 0;
+}
+
+.topbar__left,
+.topbar__right {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.topbar__left {
+  gap: 8px;
+}
+
+.topbar__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--admin-text-muted);
+  font-size: 0.9375rem;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    background: var(--admin-surface-alt);
+    color: var(--admin-text);
+    border-color: var(--admin-surface-border);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--admin-primary);
+    outline-offset: 2px;
+  }
+
+  &--mobile {
+    display: none;
+  }
+}
+
+.topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.topbar__logo {
+  display: block;
+  height: 44px;
+  width: auto;
+  max-width: 168px;
+  object-fit: contain;
+  object-position: left center;
+  flex-shrink: 0;
+}
+
+.topbar__product-suffix {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--admin-text-muted);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.topbar__profile {
+  position: relative;
+}
+
+.topbar__trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 280px;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    background: var(--admin-surface-alt);
+  }
+
+  &--open {
+    background: var(--admin-surface-alt);
+    border-color: var(--admin-surface-border);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--admin-primary);
+    outline-offset: 2px;
+  }
+}
+
+.topbar__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--admin-primary);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.9), 0 0 0 2px rgb(79 70 229 / 0.22);
+
+  &--menu {
+    width: 36px;
+    height: 36px;
+    font-size: 0.75rem;
+  }
+}
+
+.topbar__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.topbar__primary {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--admin-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__secondary {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--admin-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__chevron {
+  font-size: 0.6875rem;
+  color: var(--admin-text-muted);
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.topbar__trigger--open .topbar__chevron {
+  transform: rotate(180deg);
+}
+
+.topbar__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  width: 260px;
+  padding: 8px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-surface-border);
+  border-radius: 12px;
+  box-shadow: var(--admin-shadow-md);
+  animation: topbar-menu-in 0.14s ease;
+}
+
+.topbar__menu-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+}
+
+.topbar__menu-identity-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.topbar__menu-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--admin-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__menu-email {
+  font-size: 0.75rem;
+  color: var(--admin-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__menu-role {
+  margin-top: 2px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--admin-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--admin-surface-border);
+}
+
+.topbar__menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--admin-text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+
+  i {
+    width: 1rem;
+    font-size: 0.875rem;
+    color: var(--admin-text-muted);
+    text-align: center;
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: var(--admin-surface-alt);
+    outline: none;
+  }
+
+  &--danger {
+    color: var(--admin-danger);
+
+    i {
+      color: var(--admin-danger);
+    }
+
+    &:hover,
+    &:focus-visible {
+      background: rgb(220 38 38 / 0.06);
+    }
+  }
+}
+
+@keyframes topbar-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 901px) {
+  .topbar__brand {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    padding: 0 12px;
+    gap: 12px;
+  }
+
+  .topbar__icon-btn--mobile {
+    display: inline-flex;
+  }
+
+  .topbar__trigger {
+    max-width: 220px;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar__logo {
+    height: 38px;
+    max-width: 132px;
+  }
+
+  .topbar__product-suffix {
+    display: none;
+  }
+
+  .topbar__meta {
+    display: none;
+  }
+
+  .topbar__trigger {
+    max-width: none;
+    padding: 4px;
+    gap: 6px;
+  }
+
+  .topbar__menu {
+    width: min(260px, calc(100vw - 24px));
+  }
+}
+
+@media (max-width: 400px) {
+  .topbar__logo {
+    height: 34px;
+    max-width: 112px;
+  }
+}

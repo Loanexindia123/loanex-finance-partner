@@ -1,0 +1,148 @@
+:host {
+  display: block;
+}
+
+.donut {
+  display: flex;
+  align-items: center;
+  gap: 1.35rem;
+  min-width: 0;
+}
+
+.donut__chart {
+  position: relative;
+  width: 176px;
+  height: 176px;
+  flex-shrink: 0;
+}
+
+.donut__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.donut__track,
+.donut__seg,
+.donut__reveal {
+  fill: none;
+  stroke-linecap: butt;
+}
+
+.donut__track {
+  stroke: #eef2f6;
+  stroke-width: 16;
+}
+
+.donut__seg {
+  stroke-width: 16;
+}
+
+.donut__reveal {
+  stroke: #fff;
+  stroke-width: 18;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.donut--ready .donut__reveal {
+  stroke-dashoffset: var(--donut-c);
+}
+
+.donut__center {
+  position: absolute;
+  inset: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+
+  strong {
+    display: block;
+    font-size: 1.45rem;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    font-weight: 700;
+    color: #0b1b33;
+  }
+
+  span {
+    display: block;
+    margin-top: 0.2rem;
+    max-width: 6.5rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: #64748b;
+    line-height: 1.25;
+  }
+}
+
+.donut__legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.donut__legend li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.8125rem;
+  color: #334155;
+}
+
+.donut__swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.donut__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.donut__count {
+  color: #0b1b33;
+  font-variant-numeric: tabular-nums;
+}
+
+.donut__pct {
+  min-width: 2.25rem;
+  text-align: right;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 720px) {
+  .donut {
+    flex-direction: column;
+    align-items: center;
+    text-align: left;
+  }
+
+  .donut__legend {
+    width: 100%;
+    max-width: 260px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .donut__reveal {
+    transition: none;
+  }
+}

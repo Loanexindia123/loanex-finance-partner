@@ -1,0 +1,112 @@
+<header class="topbar">
+  <div class="topbar__left">
+    <button
+      type="button"
+      class="topbar__icon-btn topbar__icon-btn--mobile"
+      (click)="layout.toggleMobileSidebar()"
+      aria-label="Open navigation"
+    >
+      <i class="pi pi-bars" aria-hidden="true"></i>
+    </button>
+
+    <div class="topbar__brand">
+      <img
+        class="topbar__logo"
+        src="assets/logo-loanex.jpg"
+        alt="LoanEx"
+      />
+      <span class="topbar__product-suffix">Admin</span>
+    </div>
+  </div>
+
+  <div class="topbar__right">
+    <div
+      #profileRoot
+      class="topbar__profile"
+      (keydown)="onMenuKeydown($event)"
+    >
+      <button
+        #menuTrigger
+        type="button"
+        class="topbar__trigger"
+        [class.topbar__trigger--open]="menuOpen()"
+        (click)="toggleMenu($event)"
+        [attr.aria-expanded]="menuOpen()"
+        aria-haspopup="menu"
+        aria-controls="topbar-account-menu"
+        [attr.aria-label]="triggerPrimary() ? 'Account menu for ' + triggerPrimary() : 'Account menu'"
+      >
+        <span class="topbar__avatar" aria-hidden="true">{{ initials() }}</span>
+        <span class="topbar__meta">
+          @if (triggerPrimary()) {
+            <span class="topbar__primary">{{ triggerPrimary() }}</span>
+          }
+          @if (triggerSecondary()) {
+            <span class="topbar__secondary">{{ triggerSecondary() }}</span>
+          }
+        </span>
+        <i class="pi pi-chevron-down topbar__chevron" aria-hidden="true"></i>
+      </button>
+
+      @if (menuOpen()) {
+        <div
+          id="topbar-account-menu"
+          class="topbar__menu"
+          role="menu"
+          aria-label="Account"
+        >
+          <div class="topbar__menu-identity">
+            <span class="topbar__avatar topbar__avatar--menu" aria-hidden="true">{{ initials() }}</span>
+            <div class="topbar__menu-identity-text">
+              @if (displayName()) {
+                <span class="topbar__menu-name">{{ displayName() }}</span>
+              }
+              @if (email()) {
+                <span class="topbar__menu-email">{{ email() }}</span>
+              }
+              @if (roleName()) {
+                <span class="topbar__menu-role">{{ roleName() }}</span>
+              }
+            </div>
+          </div>
+
+          <div class="topbar__menu-sep" role="separator"></div>
+
+          <a
+            role="menuitem"
+            class="topbar__menu-item"
+            routerLink="/settings/profile"
+            (click)="closeMenu()"
+          >
+            <i class="pi pi-user" aria-hidden="true"></i>
+            <span>Profile</span>
+          </a>
+
+          @if (canOpenSettings()) {
+            <a
+              role="menuitem"
+              class="topbar__menu-item"
+              routerLink="/settings"
+              (click)="closeMenu()"
+            >
+              <i class="pi pi-cog" aria-hidden="true"></i>
+              <span>Settings</span>
+            </a>
+          }
+
+          <div class="topbar__menu-sep" role="separator"></div>
+
+          <button
+            type="button"
+            role="menuitem"
+            class="topbar__menu-item topbar__menu-item--danger"
+            (click)="logout()"
+          >
+            <i class="pi pi-sign-out" aria-hidden="true"></i>
+            <span>Logout</span>
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+</header>

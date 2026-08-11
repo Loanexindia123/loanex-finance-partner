@@ -41,6 +41,12 @@ export const productIdParamSchema = z.object({
 
 export type ProductIdParam = z.infer<typeof productIdParamSchema>;
 
+export const productImageIdParamSchema = z.object({
+  imageId: z.string().trim().regex(/^[a-fA-F0-9]{24}$/, 'Invalid image id'),
+});
+
+export type ProductImageIdParam = z.infer<typeof productImageIdParamSchema>;
+
 export const productSlugParamSchema = z.object({
   slug: z.string().trim().min(1),
 });

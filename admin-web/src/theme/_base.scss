@@ -1,0 +1,321 @@
+// Global element resets/defaults for the admin shell.
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  background: var(--admin-surface-alt);
+  color: var(--admin-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Product catalogue filter overlay — appended to body by p-select. */
+.catalog-filter-panel.p-select-overlay,
+.p-select-overlay.catalog-filter-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px -8px rgb(15 23 42 / 0.18);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.catalog-filter-panel .p-select-list,
+.catalog-filter-panel .p-select-list-container,
+.catalog-filter-panel ul {
+  padding: 0.35rem;
+}
+
+.catalog-filter-panel .p-select-option,
+.catalog-filter-panel li[role='option'] {
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.catalog-filter-panel .p-select-option:not(.p-select-option-selected):not(.p-disabled):hover,
+.catalog-filter-panel .p-select-option.p-focus:not(.p-select-option-selected),
+.catalog-filter-panel li[role='option']:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.catalog-filter-panel .p-select-option-selected,
+.catalog-filter-panel .p-select-option[aria-selected='true'],
+.catalog-filter-panel li[role='option'][aria-selected='true'] {
+  background: #eef2ff !important;
+  color: #4f46e5 !important;
+  font-weight: 600;
+}
+
+.p-paginator .p-paginator-page.p-paginator-page-selected {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #fff;
+}
+
+.p-tooltip.catalog-tooltip,
+.catalog-tooltip.p-tooltip {
+  max-width: none;
+}
+
+.p-tooltip.catalog-tooltip .p-tooltip-text,
+.catalog-tooltip .p-tooltip-text {
+  padding: 0.45rem 0.75rem;
+  background: #0f172a;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 550;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px rgb(15 23 42 / 0.2);
+}
+
+.p-tooltip.catalog-tooltip.p-tooltip-top .p-tooltip-arrow,
+.catalog-tooltip.p-tooltip-top .p-tooltip-arrow {
+  border-top-color: #0f172a;
+}
+
+/* Pill buttons — matches product wizard reference (rounded, soft elevation). */
+.p-button:not(.p-button-text):not(.p-button-link) {
+  border-radius: 999px;
+  font-weight: 650;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
+}
+
+.p-button.p-button-text,
+.p-button.p-button-link {
+  border-radius: 999px;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.p-button.p-button-icon-only:not(.p-button-text) {
+  border-radius: 999px;
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+}
+
+.p-button.p-button-secondary:not(.p-button-outlined):not(.p-button-text):not(.p-button-link) {
+  background: #64748b;
+  border-color: #64748b;
+  color: #fff;
+
+  &:not(:disabled):hover {
+    background: #475569;
+    border-color: #475569;
+    color: #fff;
+  }
+}
+
+/* Purple pill toggles — handle is centered with the same gap on every side. */
+.p-toggleswitch {
+  --admin-switch-w: 2.75rem;
+  --admin-switch-h: 1.5rem;
+  --admin-switch-gap: 0.1875rem;
+  --admin-switch-knob: 1.125rem;
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-shrink: 0;
+  width: var(--admin-switch-w);
+  height: var(--admin-switch-h);
+  vertical-align: middle;
+}
+
+.p-toggleswitch .p-toggleswitch-slider {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #e5e7eb;
+  box-sizing: border-box;
+}
+
+.p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider,
+.p-toggleswitch[data-p-checked='true'] .p-toggleswitch-slider {
+  background: #4f46e5;
+}
+
+.p-toggleswitch .p-toggleswitch-handle {
+  position: absolute !important;
+  top: 50% !important;
+  left: var(--admin-switch-gap) !important;
+  inset-inline-start: var(--admin-switch-gap) !important;
+  inset-inline-end: auto !important;
+  width: var(--admin-switch-knob) !important;
+  height: var(--admin-switch-knob) !important;
+  margin: 0 !important;
+  margin-block-start: 0 !important;
+  transform: translateY(-50%) !important;
+  border-radius: 999px !important;
+  background: #fff !important;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.16);
+  box-sizing: border-box;
+}
+
+.p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-handle,
+.p-toggleswitch[data-p-checked='true'] .p-toggleswitch-handle {
+  left: auto !important;
+  right: var(--admin-switch-gap) !important;
+  inset-inline-start: auto !important;
+  inset-inline-end: var(--admin-switch-gap) !important;
+}
+
+/* Every dialog — card layout, no clipped footer actions. */
+.p-dialog,
+.p-dialog.admin-dialog,
+.p-confirmdialog {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: visible;
+  box-shadow: 0 22px 50px -16px rgb(15 23 42 / 0.28);
+}
+
+.p-dialog .p-dialog-header,
+.p-confirmdialog .p-dialog-header {
+  padding: 1.15rem 1.25rem 0.85rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.p-dialog .p-dialog-title,
+.p-confirmdialog .p-dialog-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.p-dialog .p-dialog-content,
+.p-confirmdialog .p-dialog-content {
+  padding: 0.9rem 1.25rem 1rem;
+}
+
+.p-dialog .p-dialog-footer,
+.p-confirmdialog .p-dialog-footer {
+  display: flex !important;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem !important;
+  padding: 1rem 1.25rem 1.2rem !important;
+  border-top: 1px solid #e2e8f0;
+  overflow: visible;
+}
+
+.p-dialog .p-dialog-footer .p-button,
+.p-dialog .p-dialog-footer button,
+.p-confirmdialog .p-dialog-footer .p-button,
+.p-confirmdialog .p-dialog-footer button {
+  margin: 0 !important;
+  flex: 0 1 auto;
+  min-width: 5.5rem;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.p-dialog-mask {
+  background: rgb(15 23 42 / 0.42);
+}
+
+/*
+  Dialogs append to body, so they miss :host wizard field borders.
+  Tailwind preflight also zeros borders — paint them here, unlayered.
+*/
+.p-dialog .p-dialog-content .field,
+.p-dialog.admin-dialog .field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.p-dialog .p-dialog-content .field > label,
+.p-dialog.admin-dialog .field > label {
+  font-size: 0.8125rem;
+  font-weight: 650;
+  color: #0f172a;
+}
+
+.p-dialog input.p-inputtext,
+.p-dialog input[pinputtext],
+.p-dialog textarea.p-textarea,
+.p-dialog textarea[ptextarea],
+.p-dialog .p-inputnumber-input,
+.p-dialog .p-select,
+.p-dialog.admin-dialog input.p-inputtext,
+.p-dialog.admin-dialog input[pinputtext],
+.p-dialog.admin-dialog .p-select {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1.5px solid #64748b;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.p-dialog .p-select {
+  display: inline-flex;
+  align-items: center;
+  padding-right: 0.35rem;
+}
+
+.p-dialog .p-select .p-select-label {
+  padding: 0;
+  color: #0f172a;
+}
+
+.p-dialog input.p-inputtext:focus,
+.p-dialog input[pinputtext]:focus,
+.p-dialog .p-select.p-focus,
+.p-dialog .p-select.p-select-open {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgb(79 70 229 / 0.12);
+}
+
+.p-dialog .grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+@media (max-width: 640px) {
+  .p-dialog .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}

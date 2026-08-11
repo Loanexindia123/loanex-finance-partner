@@ -1,0 +1,47 @@
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { TagModule } from 'primeng/tag';
+
+type Severity = 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast';
+
+const SEVERITY_MAP: Record<string, Severity> = {
+  active: 'success',
+  approved: 'success',
+  delivered: 'success',
+  completed: 'success',
+  paid: 'success',
+  confirmed: 'info',
+  processing: 'info',
+  shipped: 'info',
+  in_progress: 'info',
+  pending: 'warn',
+  hold: 'warn',
+  draft: 'secondary',
+  inactive: 'secondary',
+  blocked: 'danger',
+  cancelled: 'danger',
+  rejected: 'danger',
+  failed: 'danger',
+  refunded: 'danger',
+};
+
+/** Maps common LoanEx status strings to a consistent PrimeNG tag severity. */
+@Component({
+  selector: 'app-status-badge',
+  standalone: true,
+  imports: [TagModule],
+  template: `<p-tag [value]="label()" [severity]="severity()" />`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class StatusBadge {
+  readonly status = input.required<string>();
+
+  readonly label = computed(() =>
+    this.status()
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase()),
+  );
+
+  readonly severity = computed<Severity>(
+    () => SEVERITY_MAP[this.status()?.toLowerCase()] ?? 'secondary',
+  );
+}

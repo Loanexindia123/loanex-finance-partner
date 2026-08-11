@@ -1,0 +1,48 @@
+<app-page-header title="Customer" subtitle="Profile and KYC details.">
+  <div actions>
+    <button pButton icon="pi pi-arrow-left" label="Back to customers" [text]="true" (click)="back()"></button>
+  </div>
+</app-page-header>
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="6" />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (!customer()) {
+  <app-error-state
+    message="This customer could not be found. The backend does not expose a single-customer lookup — this admin looked for them in the full customer list without success."
+    [retryable]="false"
+  />
+} @else {
+  <div class="detail-grid">
+    <section class="card">
+      <h3>Profile</h3>
+      <dl>
+        <div><dt>Full name</dt><dd>{{ customer()!.profile?.fullName || '—' }}</dd></div>
+        <div><dt>Phone</dt><dd>{{ customer()!.phone }}</dd></div>
+        <div><dt>Email</dt><dd>{{ customer()!.email || '—' }}</dd></div>
+        <div><dt>Date of birth</dt><dd>{{ customer()!.profile?.dob || '—' }}</dd></div>
+        <div><dt>Gender</dt><dd>{{ customer()!.profile?.gender || '—' }}</dd></div>
+        <div><dt>Joined</dt><dd>{{ customer()!.created_at | date: 'medium' }}</dd></div>
+        <div><dt>Status</dt><dd><app-status-badge [status]="customer()!.status" /></dd></div>
+      </dl>
+    </section>
+
+    <section class="card">
+      <h3>KYC</h3>
+      @if (customer()!.kyc; as kyc) {
+        <dl>
+          <div><dt>Status</dt><dd><app-status-badge [status]="customer()!.profile?.kyc_status || 'Pending'" /></dd></div>
+          <div><dt>Aadhaar verified</dt><dd>{{ kyc.aadharVerified ? 'Yes' : 'No' }}</dd></div>
+          <div><dt>Aadhaar number</dt><dd>{{ kyc.aadhar_number || '—' }}</dd></div>
+          <div><dt>PAN verified</dt><dd>{{ kyc.pan_verified ? 'Yes' : 'No' }}</dd></div>
+          <div><dt>PAN number</dt><dd>{{ kyc.panNumber || '—' }}</dd></div>
+          <div><dt>CIBIL score</dt><dd>{{ kyc.cibil_score ?? '—' }}</dd></div>
+          <div><dt>State</dt><dd>{{ kyc.address?.state || '—' }}</dd></div>
+        </dl>
+      } @else {
+        <p class="muted">No KYC record found for this customer yet.</p>
+      }
+    </section>
+  </div>
+}

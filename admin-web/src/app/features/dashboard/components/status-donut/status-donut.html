@@ -1,0 +1,53 @@
+<div class="donut" [class.donut--ready]="revealed()" [style.--donut-c]="circumference">
+  <div class="donut__chart">
+    <svg
+      class="donut__svg"
+      [attr.viewBox]="'0 0 ' + view + ' ' + view"
+      role="img"
+      [attr.aria-label]="summary()"
+    >
+      @if (caption()) {
+        <title>{{ caption() }}</title>
+      }
+      <circle
+        class="donut__track"
+        [attr.cx]="cx"
+        [attr.cy]="cy"
+        [attr.r]="radius"
+      />
+      @for (ring of rings(); track ring.key) {
+        <circle
+          class="donut__seg"
+          [attr.cx]="cx"
+          [attr.cy]="cy"
+          [attr.r]="radius"
+          [attr.stroke]="ring.color"
+          [attr.stroke-dasharray]="ring.dasharray"
+          [attr.stroke-dashoffset]="ring.dashoffset"
+        />
+      }
+      <circle
+        class="donut__reveal"
+        [attr.cx]="cx"
+        [attr.cy]="cy"
+        [attr.r]="radius"
+        [attr.stroke-dasharray]="circumference"
+      />
+    </svg>
+    <div class="donut__center" aria-hidden="true">
+      <strong>{{ total() | number }}</strong>
+      <span>{{ centerLabel() }}</span>
+    </div>
+  </div>
+
+  <ul class="donut__legend">
+    @for (slice of legend(); track slice.key) {
+      <li>
+        <span class="donut__swatch" [style.background]="slice.color"></span>
+        <span class="donut__name">{{ slice.label }}</span>
+        <strong class="donut__count">{{ slice.count | number }}</strong>
+        <span class="donut__pct">{{ slice.percent }}%</span>
+      </li>
+    }
+  </ul>
+</div>
