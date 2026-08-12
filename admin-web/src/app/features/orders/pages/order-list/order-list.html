@@ -1,32 +1,215 @@
 <app-page-header title="Orders" subtitle="All customer orders, full and EMI." />
 
+@if (!loading() && !error()) {
+  <section class="stats" aria-label="Orders summary">
+    <app-stat-card label="Total Orders" [value]="stats().total" icon="pi-shopping-cart" accent="#4f46e5" />
+    <app-stat-card label="Pending Payment" [value]="stats().pendingPay" icon="pi-wallet" accent="#d97706" />
+    <app-stat-card label="In Fulfillment" [value]="stats().processing" icon="pi-box" accent="#2563eb" />
+    <app-stat-card label="Cancelled" [value]="stats().cancelled" icon="pi-times-circle" accent="#dc2626" />
+  </section>
+}
+
 <div class="toolbar">
-  <span class="p-input-icon-left toolbar__search">
-    <i class="pi pi-search"></i>
-    <input pInputText type="text" placeholder="Search by order ID…" [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)" />
-  </span>
-  <p-select [options]="statusOptions" [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)" optionLabel="label" optionValue="value" placeholder="Status" />
+  <label class="search">
+    <i class="pi pi-search" aria-hidden="true"></i>
+    <input
+      type="search"
+      placeholder="Search by order ID, customer, or phone…"
+      [ngModel]="searchTerm()"
+      (ngModelChange)="searchTerm.set($event); resetPage()"
+    />
+  </label>
+
+  <p-select
+    [options]="statusOptions"
+    [ngModel]="statusFilter()"
+    (ngModelChange)="statusFilter.set($event); resetPage()"
+    optionLabel="label"
+    optionValue="value"
+    placeholder="Status"
+    styleClass="catalog-filter"
+    panelStyleClass="catalog-filter-panel"
+    appendTo="body"
+    [checkmark]="false"
+    scrollHeight="280px"
+  />
+  <p-select
+    [options]="paymentOptions"
+    [ngModel]="paymentFilter()"
+    (ngModelChange)="paymentFilter.set($event); resetPage()"
+    optionLabel="label"
+    optionValue="value"
+    placeholder="Payment"
+    styleClass="catalog-filter"
+    panelStyleClass="catalog-filter-panel"
+    appendTo="body"
+    [checkmark]="false"
+    scrollHeight="240px"
+  />
+
+  @if (hasActiveFilters()) {
+    <button class="toolbar__clear" type="button" (click)="clearFilters()">
+      <i class="pi pi-filter-slash" aria-hidden="true"></i>
+      Clear
+    </button>
+  }
 </div>
 
 @if (loading()) {
-  <app-loading-skeleton [rows]="6" />
+  <app-branded-loader message="Loading Orders..." />
 } @else if (error()) {
   <app-error-state [message]="error()!" (retry)="load()" />
 } @else if (filtered().length === 0) {
-  <app-empty-state icon="pi-shopping-cart" title="No orders found" />
+  <app-empty-state
+    icon="pi-shopping-cart"
+    title="No orders found"
+    description="Try adjusting your search or filters."
+  />
 } @else {
-  <p-table [value]="filtered()" [paginator]="true" [rows]="20" dataKey="id" styleClass="p-datatable-sm" [rowHover]="true">
-    <ng-template pTemplate="header">
-      <tr><th>Order</th><th>Amount</th><th>Payment</th><th>Status</th><th>Placed</th></tr>
-    </ng-template>
-    <ng-template pTemplate="body" let-order>
-      <tr (click)="view(order)" style="cursor: pointer">
-        <td class="mono">{{ order.id }}</td>
-        <td>₹{{ order.totalAmount | number }}</td>
-        <td><app-status-badge [status]="order.paymentStatus" /></td>
-        <td><app-status-badge [status]="order.status" /></td>
-        <td>{{ order.createdAt | date: 'medium' }}</td>
-      </tr>
-    </ng-template>
-  </p-table>
+  <div class="table-shell">
+    <p-table [value]="paged()" dataKey="id" [rowHover]="true" styleClass="catalog-table">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Order</th>
+          <th>Customer</th>
+          <th>Amount</th>
+          <th>Method</th>
+          <th>Payment</th>
+          <th>Status</th>
+          <th>Placed</th>
+          <th class="actions-col">Actions</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-order>
+        <tr>
+          <td>
+            <button
+              type="button"
+              class="order-id"
+              [pTooltip]="order.id"
+              [tooltipOptions]="actionTooltip"
+              (click)="view(order)"
+            >
+              <span class="order-id__label">{{ displayId(order) }}</span>
+              @if (order.orderNumber) {
+                <span class="order-id__hint">ID {{ order.id.slice(0, 8) }}…</span>
+              }
+            </button>
+          </td>
+          <td>
+            <div class="customer-cell">
+              <span class="customer-cell__name">{{ order.customerName || '—' }}</span>
+              @if (order.customerPhone) {
+                <span class="customer-cell__phone">{{ order.customerPhone }}</span>
+              }
+            </div>
+          </td>
+          <td class="amount-cell">{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</td>
+          <td>
+            <span class="method-pill" [attr.data-method]="methodLabel(order)">{{ methodLabel(order) }}</span>
+          </td>
+          <td><app-status-badge [status]="order.paymentStatus" /></td>
+          <td><app-status-badge [status]="order.status" /></td>
+          <td class="date-cell">{{ order.createdAt | date: 'MMM d, y, h:mm a' }}</td>
+          <td>
+            <div class="row-actions">
+              <button
+                type="button"
+                class="act act--view"
+                pTooltip="View order"
+                [tooltipOptions]="actionTooltip"
+                (click)="view(order)"
+              >
+                <i class="pi pi-eye" aria-hidden="true"></i>
+                View
+              </button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <div class="card-list" aria-label="Order list">
+    @for (order of paged(); track order.id) {
+      <article class="order-card" (click)="view(order)">
+        <div class="order-card__top">
+          <div class="order-card__meta">
+            <div class="order-card__id">{{ displayId(order) }}</div>
+            <div class="order-card__customer">{{ order.customerName || 'Customer' }}</div>
+          </div>
+          <app-status-badge [status]="order.status" />
+        </div>
+        <dl class="order-card__facts">
+          <div>
+            <dt>Amount</dt>
+            <dd>{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>Payment</dt>
+            <dd><app-status-badge [status]="order.paymentStatus" /></dd>
+          </div>
+          <div>
+            <dt>Method</dt>
+            <dd>{{ methodLabel(order) }}</dd>
+          </div>
+          <div>
+            <dt>Placed</dt>
+            <dd>{{ order.createdAt | date: 'MMM d, y' }}</dd>
+          </div>
+        </dl>
+        <div class="row-actions row-actions--card">
+          <button type="button" class="act act--view" (click)="view(order); $event.stopPropagation()">
+            <i class="pi pi-eye" aria-hidden="true"></i> View
+          </button>
+        </div>
+      </article>
+    }
+  </div>
+
+  <footer class="pager">
+    <p class="pager__meta">
+      Showing <strong>{{ pageFrom() }}–{{ pageTo() }}</strong> of
+      <strong>{{ filtered().length }}</strong> orders
+    </p>
+
+    <div class="pager__nav" role="navigation" aria-label="Pagination">
+      <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(1)" aria-label="First page">
+        <i class="pi pi-angle-double-left"></i>
+      </button>
+      <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" aria-label="Previous page">
+        <i class="pi pi-angle-left"></i>
+      </button>
+      @for (page of pageNumbers(); track page) {
+        <button
+          type="button"
+          class="pager__btn"
+          [class.pager__btn--active]="page === currentPage()"
+          (click)="goToPage(page)"
+        >
+          {{ page }}
+        </button>
+      }
+      <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" aria-label="Next page">
+        <i class="pi pi-angle-right"></i>
+      </button>
+      <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" aria-label="Last page">
+        <i class="pi pi-angle-double-right"></i>
+      </button>
+    </div>
+
+    <div class="pager__size">
+      <span>Rows</span>
+      <p-select
+        [options]="pageSizeOptions"
+        [ngModel]="pageSize()"
+        (ngModelChange)="changePageSize($event)"
+        optionLabel="label"
+        optionValue="value"
+        styleClass="catalog-filter pager-filter"
+        panelStyleClass="catalog-filter-panel"
+        appendTo="body"
+      />
+    </div>
+  </footer>
 }

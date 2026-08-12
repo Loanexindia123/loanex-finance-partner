@@ -2,8 +2,16 @@
   [title]="product()?.name || 'Product'"
   subtitle="Complete catalogue record from the product API"
 >
+  <button
+    leading
+    pButton
+    type="button"
+    icon="pi pi-arrow-left"
+    label="Back"
+    [text]="true"
+    (click)="back()"
+  ></button>
   <div actions>
-    <button pButton type="button" icon="pi pi-arrow-left" label="Back" [outlined]="true" severity="secondary" (click)="back()"></button>
     <button
       *appCan="'products.edit'"
       pButton
@@ -17,7 +25,7 @@
 </app-page-header>
 
 @if (loading()) {
-  <app-loading-skeleton [rows]="8" />
+  <app-branded-loader message="Loading Product..." />
 } @else if (error()) {
   <app-error-state [message]="error()!" (retry)="load()" />
 } @else if (product(); as product) {

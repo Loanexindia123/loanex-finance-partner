@@ -9,11 +9,18 @@ const SEVERITY_MAP: Record<string, Severity> = {
   delivered: 'success',
   completed: 'success',
   paid: 'success',
+  success: 'success',
+  verified: 'success',
   confirmed: 'info',
+  order_confirmed: 'info',
   processing: 'info',
+  packed: 'info',
   shipped: 'info',
+  out_for_delivery: 'info',
   in_progress: 'info',
   pending: 'warn',
+  overdue: 'danger',
+  created: 'warn',
   hold: 'warn',
   draft: 'secondary',
   inactive: 'secondary',
@@ -23,6 +30,10 @@ const SEVERITY_MAP: Record<string, Severity> = {
   failed: 'danger',
   refunded: 'danger',
 };
+
+function normalizeStatusKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
 
 /** Maps common LoanEx status strings to a consistent PrimeNG tag severity. */
 @Component({
@@ -41,7 +52,8 @@ export class StatusBadge {
       .replace(/\b\w/g, (c) => c.toUpperCase()),
   );
 
-  readonly severity = computed<Severity>(
-    () => SEVERITY_MAP[this.status()?.toLowerCase()] ?? 'secondary',
-  );
+  readonly severity = computed<Severity>(() => {
+    const key = normalizeStatusKey(this.status() ?? '');
+    return SEVERITY_MAP[key] ?? SEVERITY_MAP[key.replace(/^order_/, '')] ?? 'secondary';
+  });
 }

@@ -1,48 +1,573 @@
-<app-page-header title="Customer" subtitle="Profile and KYC details.">
-  <div actions>
-    <button pButton icon="pi pi-arrow-left" label="Back to customers" [text]="true" (click)="back()"></button>
-  </div>
+<app-page-header [title]="title()" subtitle="Customer profile, KYC, loans, EMI, and orders.">
+  <button
+    leading
+    pButton
+    type="button"
+    icon="pi pi-arrow-left"
+    label="Back"
+    [text]="true"
+    (click)="back()"
+  ></button>
 </app-page-header>
 
 @if (loading()) {
-  <app-loading-skeleton [rows]="6" />
+  <app-branded-loader message="Loading Customer..." />
 } @else if (error()) {
   <app-error-state [message]="error()!" (retry)="load()" />
 } @else if (!customer()) {
   <app-error-state
-    message="This customer could not be found. The backend does not expose a single-customer lookup — this admin looked for them in the full customer list without success."
+    message="This customer could not be found among end-user accounts."
     [retryable]="false"
   />
-} @else {
-  <div class="detail-grid">
-    <section class="card">
-      <h3>Profile</h3>
-      <dl>
-        <div><dt>Full name</dt><dd>{{ customer()!.profile?.fullName || '—' }}</dd></div>
-        <div><dt>Phone</dt><dd>{{ customer()!.phone }}</dd></div>
-        <div><dt>Email</dt><dd>{{ customer()!.email || '—' }}</dd></div>
-        <div><dt>Date of birth</dt><dd>{{ customer()!.profile?.dob || '—' }}</dd></div>
-        <div><dt>Gender</dt><dd>{{ customer()!.profile?.gender || '—' }}</dd></div>
-        <div><dt>Joined</dt><dd>{{ customer()!.created_at | date: 'medium' }}</dd></div>
-        <div><dt>Status</dt><dd><app-status-badge [status]="customer()!.status" /></dd></div>
+} @else if (customer(); as c) {
+  <div class="detail">
+    <section class="hero">
+      <div class="hero__identity">
+        <div class="avatar avatar--lg" aria-hidden="true">{{ initials() }}</div>
+        <div class="hero__meta">
+          <div class="hero__badges">
+            <app-status-badge [status]="accountStatus()" />
+            @if (kycStatus() === 'Not Available') {
+              <span class="muted-pill">KYC Not Available</span>
+            } @else {
+              <app-status-badge [status]="kycStatus()" />
+            }
+          </div>
+          <h2>{{ title() }}</h2>
+          <p class="hero__contact">{{ phone() }} · {{ email() }}</p>
+          <div class="id-row">
+            <span class="id-row__label">Customer ID</span>
+            <code>{{ c.id }}</code>
+            <button
+              type="button"
+              class="copy-btn"
+              pTooltip="Copy customer ID"
+              [tooltipOptions]="copyTooltip"
+              (click)="copyId()"
+            >
+              <i class="pi pi-copy" aria-hidden="true"></i>
+              Copy
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <dl class="hero__facts">
+        <div>
+          <dt>Registered</dt>
+          <dd>{{ c.created_at | date: 'MMM d, y, h:mm a' }}</dd>
+        </div>
+        <div>
+          <dt>Last updated</dt>
+          <dd>{{ c.updated_at | date: 'MMM d, y, h:mm a' }}</dd>
+        </div>
+        <div>
+          <dt>Date of birth</dt>
+          <dd>{{ c.profile?.dob || c.kyc?.dob || '—' }}</dd>
+        </div>
+        <div>
+          <dt>Gender</dt>
+          <dd>{{ c.profile?.gender || c.kyc?.gender || '—' }}</dd>
+        </div>
+        <div>
+          <dt>City / state</dt>
+          <dd>
+            {{
+              c.kyc?.address?.dist ||
+                c.kyc?.address?.district ||
+                c.kyc?.address?.city ||
+                c.kyc?.address?.state ||
+                '—'
+            }}
+          </dd>
+        </div>
+        <div>
+          <dt>Role</dt>
+          <dd>{{ c.role || '—' }}</dd>
+        </div>
       </dl>
     </section>
 
-    <section class="card">
-      <h3>KYC</h3>
-      @if (customer()!.kyc; as kyc) {
-        <dl>
-          <div><dt>Status</dt><dd><app-status-badge [status]="customer()!.profile?.kyc_status || 'Pending'" /></dd></div>
-          <div><dt>Aadhaar verified</dt><dd>{{ kyc.aadharVerified ? 'Yes' : 'No' }}</dd></div>
-          <div><dt>Aadhaar number</dt><dd>{{ kyc.aadhar_number || '—' }}</dd></div>
-          <div><dt>PAN verified</dt><dd>{{ kyc.pan_verified ? 'Yes' : 'No' }}</dd></div>
-          <div><dt>PAN number</dt><dd>{{ kyc.panNumber || '—' }}</dd></div>
-          <div><dt>CIBIL score</dt><dd>{{ kyc.cibil_score ?? '—' }}</dd></div>
-          <div><dt>State</dt><dd>{{ kyc.address?.state || '—' }}</dd></div>
-        </dl>
-      } @else {
-        <p class="muted">No KYC record found for this customer yet.</p>
-      }
+    <section class="kpi-strip" aria-label="Financial overview">
+      <div class="kpi">
+        <span class="kpi__label">Orders</span>
+        <strong>{{ finance().totalOrders }}</strong>
+      </div>
+      <div class="kpi">
+        <span class="kpi__label">Loans</span>
+        <strong>{{ finance().totalLoans }}</strong>
+      </div>
+      <div class="kpi">
+        <span class="kpi__label">Active loans</span>
+        <strong>{{ finance().activeLoans }}</strong>
+      </div>
+      <div class="kpi">
+        <span class="kpi__label">EMI applications</span>
+        <strong>{{ finance().emiApps }}</strong>
+      </div>
+      <div class="kpi">
+        <span class="kpi__label">Outstanding</span>
+        <strong class="kpi__warn">{{ finance().outstanding | currency: 'INR' : 'symbol' : '1.0-2' }}</strong>
+      </div>
+      <div class="kpi">
+        <span class="kpi__label">Total paid</span>
+        <strong class="kpi__ok">{{ finance().paid | currency: 'INR' : 'symbol' : '1.0-2' }}</strong>
+      </div>
     </section>
+
+    <div class="detail-grid">
+      <div class="detail-main">
+        <section class="card">
+          <div class="card__head">
+            <h3>Personal information</h3>
+          </div>
+          <dl class="facts-grid">
+            <div>
+              <dt>Full name</dt>
+              <dd>{{ title() }}</dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd>{{ email() }}</dd>
+            </div>
+            <div>
+              <dt>Mobile</dt>
+              <dd>{{ phone() }}</dd>
+            </div>
+            <div>
+              <dt>Account status</dt>
+              <dd><app-status-badge [status]="accountStatus()" /></dd>
+            </div>
+            <div>
+              <dt>Date of birth</dt>
+              <dd>{{ c.profile?.dob || c.kyc?.dob || '—' }}</dd>
+            </div>
+            <div>
+              <dt>Gender</dt>
+              <dd>{{ c.profile?.gender || c.kyc?.gender || '—' }}</dd>
+            </div>
+            <div>
+              <dt>City</dt>
+              <dd>{{ c.kyc?.address?.dist || c.kyc?.address?.district || c.kyc?.address?.city || '—' }}</dd>
+            </div>
+            <div>
+              <dt>State</dt>
+              <dd>{{ c.kyc?.address?.state || '—' }}</dd>
+            </div>
+            <div>
+              <dt>Country</dt>
+              <dd>{{ c.kyc?.address?.country || '—' }}</dd>
+            </div>
+            <div>
+              <dt>Pincode</dt>
+              <dd>{{ c.kyc?.address?.pincode || c.kyc?.address?.zip || '—' }}</dd>
+            </div>
+            <div class="facts-grid--wide">
+              <dt>Address</dt>
+              <dd>{{ address() }}</dd>
+            </div>
+            @if (c.profile?.branches?.length) {
+              <div class="facts-grid--wide">
+                <dt>Branches</dt>
+                <dd>{{ c.profile?.branches?.join(', ') }}</dd>
+              </div>
+            }
+            @if (c.profile?.pincodes?.length) {
+              <div class="facts-grid--wide">
+                <dt>Service pincodes</dt>
+                <dd>{{ c.profile?.pincodes?.join(', ') }}</dd>
+              </div>
+            }
+          </dl>
+        </section>
+
+        <section class="card">
+          <div class="card__head">
+            <h3>KYC information</h3>
+            @if (kycStatus() === 'Not Available') {
+              <span class="muted-pill">Not Available</span>
+            } @else {
+              <app-status-badge [status]="kycStatus()" />
+            }
+          </div>
+
+          @if (!c.kyc) {
+            <div class="empty-block">
+              <i class="pi pi-id-card" aria-hidden="true"></i>
+              <p>No KYC record is available for this customer from the backend.</p>
+            </div>
+          } @else {
+            <div class="verify-grid">
+              <div class="verify" [attr.data-ok]="aadhaarVerified()">
+                <i class="pi" [class]="aadhaarVerified() ? 'pi-check-circle' : 'pi-times-circle'" aria-hidden="true"></i>
+                <div>
+                  <strong>Aadhaar</strong>
+                  <span>{{ aadhaarVerified() ? 'Verified' : 'Not verified' }}</span>
+                </div>
+              </div>
+              <div class="verify" [attr.data-ok]="panVerified()">
+                <i class="pi" [class]="panVerified() ? 'pi-check-circle' : 'pi-times-circle'" aria-hidden="true"></i>
+                <div>
+                  <strong>PAN</strong>
+                  <span>{{ panVerified() ? 'Verified' : 'Not verified' }}</span>
+                </div>
+              </div>
+              <div class="verify" [attr.data-ok]="faceVerified()">
+                <i class="pi" [class]="faceVerified() ? 'pi-check-circle' : 'pi-times-circle'" aria-hidden="true"></i>
+                <div>
+                  <strong>Face match</strong>
+                  <span>{{ faceVerified() ? 'Verified' : 'Not verified' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <dl class="facts-grid facts-grid--spaced">
+              <div>
+                <dt>Aadhaar</dt>
+                <dd class="mono">{{ aadhaarDisplay() }}</dd>
+              </div>
+              <div>
+                <dt>PAN</dt>
+                <dd class="mono">{{ panDisplay() }}</dd>
+              </div>
+              <div>
+                <dt>CIBIL score</dt>
+                <dd>
+                  @if (cibilScore() !== null) {
+                    {{ cibilScore() }}
+                  } @else {
+                    —
+                  }
+                </dd>
+              </div>
+              <div>
+                <dt>Name on KYC</dt>
+                <dd>{{ c.kyc.fullName || '—' }}</dd>
+              </div>
+              <div>
+                <dt>KYC DOB</dt>
+                <dd>{{ c.kyc.dob || '—' }}</dd>
+              </div>
+              <div>
+                <dt>KYC gender</dt>
+                <dd>{{ c.kyc.gender || '—' }}</dd>
+              </div>
+              @if (c.kyc.faceMatchScore != null) {
+                <div>
+                  <dt>Face match score</dt>
+                  <dd>{{ c.kyc.faceMatchScore | number: '1.0-2' }}</dd>
+                </div>
+              }
+              @if (c.kyc.credit_eligibility_status) {
+                <div>
+                  <dt>Credit eligibility</dt>
+                  <dd>{{ c.kyc.credit_eligibility_status }}</dd>
+                </div>
+              }
+              @if (c.kyc.kycCompleted != null) {
+                <div>
+                  <dt>KYC completed</dt>
+                  <dd>{{ c.kyc.kycCompleted ? 'Yes' : 'No' }}</dd>
+                </div>
+              }
+              @if (c.kyc.kycCompletedAt) {
+                <div>
+                  <dt>KYC completed at</dt>
+                  <dd>{{ c.kyc.kycCompletedAt | date: 'MMM d, y, h:mm a' }}</dd>
+                </div>
+              }
+              <div class="facts-grid--wide">
+                <dt>Address</dt>
+                <dd>{{ address() }}</dd>
+              </div>
+              <div>
+                <dt>KYC created</dt>
+                <dd>{{ c.kyc.createdAt | date: 'MMM d, y' }}</dd>
+              </div>
+              <div>
+                <dt>KYC updated</dt>
+                <dd>{{ c.kyc.updatedAt | date: 'MMM d, y' }}</dd>
+              </div>
+            </dl>
+          }
+        </section>
+
+        <section class="card">
+          <div class="card__head">
+            <h3>Loans / EMI accounts</h3>
+            <span class="card__meta">{{ loans().length }} loan{{ loans().length === 1 ? '' : 's' }}</span>
+          </div>
+
+          @if (loans().length === 0) {
+            <div class="empty-block">
+              <i class="pi pi-wallet" aria-hidden="true"></i>
+              <p>No loan accounts linked to this customer.</p>
+            </div>
+          } @else {
+            <div class="items-shell table-scroll">
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Loan</th>
+                    <th>Product</th>
+                    <th>Status</th>
+                    <th class="num">Amount</th>
+                    <th class="num">EMI</th>
+                    <th class="num">Outstanding</th>
+                    <th class="num">Paid</th>
+                    <th>Next due</th>
+                    <th>Start</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (loan of loans(); track loan.id) {
+                    <tr>
+                      <td>
+                        <div class="stack-cell">
+                          <strong>{{ loan.loanAccountNumber || loan.id }}</strong>
+                          @if (loan.applicationNumber) {
+                            <span>{{ loan.applicationNumber }}</span>
+                          }
+                        </div>
+                      </td>
+                      <td>{{ loan.productName || '—' }}</td>
+                      <td><app-status-badge [status]="loan.loanStatus" /></td>
+                      <td class="num">{{ loan.loanAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</td>
+                      <td class="num">{{ loan.emiAmount | currency: 'INR' : 'symbol' : '1.0-2' }}</td>
+                      <td class="num">{{ loan.outstandingAmount | currency: 'INR' : 'symbol' : '1.0-2' }}</td>
+                      <td class="num">{{ loan.paidAmount | currency: 'INR' : 'symbol' : '1.0-2' }}</td>
+                      <td>{{ loan.nextEmiDueDate ? (loan.nextEmiDueDate | date: 'MMM d, y') : '—' }}</td>
+                      <td>{{ loan.loanStartDate ? (loan.loanStartDate | date: 'MMM d, y') : '—' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </section>
+
+        <section class="card">
+          <div class="card__head">
+            <h3>EMI applications</h3>
+            <span class="card__meta">{{ emiApplications().length }} application{{ emiApplications().length === 1 ? '' : 's' }}</span>
+          </div>
+
+          @if (emiApplications().length === 0) {
+            <div class="empty-block">
+              <i class="pi pi-file" aria-hidden="true"></i>
+              <p>No EMI applications found for this customer.</p>
+            </div>
+          } @else {
+            <div class="items-shell table-scroll">
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Application</th>
+                    <th>Product</th>
+                    <th>Status</th>
+                    <th class="num">Requested</th>
+                    <th class="num">Monthly EMI</th>
+                    <th class="num">Approved</th>
+                    <th>Submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (app of emiApplications(); track app.id) {
+                    <tr>
+                      <td class="mono">{{ app.applicationNumber }}</td>
+                      <td>{{ app.productName || '—' }}</td>
+                      <td><app-status-badge [status]="app.status" /></td>
+                      <td class="num">{{ (app.requestedAmount || 0) | currency: 'INR' : 'symbol' : '1.0-0' }}</td>
+                      <td class="num">{{ (app.monthlyEmi || app.estimatedMonthlyEmi || 0) | currency: 'INR' : 'symbol' : '1.0-2' }}</td>
+                      <td class="num">
+                        @if (app.approvedAmount != null) {
+                          {{ app.approvedAmount | currency: 'INR' : 'symbol' : '1.0-0' }}
+                        } @else {
+                          —
+                        }
+                      </td>
+                      <td>{{ (app.submittedAt || app.createdAt) | date: 'MMM d, y' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </section>
+
+        <section class="card">
+          <div class="card__head">
+            <h3>Orders / purchases</h3>
+            <span class="card__meta">{{ orders().length }} order{{ orders().length === 1 ? '' : 's' }}</span>
+          </div>
+
+          @if (orders().length === 0) {
+            <div class="empty-block">
+              <i class="pi pi-shopping-cart" aria-hidden="true"></i>
+              <p>No orders linked to this customer.</p>
+            </div>
+          } @else {
+            <div class="items-shell table-scroll">
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Order</th>
+                    <th>Product</th>
+                    <th class="num">Amount</th>
+                    <th>Method</th>
+                    <th>Payment</th>
+                    <th>Status</th>
+                    <th>Placed</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (order of orders(); track order.id) {
+                    <tr>
+                      <td class="mono">{{ orderLabel(order) }}</td>
+                      <td>{{ order.productName || '—' }}</td>
+                      <td class="num">{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</td>
+                      <td>
+                        <span class="method-pill" [attr.data-method]="methodLabel(order)">{{ methodLabel(order) }}</span>
+                      </td>
+                      <td><app-status-badge [status]="order.paymentStatus" /></td>
+                      <td><app-status-badge [status]="order.status" /></td>
+                      <td>{{ order.createdAt | date: 'MMM d, y' }}</td>
+                      <td>
+                        <button type="button" class="act" (click)="viewOrder(order)">
+                          <i class="pi pi-eye" aria-hidden="true"></i>
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </section>
+
+        <section class="card">
+          <div class="card__head">
+            <h3>Activity / account</h3>
+            <span class="card__meta">{{ activity().length }} event{{ activity().length === 1 ? '' : 's' }}</span>
+          </div>
+
+          <dl class="facts-grid">
+            <div>
+              <dt>Created</dt>
+              <dd>{{ c.created_at | date: 'MMM d, y, h:mm a' }}</dd>
+            </div>
+            <div>
+              <dt>Updated</dt>
+              <dd>{{ c.updated_at | date: 'MMM d, y, h:mm a' }}</dd>
+            </div>
+            <div>
+              <dt>Account status</dt>
+              <dd><app-status-badge [status]="accountStatus()" /></dd>
+            </div>
+            <div>
+              <dt>KYC status</dt>
+              <dd>
+                @if (kycStatus() === 'Not Available') {
+                  <span class="muted-pill">Not Available</span>
+                } @else {
+                  <app-status-badge [status]="kycStatus()" />
+                }
+              </dd>
+            </div>
+            <div>
+              <dt>Blocked</dt>
+              <dd>{{ c.blocked ? 'Yes' : 'No' }}</dd>
+            </div>
+            <div>
+              <dt>Role</dt>
+              <dd>{{ c.role || '—' }}</dd>
+            </div>
+          </dl>
+
+          @if (activity().length === 0) {
+            <div class="empty-block empty-block--tight">
+              <i class="pi pi-history" aria-hidden="true"></i>
+              <p>No audit activity recorded for this customer.</p>
+            </div>
+          } @else {
+            <div class="activity-list">
+              @for (event of activity(); track event.id) {
+                <article class="activity-item">
+                  <div class="activity-item__main">
+                    <strong>{{ actionLabel(event.action) }}</strong>
+                    @if (event.entityType || event.entity) {
+                      <span>{{ event.entityType || event.entity }}{{ event.entityId ? ' · ' + event.entityId : '' }}</span>
+                    }
+                  </div>
+                  <time>{{ event.createdAt | date: 'MMM d, y, h:mm a' }}</time>
+                </article>
+              }
+            </div>
+          }
+        </section>
+      </div>
+
+      <aside class="detail-side">
+        <section class="card">
+          <div class="card__head">
+            <h3>Quick facts</h3>
+          </div>
+          <dl class="facts-stack">
+            <div>
+              <dt>Account</dt>
+              <dd><app-status-badge [status]="accountStatus()" /></dd>
+            </div>
+            <div>
+              <dt>KYC</dt>
+              <dd>
+                @if (kycStatus() === 'Not Available') {
+                  <span class="muted-pill">Not Available</span>
+                } @else {
+                  <app-status-badge [status]="kycStatus()" />
+                }
+              </dd>
+            </div>
+            <div>
+              <dt>Orders</dt>
+              <dd>{{ finance().totalOrders }}</dd>
+            </div>
+            <div>
+              <dt>Loans</dt>
+              <dd>{{ finance().totalLoans }}</dd>
+            </div>
+            <div>
+              <dt>Active loans</dt>
+              <dd>{{ finance().activeLoans }}</dd>
+            </div>
+            <div>
+              <dt>Phone</dt>
+              <dd>{{ phone() }}</dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd>{{ email() }}</dd>
+            </div>
+            @if (cibilScore() !== null) {
+              <div>
+                <dt>CIBIL</dt>
+                <dd>{{ cibilScore() }}</dd>
+              </div>
+            }
+          </dl>
+        </section>
+
+        <section class="card">
+          <div class="card__head">
+            <h3>Documents</h3>
+          </div>
+          <div class="empty-block empty-block--tight">
+            <i class="pi pi-folder" aria-hidden="true"></i>
+            <p>No document download endpoints are exposed for customers in the admin API.</p>
+          </div>
+        </section>
+      </aside>
+    </div>
   </div>
 }

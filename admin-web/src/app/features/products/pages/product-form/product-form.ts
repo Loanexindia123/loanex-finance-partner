@@ -31,7 +31,7 @@ import { MessageService } from 'primeng/api';
 import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
 import { isStoredImageRef, resolveMediaUrl } from '../../../../core/config/api.config';
-import { LoadingSkeleton } from '../../../../shared/components/loading-skeleton/loading-skeleton';
+import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
 import { ManageableSelect } from '../../components/manageable-select/manageable-select';
 import { ProductService } from '../../services/product.service';
 import { WizardOptionsService } from '../../services/wizard-options.service';
@@ -103,7 +103,7 @@ import {
     ButtonModule,
     TooltipModule,
     DialogModule,
-    LoadingSkeleton,
+    BrandedLoader,
     ManageableSelect,
   ],
   templateUrl: './product-form.html',

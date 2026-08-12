@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ButtonModule } from 'primeng/button';
 import { PageHeader } from '../../../../shared/components/page-header/page-header';
-import { LoadingSkeleton } from '../../../../shared/components/loading-skeleton/loading-skeleton';
+import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
 import { ErrorState } from '../../../../shared/components/error-state/error-state';
 import { StatusBadge } from '../../../../shared/components/status-badge/status-badge';
 import { CanDirective } from '../../../../shared/directives/can.directive';
@@ -37,7 +37,7 @@ interface DetailSection {
     CurrencyPipe,
     ButtonModule,
     PageHeader,
-    LoadingSkeleton,
+    BrandedLoader,
     ErrorState,
     StatusBadge,
     CanDirective,

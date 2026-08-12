@@ -5,11 +5,14 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   standalone: true,
   template: `
     <div class="page-header">
-      <div>
-        <h1>{{ title() }}</h1>
-        @if (subtitle()) {
-          <p>{{ subtitle() }}</p>
-        }
+      <div class="page-header__left">
+        <ng-content select="[leading]" />
+        <div class="page-header__titles">
+          <h1>{{ title() }}</h1>
+          @if (subtitle()) {
+            <p>{{ subtitle() }}</p>
+          }
+        </div>
       </div>
       <div class="page-header__actions">
         <ng-content select="[actions]" />
@@ -26,6 +29,17 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
         margin-bottom: 1.25rem;
         flex-wrap: wrap;
       }
+      .page-header__left {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.15rem;
+        min-width: 0;
+        flex: 1;
+      }
+      .page-header__titles {
+        min-width: 0;
+      }
       h1 {
         margin: 0;
         font-size: 1.25rem;
@@ -41,6 +55,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        flex-wrap: wrap;
       }
     `,
   ],

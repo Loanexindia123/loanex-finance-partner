@@ -1,63 +1,491 @@
-<app-page-header title="Order {{ orderId }}" subtitle="Order details, items, and status.">
-  <div actions>
-    <button pButton icon="pi pi-arrow-left" label="Back to orders" [text]="true" (click)="back()"></button>
-  </div>
+<app-page-header [title]="title()" subtitle="Order details, loan ledger, EMI schedule, and fulfillment.">
+  <button
+    leading
+    pButton
+    type="button"
+    icon="pi pi-arrow-left"
+    label="Back"
+    [text]="true"
+    (click)="back()"
+  ></button>
 </app-page-header>
 
 @if (loading()) {
-  <app-loading-skeleton [rows]="6" />
+  <app-branded-loader message="Loading Order..." />
 } @else if (error()) {
   <app-error-state [message]="error()!" (retry)="load()" />
 } @else if (order(); as o) {
-  <div class="detail-grid">
-    <section class="card">
-      <h3>Summary</h3>
-      <dl>
-        <div><dt>Amount</dt><dd>₹{{ o.totalAmount | number }}</dd></div>
-        <div><dt>Payment method</dt><dd>{{ o.paymentMethod || '—' }}</dd></div>
-        <div><dt>Payment status</dt><dd><app-status-badge [status]="o.paymentStatus" /></dd></div>
-        <div><dt>Order status</dt><dd><app-status-badge [status]="o.status" /></dd></div>
-        <div><dt>Placed</dt><dd>{{ o.createdAt | date: 'medium' }}</dd></div>
+  <div class="detail">
+    <section class="hero">
+      <div class="hero__product">
+        @if (o.productImageUrl; as src) {
+          <img [src]="src" [alt]="o.productName || 'Product'" />
+        } @else {
+          <div class="hero__product-empty" aria-hidden="true">
+            <i class="pi pi-box"></i>
+          </div>
+        }
+        <div class="hero__product-meta">
+          <div class="hero__badges">
+            <app-status-badge [status]="o.status" />
+            <app-status-badge [status]="o.paymentStatus" />
+            <span class="method-pill" [attr.data-method]="methodLabel()">{{ methodLabel() }}</span>
+          </div>
+          <h2>{{ o.productName || 'Order' }}</h2>
+          <p class="hero__amount">{{ o.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</p>
+          <p class="hero__placed">Placed {{ o.createdAt | date: 'MMM d, y, h:mm a' }}</p>
+        </div>
+      </div>
+
+      <dl class="hero__facts">
+        <div>
+          <dt>Order number</dt>
+          <dd>{{ o.orderNumber || '—' }}</dd>
+        </div>
+        <div>
+          <dt>Order ID</dt>
+          <dd class="mono">
+            {{ o.id }}
+            <button type="button" class="inline-copy" pTooltip="Copy order ID" [tooltipOptions]="copyTooltip" (click)="copyId()">
+              <i class="pi pi-copy" aria-hidden="true"></i>
+            </button>
+          </dd>
+        </div>
+        <div>
+          <dt>Customer</dt>
+          <dd>{{ o.customerName || '—' }}</dd>
+        </div>
+        <div>
+          <dt>Phone</dt>
+          <dd>{{ o.customerPhone || '—' }}</dd>
+        </div>
+        <div>
+          <dt>Customer ID</dt>
+          <dd class="mono">{{ o.customerId || o.userId || '—' }}</dd>
+        </div>
+        <div>
+          <dt>Transaction</dt>
+          <dd>{{ (o.transactionDate || o.createdAt) | date: 'MMM d, y, h:mm a' }}</dd>
+        </div>
+        @if (o.deliveryAddress) {
+          <div class="hero__facts--wide">
+            <dt>Delivery address</dt>
+            <dd>{{ o.deliveryAddress }}</dd>
+          </div>
+        }
       </dl>
+    </section>
 
-      <h3 class="mt">Items</h3>
-      @if (o.items.length === 0) {
-        <p class="muted">No items recorded on this order.</p>
-      } @else {
-        <table class="items-table">
-          <thead><tr><th>Product</th><th>Qty</th><th>Unit price</th></tr></thead>
-          <tbody>
-            @for (item of o.items; track item.productId) {
-              <tr>
-                <td>{{ item.productName || item.productId }}</td>
-                <td>{{ item.quantity }}</td>
-                <td>₹{{ item.unitPrice | number }}</td>
-              </tr>
+    @if (isEmi()) {
+      <section class="loan-strip" aria-label="Loan summary">
+        <div class="loan-strip__head">
+          <div>
+            <h3>Loan overview</h3>
+            <div class="loan-strip__sub">
+              {{ o.loanAccountNumber || 'Loan account' }}
+              @if (o.loanStatus) {
+                <span aria-hidden="true">·</span>
+                <app-status-badge [status]="o.loanStatus" />
+              }
+            </div>
+          </div>
+          <div class="loan-strip__progress">
+            <span>{{ emiProgress().paid }}/{{ emiProgress().total }} EMIs paid</span>
+            <div class="progress-bar" aria-hidden="true">
+              <span [style.width.%]="emiProgress().pct"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi">
+            <span class="kpi__label">Loan amount</span>
+            <strong>{{ (o.loanAmount ?? o.totalAmount) | currency: 'INR' : 'symbol' : '1.0-0' }}</strong>
+          </div>
+          <div class="kpi">
+            <span class="kpi__label">Outstanding</span>
+            <strong class="kpi__warn">
+              @if (o.outstandingAmount !== null && o.outstandingAmount !== undefined) {
+                {{ o.outstandingAmount | currency: 'INR' : 'symbol' : '1.0-2' }}
+              } @else {
+                —
+              }
+            </strong>
+          </div>
+          <div class="kpi">
+            <span class="kpi__label">Amount paid</span>
+            <strong class="kpi__ok">
+              @if (o.amountPaid !== null && o.amountPaid !== undefined) {
+                {{ o.amountPaid | currency: 'INR' : 'symbol' : '1.0-2' }}
+              } @else {
+                —
+              }
+            </strong>
+          </div>
+          <div class="kpi">
+            <span class="kpi__label">EMI amount</span>
+            <strong>
+              @if (o.emiAmount !== null && o.emiAmount !== undefined) {
+                {{ o.emiAmount | currency: 'INR' : 'symbol' : '1.0-2' }}
+              } @else {
+                —
+              }
+            </strong>
+          </div>
+          <div class="kpi">
+            <span class="kpi__label">Interest rate</span>
+            <strong>
+              @if (o.interestRate !== null && o.interestRate !== undefined) {
+                {{ o.interestRate | number: '1.0-2' }}%
+              } @else {
+                —
+              }
+            </strong>
+          </div>
+          <div class="kpi">
+            <span class="kpi__label">Next EMI due</span>
+            <strong>
+              @if (o.nextEmiDueDate) {
+                {{ o.nextEmiDueDate | date: 'MMM d, y' }}
+              } @else {
+                —
+              }
+            </strong>
+          </div>
+        </div>
+      </section>
+    }
+
+    <div class="detail-grid">
+      <div class="detail-main">
+        <section class="card">
+          <div class="card__head">
+            <h3>Product</h3>
+            <span class="card__meta">{{ o.items.length }} line{{ o.items.length === 1 ? '' : 's' }}</span>
+          </div>
+
+          @if (o.items.length === 0) {
+            <div class="empty-items">
+              <i class="pi pi-box" aria-hidden="true"></i>
+              <p>No items recorded on this order.</p>
+            </div>
+          } @else {
+            <div class="items-shell">
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th class="num">Qty</th>
+                    <th class="num">Unit price</th>
+                    <th class="num">Line total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of o.items; track item.productId + '-' + $index) {
+                    <tr>
+                      <td>
+                        <div class="product-cell">
+                          @if (item.productImageUrl; as src) {
+                            <img [src]="src" [alt]="item.productName || 'Product'" />
+                          } @else {
+                            <div class="product-cell__placeholder" aria-hidden="true">
+                              <i class="pi pi-box"></i>
+                            </div>
+                          }
+                          <div class="product-cell__meta">
+                            <div class="product-cell__name">{{ item.productName || item.productId }}</div>
+                            @if (item.productBrand) {
+                              <div class="product-cell__brand">{{ item.productBrand }}</div>
+                            }
+                            <div class="product-cell__sku">{{ item.productId }}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="num">{{ item.quantity }}</td>
+                      <td class="num">{{ item.unitPrice | currency: 'INR' : 'symbol' : '1.0-0' }}</td>
+                      <td class="num amount">{{ lineTotal(item) | currency: 'INR' : 'symbol' : '1.0-0' }}</td>
+                    </tr>
+                  }
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="3">Items total</td>
+                    <td class="num amount">{{ itemsTotal() | currency: 'INR' : 'symbol' : '1.0-0' }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          }
+        </section>
+
+        @if (isEmi()) {
+          <section class="card">
+            <div class="card__head">
+              <h3>EMI plan</h3>
+              <span class="card__meta">{{ o.emiPlan || o.emiDuration || 'EMI' }}</span>
+            </div>
+            <dl class="facts-grid">
+              <div>
+                <dt>Plan</dt>
+                <dd>{{ o.emiPlan || '—' }}</dd>
+              </div>
+              <div>
+                <dt>Duration</dt>
+                <dd>{{ o.emiDuration || '—' }}</dd>
+              </div>
+              <div>
+                <dt>Monthly EMI</dt>
+                <dd>
+                  @if (o.emiAmount !== null && o.emiAmount !== undefined) {
+                    {{ o.emiAmount | currency: 'INR' : 'symbol' : '1.0-2' }}
+                  } @else {
+                    —
+                  }
+                </dd>
+              </div>
+              <div>
+                <dt>Down payment</dt>
+                <dd>
+                  @if (o.downPayment !== null && o.downPayment !== undefined) {
+                    {{ o.downPayment | currency: 'INR' : 'symbol' : '1.0-2' }}
+                  } @else {
+                    —
+                  }
+                </dd>
+              </div>
+              <div>
+                <dt>Down payment collected</dt>
+                <dd>
+                  @if (o.downPaymentCollected !== null && o.downPaymentCollected !== undefined) {
+                    {{ o.downPaymentCollected | currency: 'INR' : 'symbol' : '1.0-2' }}
+                  } @else {
+                    —
+                  }
+                </dd>
+              </div>
+              <div>
+                <dt>Processing fee</dt>
+                <dd>
+                  @if (o.processingFee !== null && o.processingFee !== undefined) {
+                    {{ o.processingFee | currency: 'INR' : 'symbol' : '1.0-2' }}
+                  } @else {
+                    —
+                  }
+                </dd>
+              </div>
+              <div>
+                <dt>Paid at delivery</dt>
+                <dd>
+                  @if (o.paidAtDelivery !== null && o.paidAtDelivery !== undefined) {
+                    {{ o.paidAtDelivery | currency: 'INR' : 'symbol' : '1.0-2' }}
+                  } @else {
+                    —
+                  }
+                </dd>
+              </div>
+              <div>
+                <dt>Interest rate</dt>
+                <dd>
+                  @if (o.interestRate !== null && o.interestRate !== undefined) {
+                    {{ o.interestRate | number: '1.0-2' }}%
+                  } @else {
+                    —
+                  }
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="card">
+            <div class="card__head">
+              <h3>EMI schedule</h3>
+              <span class="card__meta">{{ o.emiSchedule.length }} installments</span>
+            </div>
+
+            @if (o.emiSchedule.length === 0) {
+              <div class="empty-items">
+                <i class="pi pi-calendar" aria-hidden="true"></i>
+                <p>No EMI schedule available for this order.</p>
+              </div>
+            } @else {
+              <div class="items-shell table-scroll">
+                <table class="items-table schedule-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Due</th>
+                      <th>Status</th>
+                      <th class="num">Principal</th>
+                      <th class="num">Interest</th>
+                      <th class="num">EMI</th>
+                      <th>Paid on</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of o.emiSchedule; track row.emiNumber) {
+                      <tr [attr.data-status]="row.paymentStatus">
+                        <td>{{ row.emiNumber }}</td>
+                        <td>{{ row.dueDate | date: 'MMM d, y' }}</td>
+                        <td><app-status-badge [status]="row.paymentStatus" /></td>
+                        <td class="num">{{ row.principalAmount | currency: 'INR' : 'symbol' : '1.0-2' }}</td>
+                        <td class="num">{{ row.interestAmount | currency: 'INR' : 'symbol' : '1.0-2' }}</td>
+                        <td class="num amount">{{ row.amount | currency: 'INR' : 'symbol' : '1.0-2' }}</td>
+                        <td>{{ row.paidAt ? (row.paidAt | date: 'MMM d, y') : '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             }
-          </tbody>
-        </table>
-      }
-    </section>
+          </section>
 
-    <section class="card" *appCan="'orders.edit'">
-      <h3>Update status</h3>
-      <div class="field">
-        <label>Status</label>
-        <p-select [options]="statusOptions" [ngModel]="nextStatus()" (ngModelChange)="nextStatus.set($event)" optionLabel="label" optionValue="value" />
+          @if (o.emiPayments.length > 0) {
+            <section class="card">
+              <div class="card__head">
+                <h3>EMI payments received</h3>
+                <span class="card__meta">{{ o.emiPayments.length }} payment{{ o.emiPayments.length === 1 ? '' : 's' }}</span>
+              </div>
+              <div class="items-shell table-scroll">
+                <table class="items-table">
+                  <thead>
+                    <tr>
+                      <th>EMI #</th>
+                      <th>Due</th>
+                      <th>Paid on</th>
+                      <th class="num">Principal</th>
+                      <th class="num">Interest</th>
+                      <th class="num">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (pay of o.emiPayments; track pay.emiNumber) {
+                      <tr>
+                        <td>{{ pay.emiNumber }}</td>
+                        <td>{{ pay.dueDate | date: 'MMM d, y' }}</td>
+                        <td>{{ pay.paidAt | date: 'MMM d, y, h:mm a' }}</td>
+                        <td class="num">{{ pay.principalAmount | currency: 'INR' : 'symbol' : '1.0-2' }}</td>
+                        <td class="num">{{ pay.interestAmount | currency: 'INR' : 'symbol' : '1.0-2' }}</td>
+                        <td class="num amount">{{ pay.amount | currency: 'INR' : 'symbol' : '1.0-2' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          }
+        }
       </div>
-      <div class="field">
-        <label>Courier partner</label>
-        <input pInputText [ngModel]="courierPartner()" (ngModelChange)="courierPartner.set($event)" />
-      </div>
-      <div class="field">
-        <label>Tracking number</label>
-        <input pInputText [ngModel]="trackingNumber()" (ngModelChange)="trackingNumber.set($event)" />
-      </div>
-      <div class="field">
-        <label>Remarks</label>
-        <textarea pTextarea rows="3" [ngModel]="remarks()" (ngModelChange)="remarks.set($event)"></textarea>
-      </div>
-      <button pButton label="Update order" [loading]="updating()" (click)="updateStatus()"></button>
-    </section>
+
+      <aside class="detail-side">
+        <section class="card" *appCan="'orders.edit'">
+          <div class="card__head">
+            <h3>Update status</h3>
+          </div>
+
+          <div class="field">
+            <label for="order-status">Status</label>
+            <p-select
+              inputId="order-status"
+              [options]="statusOptions"
+              [ngModel]="nextStatus()"
+              (ngModelChange)="nextStatus.set($event)"
+              optionLabel="label"
+              optionValue="value"
+              styleClass="detail-select"
+              panelStyleClass="catalog-filter-panel"
+              appendTo="body"
+              [checkmark]="false"
+              scrollHeight="280px"
+            />
+          </div>
+          <div class="field">
+            <label for="courier-partner">Courier partner</label>
+            <input
+              id="courier-partner"
+              pInputText
+              type="text"
+              placeholder="e.g. Delhivery, Blue Dart"
+              [ngModel]="courierPartner()"
+              (ngModelChange)="courierPartner.set($event)"
+            />
+          </div>
+          <div class="field">
+            <label for="tracking-number">Tracking number</label>
+            <input
+              id="tracking-number"
+              pInputText
+              type="text"
+              placeholder="Shipment tracking ID"
+              [ngModel]="trackingNumber()"
+              (ngModelChange)="trackingNumber.set($event)"
+            />
+          </div>
+          <div class="field">
+            <label for="remarks">Remarks</label>
+            <textarea
+              id="remarks"
+              pTextarea
+              rows="4"
+              placeholder="Optional note for this status change"
+              [ngModel]="remarks()"
+              (ngModelChange)="remarks.set($event)"
+            ></textarea>
+          </div>
+
+          <button
+            pButton
+            type="button"
+            class="update-btn"
+            label="Update order"
+            icon="pi pi-check"
+            [loading]="updating()"
+            [disabled]="updating()"
+            (click)="updateStatus()"
+          ></button>
+        </section>
+
+        <section class="card">
+          <div class="card__head">
+            <h3>Quick facts</h3>
+          </div>
+          <dl class="facts-stack">
+            <div>
+              <dt>Payment method</dt>
+              <dd>{{ methodLabel() }}</dd>
+            </div>
+            <div>
+              <dt>Payment status</dt>
+              <dd><app-status-badge [status]="o.paymentStatus" /></dd>
+            </div>
+            <div>
+              <dt>Order status</dt>
+              <dd><app-status-badge [status]="o.status" /></dd>
+            </div>
+            @if (o.loanAccountNumber) {
+              <div>
+                <dt>Loan account</dt>
+                <dd class="mono">{{ o.loanAccountNumber }}</dd>
+              </div>
+            }
+            @if (o.loanStatus) {
+              <div>
+                <dt>Loan status</dt>
+                <dd><app-status-badge [status]="o.loanStatus" /></dd>
+              </div>
+            }
+            <div>
+              <dt>Selling price</dt>
+              <dd>
+                @if (o.sellingPrice !== null && o.sellingPrice !== undefined) {
+                  {{ o.sellingPrice | currency: 'INR' : 'symbol' : '1.0-0' }}
+                } @else {
+                  {{ o.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}
+                }
+              </dd>
+            </div>
+          </dl>
+        </section>
+      </aside>
+    </div>
   </div>
 }

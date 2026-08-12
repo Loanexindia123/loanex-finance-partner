@@ -1,43 +1,210 @@
 <app-page-header title="Customers" subtitle="Registered customers and their KYC status." />
 
+@if (!loading() && !error()) {
+  <section class="stats" aria-label="Customers summary">
+    <app-stat-card label="Total Customers" [value]="stats().total" icon="pi-users" accent="#4f46e5" />
+    <app-stat-card label="KYC Approved" [value]="stats().approved" icon="pi-verified" accent="#16a34a" />
+    <app-stat-card label="KYC Pending" [value]="stats().pending" icon="pi-clock" accent="#d97706" />
+    <app-stat-card label="Blocked" [value]="stats().blocked" icon="pi-ban" accent="#dc2626" />
+  </section>
+}
+
 <div class="toolbar">
-  <span class="p-input-icon-left toolbar__search">
-    <i class="pi pi-search"></i>
+  <label class="search">
+    <i class="pi pi-search" aria-hidden="true"></i>
     <input
-      pInputText
-      type="text"
-      placeholder="Search by name, phone, or email…"
+      type="search"
+      placeholder="Search by name, phone, email, or ID…"
       [ngModel]="searchTerm()"
-      (ngModelChange)="searchTerm.set($event)"
+      (ngModelChange)="searchTerm.set($event); resetPage()"
     />
-  </span>
+  </label>
+
+  <p-select
+    [options]="kycOptions"
+    [ngModel]="kycFilter()"
+    (ngModelChange)="kycFilter.set($event); resetPage()"
+    optionLabel="label"
+    optionValue="value"
+    placeholder="KYC"
+    styleClass="catalog-filter"
+    panelStyleClass="catalog-filter-panel"
+    appendTo="body"
+    [checkmark]="false"
+  />
+  <p-select
+    [options]="statusOptions"
+    [ngModel]="statusFilter()"
+    (ngModelChange)="statusFilter.set($event); resetPage()"
+    optionLabel="label"
+    optionValue="value"
+    placeholder="Status"
+    styleClass="catalog-filter"
+    panelStyleClass="catalog-filter-panel"
+    appendTo="body"
+    [checkmark]="false"
+  />
+
+  @if (hasActiveFilters()) {
+    <button class="toolbar__clear" type="button" (click)="clearFilters()">
+      <i class="pi pi-filter-slash" aria-hidden="true"></i>
+      Clear
+    </button>
+  }
 </div>
 
 @if (loading()) {
-  <app-loading-skeleton [rows]="6" />
+  <app-branded-loader message="Loading Customers..." />
 } @else if (error()) {
   <app-error-state [message]="error()!" (retry)="load()" />
 } @else if (filtered().length === 0) {
-  <app-empty-state icon="pi-users" title="No customers found" />
+  <app-empty-state
+    icon="pi-users"
+    title="No customers found"
+    description="Try adjusting your search or filters."
+  />
 } @else {
-  <p-table [value]="filtered()" [paginator]="true" [rows]="20" dataKey="id" styleClass="p-datatable-sm" [rowHover]="true">
-    <ng-template pTemplate="header">
-      <tr><th>Name</th><th>Phone</th><th>Email</th><th>KYC status</th><th>Joined</th></tr>
-    </ng-template>
-    <ng-template pTemplate="body" let-customer>
-      <tr (click)="view(customer)" style="cursor: pointer">
-        <td>{{ customer.profile?.fullName || '—' }}</td>
-        <td>{{ customer.phone }}</td>
-        <td>{{ customer.email || '—' }}</td>
-        <td>
-          @if (customer.kyc || customer.profile?.kyc_status) {
-            <app-status-badge [status]="customer.profile?.kyc_status || 'Pending'" />
+  <div class="table-shell">
+    <p-table [value]="paged()" dataKey="id" [rowHover]="true" styleClass="catalog-table">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th>Email</th>
+          <th>City</th>
+          <th>KYC</th>
+          <th>Status</th>
+          <th>Joined</th>
+          <th class="actions-col">Actions</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-customer>
+        <tr>
+          <td>
+            <div class="customer-cell">
+              <div class="avatar" aria-hidden="true">{{ initials(customer) }}</div>
+              <div class="customer-cell__meta">
+                <div class="customer-cell__name">{{ name(customer) }}</div>
+                <div class="customer-cell__id">{{ customer.id.slice(0, 8) }}…</div>
+              </div>
+            </div>
+          </td>
+          <td>{{ phone(customer) }}</td>
+          <td>{{ email(customer) }}</td>
+          <td>{{ city(customer) }}</td>
+          <td>
+            @if (kycStatus(customer) === 'Not Available') {
+              <span class="muted-pill">Not Available</span>
+            } @else {
+              <app-status-badge [status]="kycStatus(customer)" />
+            }
+          </td>
+          <td><app-status-badge [status]="accountStatus(customer)" /></td>
+          <td class="date-cell">{{ customer.created_at | date: 'MMM d, y' }}</td>
+          <td>
+            <div class="row-actions">
+              <button
+                type="button"
+                class="act act--view"
+                pTooltip="View customer"
+                [tooltipOptions]="actionTooltip"
+                (click)="view(customer)"
+              >
+                <i class="pi pi-eye" aria-hidden="true"></i>
+                View
+              </button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <div class="card-list" aria-label="Customer list">
+    @for (customer of paged(); track customer.id) {
+      <article class="customer-card" (click)="view(customer)">
+        <div class="customer-card__top">
+          <div class="customer-cell">
+            <div class="avatar" aria-hidden="true">{{ initials(customer) }}</div>
+            <div class="customer-cell__meta">
+              <div class="customer-cell__name">{{ name(customer) }}</div>
+              <div class="customer-cell__id">{{ phone(customer) }}</div>
+            </div>
+          </div>
+          @if (kycStatus(customer) === 'Not Available') {
+            <span class="muted-pill">Not Available</span>
           } @else {
-            <span class="muted">Not started</span>
+            <app-status-badge [status]="kycStatus(customer)" />
           }
-        </td>
-        <td>{{ customer.created_at | date: 'mediumDate' }}</td>
-      </tr>
-    </ng-template>
-  </p-table>
+        </div>
+        <dl class="customer-card__facts">
+          <div>
+            <dt>Email</dt>
+            <dd>{{ email(customer) }}</dd>
+          </div>
+          <div>
+            <dt>City</dt>
+            <dd>{{ city(customer) }}</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd><app-status-badge [status]="accountStatus(customer)" /></dd>
+          </div>
+          <div>
+            <dt>Joined</dt>
+            <dd>{{ customer.created_at | date: 'MMM d, y' }}</dd>
+          </div>
+        </dl>
+        <div class="row-actions row-actions--card">
+          <button type="button" class="act act--view" (click)="view(customer); $event.stopPropagation()">
+            <i class="pi pi-eye" aria-hidden="true"></i> View
+          </button>
+        </div>
+      </article>
+    }
+  </div>
+
+  <footer class="pager">
+    <p class="pager__meta">
+      Showing <strong>{{ pageFrom() }}–{{ pageTo() }}</strong> of
+      <strong>{{ filtered().length }}</strong> customers
+    </p>
+    <div class="pager__nav" role="navigation" aria-label="Pagination">
+      <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(1)" aria-label="First page">
+        <i class="pi pi-angle-double-left"></i>
+      </button>
+      <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" aria-label="Previous page">
+        <i class="pi pi-angle-left"></i>
+      </button>
+      @for (page of pageNumbers(); track page) {
+        <button
+          type="button"
+          class="pager__btn"
+          [class.pager__btn--active]="page === currentPage()"
+          (click)="goToPage(page)"
+        >
+          {{ page }}
+        </button>
+      }
+      <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" aria-label="Next page">
+        <i class="pi pi-angle-right"></i>
+      </button>
+      <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" aria-label="Last page">
+        <i class="pi pi-angle-double-right"></i>
+      </button>
+    </div>
+    <div class="pager__size">
+      <span>Rows</span>
+      <p-select
+        [options]="pageSizeOptions"
+        [ngModel]="pageSize()"
+        (ngModelChange)="changePageSize($event)"
+        optionLabel="label"
+        optionValue="value"
+        styleClass="catalog-filter pager-filter"
+        panelStyleClass="catalog-filter-panel"
+        appendTo="body"
+      />
+    </div>
+  </footer>
 }

@@ -38,7 +38,7 @@
 </header>
 
 @if (loading()) {
-  <app-loading-skeleton [rows]="8" />
+  <app-branded-loader message="Loading Product..." />
 } @else {
   <div class="wizard" [formGroup]="form">
     <nav class="wizard__steps" aria-label="Product wizard steps">
