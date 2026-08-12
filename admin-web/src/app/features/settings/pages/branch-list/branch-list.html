@@ -1,0 +1,268 @@
+<div class="toolbar">
+  <label class="search">
+    <i class="pi pi-search" aria-hidden="true"></i>
+    <input
+      type="search"
+      placeholder="Search by name, code, city, state or manager"
+      [ngModel]="searchTerm()"
+      (ngModelChange)="searchTerm.set($event)"
+    />
+  </label>
+
+  <button *appCan="'masters.create'" class="toolbar__add" type="button" (click)="openAdd()">
+    <i class="pi pi-plus" aria-hidden="true"></i>
+    Add Branch
+  </button>
+
+  <p-select
+    [options]="statusFilterOptions"
+    [ngModel]="statusFilter()"
+    (ngModelChange)="statusFilter.set($event)"
+    optionLabel="label"
+    optionValue="value"
+    styleClass="catalog-filter"
+    panelStyleClass="catalog-filter-panel"
+    appendTo="body"
+    [checkmark]="false"
+  />
+</div>
+
+@if (loading()) {
+  <app-branded-loader message="Loading Branches..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (filtered().length === 0) {
+  <app-empty-state
+    icon="pi-building"
+    title="No branches found"
+    description="Try a different search, or add a new branch."
+  />
+} @else {
+  <div class="table-shell">
+    <p-table [value]="filtered()" dataKey="id" [rowHover]="true" styleClass="catalog-table">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Branch Name</th>
+          <th>Branch Code</th>
+          <th>City</th>
+          <th>State</th>
+          <th>Branch Manager</th>
+          <th>Mobile Number</th>
+          <th>Status</th>
+          <th class="actions-col">Actions</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-branch>
+        <tr>
+          <td>{{ branch.name }}</td>
+          <td>{{ branch.branchCode }}</td>
+          <td>{{ branch.city }}</td>
+          <td>{{ branch.state }}</td>
+          <td>{{ branch.branchManager }}</td>
+          <td>{{ branch.mobile }}</td>
+          <td>
+            <button
+              *appCan="'masters.edit'; else statusBadge"
+              type="button"
+              class="status-toggle"
+              [attr.data-status]="branch.status"
+              pTooltip="Click to toggle Enable/Disable"
+              [tooltipOptions]="actionTooltip"
+              (click)="toggleStatus(branch)"
+            >
+              <app-status-badge [status]="branch.status" />
+            </button>
+            <ng-template #statusBadge>
+              <app-status-badge [status]="branch.status" />
+            </ng-template>
+          </td>
+          <td>
+            <div class="row-actions">
+              <button
+                type="button"
+                class="act act--view"
+                pTooltip="View branch"
+                [tooltipOptions]="actionTooltip"
+                (click)="view(branch)"
+              >
+                <i class="pi pi-eye" aria-hidden="true"></i>
+                View
+              </button>
+              <button
+                *appCan="'masters.edit'"
+                type="button"
+                class="act act--edit"
+                pTooltip="Edit branch"
+                [tooltipOptions]="actionTooltip"
+                (click)="openEdit(branch)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+                Edit
+              </button>
+              <button
+                *appCan="'masters.delete'"
+                type="button"
+                class="act act--delete"
+                pTooltip="Delete branch"
+                [tooltipOptions]="actionTooltip"
+                (click)="askDelete(branch)"
+              >
+                <i class="pi pi-trash" aria-hidden="true"></i>
+                Delete
+              </button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+}
+
+<!-- Add / Edit dialog -->
+<p-dialog
+  [header]="formMode() === 'add' ? 'Add Branch' : 'Edit Branch'"
+  [visible]="formOpen()"
+  (visibleChange)="!$event && closeForm()"
+  [modal]="true"
+  [draggable]="false"
+  [closable]="!saving()"
+  [closeOnEscape]="!saving()"
+  [dismissableMask]="!saving()"
+  appendTo="body"
+  styleClass="admin-dialog"
+  [style]="{ width: 'min(520px, calc(100vw - 2rem))' }"
+>
+  <form [formGroup]="form" class="branch-form" (ngSubmit)="submitForm()">
+    <div class="field">
+      <label for="branchName">Branch Name</label>
+      <input id="branchName" pInputText formControlName="name" placeholder="e.g. Mumbai Andheri" />
+    </div>
+    <div class="field">
+      <label for="branchCode">Branch Code</label>
+      <input id="branchCode" pInputText formControlName="branchCode" placeholder="e.g. MUM-AND" />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="city">City</label>
+        <input id="city" pInputText formControlName="city" placeholder="e.g. Mumbai" />
+      </div>
+      <div class="field">
+        <label for="state">State</label>
+        <input id="state" pInputText formControlName="state" placeholder="e.g. Maharashtra" />
+      </div>
+    </div>
+    <div class="field">
+      <label for="branchManager">Branch Manager</label>
+      <input id="branchManager" pInputText formControlName="branchManager" placeholder="e.g. Anil Sharma" />
+    </div>
+    <div class="field">
+      <label for="mobile">Mobile Number</label>
+      <input id="mobile" pInputText formControlName="mobile" placeholder="e.g. +91 98000 11111" />
+    </div>
+    <div class="status-row">
+      <label for="isActive">Status</label>
+      <p-toggleswitch formControlName="isActive" inputId="isActive" />
+    </div>
+  </form>
+
+  <ng-template pTemplate="footer">
+    <button
+      pButton
+      type="button"
+      label="Cancel"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="saving()"
+      (click)="closeForm()"
+    ></button>
+    <button
+      pButton
+      type="button"
+      [label]="formMode() === 'add' ? 'Add Branch' : 'Save Changes'"
+      [icon]="formMode() === 'add' ? 'pi pi-plus' : 'pi pi-check'"
+      [loading]="saving()"
+      [disabled]="saving()"
+      (click)="submitForm()"
+    ></button>
+  </ng-template>
+</p-dialog>
+
+<!-- View dialog (read-only) -->
+<p-dialog
+  header="Branch Details"
+  [visible]="!!viewTarget()"
+  (visibleChange)="!$event && closeView()"
+  [modal]="true"
+  [draggable]="false"
+  appendTo="body"
+  styleClass="admin-dialog"
+  [style]="{ width: 'min(480px, calc(100vw - 2rem))' }"
+>
+  @if (viewTarget(); as branch) {
+    <dl class="branch-view">
+      <div><dt>Branch Name</dt><dd>{{ branch.name }}</dd></div>
+      <div><dt>Branch Code</dt><dd>{{ branch.branchCode }}</dd></div>
+      <div><dt>City</dt><dd>{{ branch.city }}</dd></div>
+      <div><dt>State</dt><dd>{{ branch.state }}</dd></div>
+      <div><dt>Branch Manager</dt><dd>{{ branch.branchManager }}</dd></div>
+      <div><dt>Mobile Number</dt><dd>{{ branch.mobile }}</dd></div>
+      <div><dt>Status</dt><dd><app-status-badge [status]="branch.status" /></dd></div>
+    </dl>
+  }
+  <ng-template pTemplate="footer">
+    <button pButton type="button" label="Close" severity="secondary" [outlined]="true" (click)="closeView()"></button>
+  </ng-template>
+</p-dialog>
+
+<!-- Delete confirmation -->
+<p-dialog
+  [visible]="!!deleteTarget()"
+  [modal]="true"
+  [draggable]="false"
+  [closable]="!deleting()"
+  [closeOnEscape]="!deleting()"
+  [dismissableMask]="!deleting()"
+  appendTo="body"
+  styleClass="admin-dialog delete-dialog"
+  [style]="{ width: 'min(440px, calc(100vw - 2rem))' }"
+  (visibleChange)="!$event && cancelDelete()"
+>
+  <ng-template pTemplate="header">
+    <div class="delete-dialog__head">
+      <span class="delete-dialog__icon" aria-hidden="true"><i class="pi pi-exclamation-triangle"></i></span>
+      <span>Delete Branch?</span>
+    </div>
+  </ng-template>
+
+  @if (deleteTarget(); as branch) {
+    <p class="delete-dialog__copy">
+      Are you sure you want to delete this branch? This action cannot be undone.
+    </p>
+    <div class="delete-dialog__product">
+      <strong>{{ branch.name }}</strong>
+      <span>{{ branch.branchCode }}</span>
+    </div>
+  }
+
+  <ng-template pTemplate="footer">
+    <button
+      pButton
+      type="button"
+      label="Cancel"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="deleting()"
+      (click)="cancelDelete()"
+    ></button>
+    <button
+      pButton
+      type="button"
+      label="Delete Branch"
+      severity="danger"
+      icon="pi pi-trash"
+      [loading]="deleting()"
+      [disabled]="deleting()"
+      (click)="confirmDelete()"
+    ></button>
+  </ng-template>
+</p-dialog>

@@ -1,0 +1,12 @@
+<app-page-header title="Settings" subtitle="Configure LoanEx platform data" />
+
+<nav class="settings-tabs" aria-label="Settings sections">
+  @for (tab of tabs; track tab.route) {
+    <a class="settings-tabs__link" [routerLink]="tab.route" routerLinkActive="settings-tabs__link--active">
+      <i class="pi" [class]="tab.icon" aria-hidden="true"></i>
+      {{ tab.label }}
+    </a>
+  }
+</nav>
+
+<router-outlet />
