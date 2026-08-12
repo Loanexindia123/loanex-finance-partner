@@ -4,6 +4,11 @@ import { requirePermission } from '../../common/middleware/require-permission';
 import { validateRequest } from '../../common/middleware/validate';
 import { asyncHandler } from '../../common/utils/async-handler';
 import { adminController } from './admin.controller';
+import { branchController } from './branch/branch.controller';
+import {
+  createBranchBodySchema,
+  updateBranchBodySchema,
+} from './branch/branch.validator';
 import { emiApplicationController } from '../emi-application/controller/emi-application.controller';
 import { emiPaymentController } from '../emi-payment/controller/emi-payment.controller';
 import { autopayController } from '../autopay/controller/autopay.controller';
@@ -142,13 +147,41 @@ adminRouter.get('/fi-cases', requirePermission('fi.view'), asyncHandler(adminCon
 adminRouter.get('/fi-cases/:fiCaseId', requirePermission('fi.view'), asyncHandler(adminController.getFiCase));
 adminRouter.patch('/fi-cases/:fiCaseId', requirePermission('fi.edit'), asyncHandler(adminController.updateFiCase));
 
-// —— Master data ——
+// —— Branches (dedicated: validation + GET by id; same /admin/branches contract) ——
+adminRouter.get(
+  '/branches',
+  requirePermission('masters.view'),
+  asyncHandler(branchController.list),
+);
+adminRouter.post(
+  '/branches',
+  requirePermission('masters.create'),
+  validateRequest(createBranchBodySchema),
+  asyncHandler(branchController.create),
+);
+adminRouter.get(
+  '/branches/:id',
+  requirePermission('masters.view'),
+  asyncHandler(branchController.getById),
+);
+adminRouter.put(
+  '/branches/:id',
+  requirePermission('masters.edit'),
+  validateRequest(updateBranchBodySchema),
+  asyncHandler(branchController.update),
+);
+adminRouter.delete(
+  '/branches/:id',
+  requirePermission('masters.delete'),
+  asyncHandler(branchController.remove),
+);
+
+// —— Master data (other collections; branches handled above) ——
 for (const collection of [
   'suppliers',
   'dealers',
   'warehouses',
   'brands',
-  'branches',
   'pincodes',
   'wholesalers',
   'delivery_partners',

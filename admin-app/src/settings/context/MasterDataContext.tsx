@@ -239,7 +239,14 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
       apply(wholesalersRes, setWholesalers);
       apply(deliveryPartnersRes, setDeliveryPartners);
       apply(deliveryZonesRes, setDeliveryZones);
-      apply(branchesRes, setBranches);
+      // Branches: always replace local seeds with API data (including []).
+      // Keeping seeds when the server list is empty caused Edit PUT 404s on
+      // client-only UUIDs that were never persisted.
+      if (branchesRes.status === 'fulfilled') {
+        setBranches(unwrapList(branchesRes.value.data));
+      } else {
+        console.warn('Unable to load branches from API:', branchesRes.reason);
+      }
       apply(pincodesRes, setPincodes);
     });
 
@@ -788,6 +795,7 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
           return false;
         }
 
+        const isEdit = !!data.id;
         const payload = {
           ...data,
           name,
@@ -798,10 +806,11 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
           mobile: data.mobile.trim(),
         };
 
-        if (data.id) {
+        if (isEdit) {
           const old = branches.find((b) => b.id === data.id);
+          const item = { ...payload, id: data.id } as BranchMaster;
           setBranches((prev) =>
-            prev.map((item) => (item.id === data.id ? { ...item, ...payload } : item)),
+            prev.map((b) => (b.id === data.id ? { ...b, ...item } : b)),
           );
           if (old && old.name !== name) {
             setPincodes((prev) =>
@@ -810,11 +819,23 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
               ),
             );
           }
-          syncUpsert('/admin/branches', { ...payload, id: data.id });
+          // Prefer PUT. If the id only exists locally (never POSTed), create it.
+          api
+            .put(`/admin/branches/${data.id}`, item)
+            .catch((err) => {
+              if (err?.response?.status === 404) {
+                return api.post('/admin/branches', item);
+              }
+              console.warn('Failed to save branch:', err);
+              return undefined;
+            })
+            .catch((err) => console.warn('Failed to save branch:', err));
         } else {
           const item = { ...payload, id: createMasterId('branch') } as BranchMaster;
           setBranches((prev) => [...prev, item]);
-          syncUpsert('/admin/branches', item);
+          api
+            .post('/admin/branches', item)
+            .catch((err) => console.warn('Failed to save branch:', err));
         }
         return true;
       },
