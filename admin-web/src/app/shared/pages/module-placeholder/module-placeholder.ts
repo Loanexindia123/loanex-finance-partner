@@ -12,7 +12,12 @@ import { EmptyState } from '../../components/empty-state/empty-state';
   standalone: true,
   imports: [PageHeader, EmptyState],
   template: `
-    <app-page-header [title]="title" [subtitle]="subtitle" />
+    <app-page-header
+      [title]="title"
+      [subtitle]="subtitle"
+      [backLink]="backLink"
+      [backLabel]="backLabel"
+    />
     <app-empty-state icon="pi-hourglass" title="Coming in a later phase" [description]="description" />
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -21,6 +26,8 @@ export class ModulePlaceholder {
   private readonly route = inject(ActivatedRoute);
   readonly title = (this.route.snapshot.data['title'] as string) ?? 'Module';
   readonly subtitle = this.route.snapshot.data['subtitle'] as string | undefined;
+  readonly backLink = this.route.snapshot.data['backLink'] as string | undefined;
+  readonly backLabel = (this.route.snapshot.data['backLabel'] as string) ?? 'Back';
   readonly description =
     (this.route.snapshot.data['description'] as string) ??
     'This section is scaffolded and will be wired up to the backend in an upcoming build phase.';

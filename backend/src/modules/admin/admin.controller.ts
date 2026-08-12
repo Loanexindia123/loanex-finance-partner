@@ -1,10 +1,18 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { EmiApplicationStatus } from '@prisma/client';
 import { jsonDb } from '../../config/json-db';
 import { sendSuccess } from '../../common/utils/api-response';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../../common/errors/app-error';
 import { hashPassword } from '../../common/utils/password';
 import { rolePermissions, SUPER_ADMIN_PERMISSIONS } from '../rbac/permissions';
+
+/** EMI statuses that FI Accept/Reject may still move (pre-final-approval). */
+const FI_MUTABLE_EMI_STATUSES = new Set<string>([
+  EmiApplicationStatus.PENDING,
+  EmiApplicationStatus.UNDER_REVIEW,
+  EmiApplicationStatus.APPROVED,
+]);
 
 /** Resolve role + effective permissions for a user row (sync, in-memory). */
 export function resolveRbacForUser(user: any) {
@@ -85,6 +93,51 @@ const MASTER_COLLECTIONS = [
   'product_variants',
   'product_variant_attributes',
 ] as const;
+
+/**
+ * Credit review fields — mirrors admin-app's src/types/creditReview.ts and
+ * admin-web's credit-review.models.ts exactly. Do not add fields here that
+ * aren't already part of that shared shape.
+ */
+const CREDIT_REVIEW_FIELDS = [
+  'creditStatus',
+  'reviewer',
+  'reviewDate',
+  'remarks',
+  'decision',
+  'kycStatus',
+  'aadhaarStatus',
+  'panStatus',
+  'bankingDetails',
+  'fiReport',
+  'emiEligibility',
+  'repaymentCapacity',
+  'selectedProduct',
+  'productMargin',
+  'downPayment',
+  'riskCategory',
+  'recommendedProduct',
+] as const;
+
+const CREDIT_REVIEW_DEFAULTS: Record<(typeof CREDIT_REVIEW_FIELDS)[number], string> = {
+  creditStatus: 'Waiting',
+  reviewer: '—',
+  reviewDate: '—',
+  remarks: '',
+  decision: 'Pending',
+  kycStatus: 'Pending',
+  aadhaarStatus: 'Pending',
+  panStatus: 'Pending',
+  bankingDetails: '—',
+  fiReport: '—',
+  emiEligibility: 'Under assessment',
+  repaymentCapacity: 'Under assessment',
+  selectedProduct: '—',
+  productMargin: '—',
+  downPayment: '—',
+  riskCategory: '—',
+  recommendedProduct: '',
+};
 
 function toProfile(row: any) {
   if (!row) return null;
@@ -295,15 +348,116 @@ export class AdminController {
     return sendSuccess(res, item, 'FI case fetched');
   };
 
-  /** PATCH /admin/fi-cases/:fiCaseId */
+  /**
+   * PATCH /admin/fi-cases/:fiCaseId
+   *
+   * FI Accept  → status `completed`: EMI returns to UNDER_REVIEW for Admin Credit Review
+   *              (NOT final EMI/application approval).
+   * FI Reject  → status `hold`: EMI moves to REJECTED; remarks become the rejection reason.
+   */
   updateFiCase = async (req: Request, res: Response) => {
     const id = String(req.params.fiCaseId ?? '');
     const existing = jsonDb.findOne('fi_cases', { id });
     if (!existing) {
       throw new NotFoundError('FI case not found');
     }
-    const updated = jsonDb.update('fi_cases', { id }, req.body ?? {});
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const nextStatus = String(
+      body.status !== undefined ? body.status : existing.status ?? '',
+    ).toLowerCase();
+    const nextRemarks = String(
+      body.remarks !== undefined ? body.remarks : existing.remarks ?? '',
+    ).trim();
+
+    if (nextStatus === 'hold' && !nextRemarks) {
+      throw new BadRequestError('Remarks are required when rejecting a field investigation.');
+    }
+
+    const updated = jsonDb.update('fi_cases', { id }, body);
+    const applicationId = String(updated?.applicationId ?? existing.applicationId ?? '');
+
+    if (applicationId && (nextStatus === 'completed' || nextStatus === 'hold')) {
+      const app = jsonDb.findOne('emi_applications', { id: applicationId });
+      if (app && FI_MUTABLE_EMI_STATUSES.has(String(app.status))) {
+        if (nextStatus === 'completed') {
+          // FI Accept — investigation succeeded; Admin continues Credit Review / terms.
+          jsonDb.update('emi_applications', { id: applicationId }, {
+            status: EmiApplicationStatus.UNDER_REVIEW,
+            rejectionReason: null,
+            reviewedAt: new Date(),
+            offerAcceptedAt: null,
+            offerDeclinedAt: null,
+          });
+
+          // Open Credit Review for Admin (Waiting) — not final approval.
+          if (!jsonDb.findOne('credit_reviews', { applicationId })) {
+            jsonDb.upsert(
+              'credit_reviews',
+              { applicationId },
+              {},
+              {
+                ...CREDIT_REVIEW_DEFAULTS,
+                applicationId,
+                creditStatus: 'Waiting',
+                decision: 'Pending',
+                fiReport: nextRemarks || 'FI accepted. Awaiting credit review.',
+                selectedProduct: String(app.productName ?? CREDIT_REVIEW_DEFAULTS.selectedProduct),
+                downPayment:
+                  app.approvedDownPayment != null || app.requestedDownPayment != null
+                    ? String(app.approvedDownPayment ?? app.requestedDownPayment)
+                    : CREDIT_REVIEW_DEFAULTS.downPayment,
+              },
+            );
+          }
+        } else {
+          // FI Reject — failed investigation. Do not open Credit Review success path.
+          const reason = nextRemarks || 'Field investigation rejected.';
+          jsonDb.update('emi_applications', { id: applicationId }, {
+            status: EmiApplicationStatus.REJECTED,
+            rejectionReason: reason,
+            adminRemarks: reason,
+            reviewedAt: new Date(),
+            offerAcceptedAt: null,
+            offerDeclinedAt: null,
+          });
+        }
+      }
+    }
+
     return sendSuccess(res, updated, 'FI case updated');
+  };
+
+  /** GET /admin/credit-reviews/:applicationId */
+  getCreditReview = async (req: Request, res: Response) => {
+    const applicationId = String(req.params.applicationId ?? '');
+    const item = jsonDb.findOne('credit_reviews', { applicationId });
+    if (!item) {
+      throw new NotFoundError('Credit review not found');
+    }
+    return sendSuccess(res, item, 'Credit review fetched');
+  };
+
+  /** PATCH /admin/credit-reviews/:applicationId — creates the record on first save (upsert). */
+  upsertCreditReview = async (req: Request, res: Response) => {
+    const applicationId = String(req.params.applicationId ?? '');
+    if (!applicationId) {
+      throw new BadRequestError('applicationId is required');
+    }
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const patch: Record<string, unknown> = {};
+    for (const field of CREDIT_REVIEW_FIELDS) {
+      if (body[field] !== undefined) patch[field] = body[field];
+    }
+
+    const existed = Boolean(jsonDb.findOne('credit_reviews', { applicationId }));
+    const saved = jsonDb.upsert(
+      'credit_reviews',
+      { applicationId },
+      patch,
+      { ...CREDIT_REVIEW_DEFAULTS, applicationId, ...patch },
+    );
+    return sendSuccess(res, saved, existed ? 'Credit review updated' : 'Credit review created', existed ? 200 : 201);
   };
 
   /** GET /admin/suppliers|dealers|warehouses */

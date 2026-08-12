@@ -445,16 +445,30 @@
 
                           <div class="grid-2">
                             <div class="field">
-                              <app-manageable-select
-                                label="Supplier"
-                                entityName="Supplier"
-                                [options]="options.suppliers()"
-                                [value]="asGroup(ctrl).get('supplier')!.value"
-                                (valueChange)="asGroup(ctrl).patchValue({ supplier: $event })"
-                                (add)="options.addSupplier($event)"
-                                (rename)="renameSupplierEverywhere($event.from, $event.to)"
-                                (remove)="deleteSupplierEverywhere($event)"
-                              />
+                              <label>Dealer</label>
+                              <div class="dealer-select-row">
+                                <p-select
+                                  formControlName="supplier"
+                                  [options]="variantDealerSelectOptions()"
+                                  optionLabel="label"
+                                  optionValue="value"
+                                  placeholder="Search dealer..."
+                                  panelStyleClass="catalog-filter-panel dealer-select-panel"
+                                  [filter]="true"
+                                  filterPlaceholder="Search by name or code..."
+                                  [showClear]="true"
+                                  [loading]="dealersLoading()"
+                                  (onChange)="onVariantDealerChange(i)"
+                                />
+                                <button
+                                  pButton
+                                  type="button"
+                                  [outlined]="true"
+                                  icon="pi pi-plus"
+                                  label="Add Dealer"
+                                  (click)="navigateToAddDealerFromVariant()"
+                                ></button>
+                              </div>
                             </div>
                             <div class="field">
                               <app-manageable-select
@@ -1041,147 +1055,120 @@
             <section class="section-card">
               <div class="section-card__head">
                 <div>
-                  <h3>Supplier information</h3>
-                  <p>Link suppliers, dealers, settlement cycles, and purchase details.</p>
+                  <h3>Dealer</h3>
+                  <p>Link this product to a dealer. Fields auto-fill from dealer master data.</p>
                 </div>
-                <button pButton type="button" icon="pi pi-plus" label="Add supplier" (click)="addSupplier()"></button>
+                <div class="source-actions">
+                  <button pButton type="button" icon="pi pi-plus" label="Add Dealer" (click)="addSupplier()"></button>
+                </div>
               </div>
 
               @if (suppliersArr.length === 0) {
                 <div class="empty-hint empty-hint--tall">
-                  <i class="pi pi-truck" aria-hidden="true"></i>
+                  <i class="pi pi-shop" aria-hidden="true"></i>
                   <div>
-                    <strong>No suppliers added yet</strong>
-                    <p>Add a supplier card to record vendor, invoice and settlement details.</p>
+                    <strong>No dealer linked yet</strong>
+                    <p>Add a dealer to set commercial terms and payment schedule.</p>
                   </div>
-                  <button pButton type="button" [outlined]="true" icon="pi pi-plus" label="Add supplier" (click)="addSupplier()"></button>
+                  <button pButton type="button" [outlined]="true" icon="pi pi-plus" label="Add Dealer" (click)="addSupplier()"></button>
                 </div>
               }
 
               @for (ctrl of suppliersArr.controls; track $index; let i = $index) {
                 <article class="entity-card" [formGroup]="asGroup(ctrl)">
                   <header class="entity-card__head">
-                    <h4>Supplier #{{ i + 1 }}</h4>
+                    <h4>Dealer #{{ i + 1 }}</h4>
                     <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger" label="Delete" (click)="removeSupplier(i)"></button>
                   </header>
 
                   <div class="grid-2">
                     <div class="field">
-                      <app-manageable-select
-                        label="Supplier"
-                        entityName="Supplier"
-                        [options]="options.suppliers()"
-                        [value]="asGroup(ctrl).get('supplier')!.value"
-                        (valueChange)="onSupplierFieldChange(i, 'supplier', $event)"
-                        (add)="options.addSupplier($event)"
-                        (rename)="renameSupplierEverywhere($event.from, $event.to)"
-                        (remove)="deleteSupplierEverywhere($event)"
-                      />
+                      <label>Dealer</label>
+                      <div class="dealer-select-row">
+                        <p-select
+                          formControlName="dealerId"
+                          [options]="dealerSelectOptions()"
+                          optionLabel="label"
+                          optionValue="value"
+                          placeholder="Search dealer..."
+                          panelStyleClass="catalog-filter-panel dealer-select-panel"
+                          [filter]="true"
+                          filterPlaceholder="Search by name or code..."
+                          [showClear]="true"
+                          [loading]="dealersLoading()"
+                          (onChange)="onDealerSelected(i, $event.value)"
+                        />
+                        <button
+                          pButton
+                          type="button"
+                          [outlined]="true"
+                          icon="pi pi-plus"
+                          label="Add Dealer"
+                          (click)="navigateToAddDealer(i)"
+                        ></button>
+                      </div>
                     </div>
                     <div class="field">
-                      <app-manageable-select
-                        label="Dealer"
-                        entityName="Dealer"
-                        [options]="options.dealers()"
-                        [value]="asGroup(ctrl).get('dealer')!.value"
-                        (valueChange)="onSupplierFieldChange(i, 'dealer', $event)"
-                        (add)="options.addDealer($event)"
-                        (rename)="renameDealerEverywhere($event.from, $event.to)"
-                        (remove)="deleteDealerEverywhere($event)"
-                      />
-                    </div>
-                    <div class="field">
-                      <app-manageable-select
-                        label="Wholesaler"
-                        entityName="Wholesaler"
-                        [options]="options.wholesalers()"
-                        [value]="asGroup(ctrl).get('wholesaler')!.value"
-                        (valueChange)="onSupplierFieldChange(i, 'wholesaler', $event)"
-                        (add)="options.addWholesaler($event)"
-                        (rename)="renameWholesalerEverywhere($event.from, $event.to)"
-                        (remove)="deleteWholesalerEverywhere($event)"
-                      />
-                    </div>
-                    <div class="field">
-                      <label>Product source</label>
+                      <label>Product Source</label>
                       <p-select
-                        [options]="productSourceOptions"
-                        formControlName="productSource"
+                        formControlName="sourceCreatedBy"
+                        [options]="staffOptions()"
                         optionLabel="label"
                         optionValue="value"
-                        placeholder="Select source"
-                        [showClear]="true"
-                        appendTo="body"
-                        panelStyleClass="catalog-filter-panel"
-                        [checkmark]="false"
+                        placeholder="Select employee"
+                        panelStyleClass="catalog-filter-panel dealer-select-panel"
+                        [filter]="true"
+                        filterPlaceholder="Search employee..."
+                        filterBy="label,code,email"
                         scrollHeight="240px"
+                        [showClear]="true"
                       />
                     </div>
+                  </div>
+
+                  @if (selectedDealer(i); as dealerInfo) {
+                    <div class="dealer-info-panel">
+                      <div class="dealer-info-panel__head">
+                        <i class="pi pi-lock" aria-hidden="true"></i>
+                        <div>
+                          <strong>Dealer Information</strong>
+                          <p>Automatically populated from the selected dealer — read-only on this form.</p>
+                        </div>
+                      </div>
+                      <dl class="dealer-info-panel__grid">
+                        <dt>Firm Name</dt><dd>{{ dealerInfo.dealerName }}</dd>
+                        <dt>Owner</dt><dd>{{ dealerInfo.ownerName || '—' }}</dd>
+                        <dt>Mobile</dt><dd>{{ dealerInfo.mobile || '—' }}</dd>
+                        <dt>WhatsApp</dt><dd>{{ dealerInfo.whatsapp || '—' }}</dd>
+                        <dt>Email</dt><dd>{{ dealerInfo.email || '—' }}</dd>
+                        <dt>Address</dt><dd>{{ dealerInfo.shopAddress || '—' }}</dd>
+                        <dt>Pincode</dt><dd>{{ dealerInfo.pincode || '—' }}</dd>
+                        <dt>GST</dt><dd>{{ dealerInfo.gstNumber || '—' }}</dd>
+                        <dt>Branch</dt><dd>{{ dealerInfo.branch || '—' }}</dd>
+                        <dt>Warehouse</dt><dd>{{ dealerInfo.warehouseAddress || '—' }}</dd>
+                        <dt>Delivery Area</dt><dd>{{ dealerInfo.deliveryArea || '—' }}</dd>
+                        <dt>Payment Cycle</dt><dd>{{ dealerInfo.paymentCycle || '—' }}</dd>
+                      </dl>
+                    </div>
+                  }
+
+                  <p class="subsection-label">Commercial terms (from dealer)</p>
+                  <div class="grid-2">
                     <div class="field">
-                      <label>Supplier code</label>
-                      <input pInputText formControlName="supplierCode" />
+                      <label>Dealer code</label>
+                      <input pInputText formControlName="supplierCode" [readonly]="isDealerFieldReadOnly(i, 'supplierCode')" />
                     </div>
                     <div class="field">
                       <label>Dealer branch</label>
-                      <input pInputText formControlName="dealerBranch" />
+                      <input pInputText formControlName="dealerBranch" [readonly]="isDealerFieldReadOnly(i, 'dealerBranch')" />
                     </div>
                     <div class="field">
                       <label>GSTIN</label>
-                      <input pInputText formControlName="supplierGstin" placeholder="22AAAAA0000A1Z5" />
+                      <input pInputText formControlName="supplierGstin" [readonly]="isDealerFieldReadOnly(i, 'supplierGstin')" />
                     </div>
                     <div class="field">
                       <label>Contact</label>
-                      <input pInputText formControlName="supplierContact" placeholder="Phone or email" />
-                    </div>
-                    <div class="field">
-                      <label>Supplier SKU</label>
-                      <input pInputText formControlName="supplierSku" />
-                    </div>
-                    <div class="field">
-                      <label>Supplier product code</label>
-                      <input pInputText formControlName="supplierProductCode" />
-                    </div>
-                    <div class="field">
-                      <label>Stock ownership</label>
-                      <p-select
-                        [options]="stockOwnershipOptions"
-                        formControlName="stockOwnership"
-                        optionLabel="label"
-                        optionValue="value"
-                        placeholder="Select ownership"
-                        [showClear]="true"
-                        appendTo="body"
-                        panelStyleClass="catalog-filter-panel"
-                        [checkmark]="false"
-                        scrollHeight="240px"
-                      />
-                    </div>
-                    <div class="field">
-                      <label>Dispatch from</label>
-                      <input pInputText formControlName="dispatchFrom" />
-                    </div>
-                    <div class="field">
-                      <label>Invoice #</label>
-                      <input pInputText formControlName="purchaseInvoice" />
-                    </div>
-                    <div class="field">
-                      <label>Purchase date</label>
-                      <input pInputText formControlName="purchaseDate" placeholder="DD/MM/YYYY" />
-                    </div>
-                    <div class="field">
-                      <label>Settlement cycle</label>
-                      <p-select
-                        [options]="settlementCycleOptions"
-                        formControlName="settlementCycle"
-                        optionLabel="label"
-                        optionValue="value"
-                        placeholder="Select cycle"
-                        [showClear]="true"
-                        appendTo="body"
-                        panelStyleClass="catalog-filter-panel"
-                        [checkmark]="false"
-                        scrollHeight="240px"
-                      />
+                      <input pInputText formControlName="supplierContact" [readonly]="isDealerFieldReadOnly(i, 'supplierContact')" />
                     </div>
                     <div class="field">
                       <label>Payment terms</label>
@@ -1191,20 +1178,29 @@
                         optionLabel="label"
                         optionValue="value"
                         placeholder="Select terms"
-                        [showClear]="true"
-                        appendTo="body"
                         panelStyleClass="catalog-filter-panel"
-                        [checkmark]="false"
-                        scrollHeight="240px"
+                        [disabled]="isDealerFieldReadOnly(i, 'paymentTerms')"
                       />
                     </div>
                     <div class="field">
-                      <label>Lead time (days)</label>
-                      <input pInputText formControlName="leadTime" placeholder="e.g. 7" />
+                      <label>Settlement cycle</label>
+                      <p-select
+                        [options]="settlementCycleOptions"
+                        formControlName="settlementCycle"
+                        optionLabel="label"
+                        optionValue="value"
+                        placeholder="Select cycle"
+                        panelStyleClass="catalog-filter-panel"
+                        [disabled]="isDealerFieldReadOnly(i, 'settlementCycle')"
+                      />
+                    </div>
+                    <div class="field">
+                      <label>Dispatch from</label>
+                      <input pInputText formControlName="dispatchFrom" [readonly]="isDealerFieldReadOnly(i, 'dispatchFrom')" />
                     </div>
                     <div class="field">
                       <label>Dealer incentive %</label>
-                      <input pInputText formControlName="dealerIncentivePercent" placeholder="0" />
+                      <input pInputText formControlName="dealerIncentivePercent" [readonly]="isDealerFieldReadOnly(i, 'dealerIncentivePercent')" />
                     </div>
                   </div>
 
@@ -1220,31 +1216,31 @@
                     </div>
                     <div class="field">
                       <label>Hold payment %</label>
-                      <input pInputText formControlName="holdPaymentPercent" />
+                      <input pInputText formControlName="holdPaymentPercent" [readonly]="isDealerFieldReadOnly(i, 'holdPaymentPercent')" />
                     </div>
                   </div>
+
+                  <div class="grid-2 mt-2">
+                    <div class="field">
+                      <label>Lead time (days)</label>
+                      <input pInputText formControlName="leadTime" placeholder="e.g. 7" />
+                    </div>
+                  </div>
+
                   <div class="schedule-note">
                     <strong>Dealer Payment Schedule Summary</strong>
                     <p>{{ supplierSchedule(ctrl) }}</p>
                   </div>
 
-                  <div class="setting-row">
-                    <div>
-                      <label [attr.for]="'returnToSupplier-' + i">Return to supplier allowed</label>
-                      <p>Allow returning unsold stock to this supplier</p>
-                    </div>
-                    <p-toggleswitch formControlName="returnToSupplierAllowed" [inputId]="'returnToSupplier-' + i" />
-                  </div>
-
                   <div class="field">
-                    <label>Supplier notes</label>
+                    <label>Notes</label>
                     <textarea pTextarea formControlName="notes" rows="3"></textarea>
                   </div>
                 </article>
               }
 
               @if (suppliersArr.length > 0) {
-                <button pButton type="button" [outlined]="true" icon="pi pi-plus" label="Add another supplier" class="mt-2" (click)="addSupplier()"></button>
+                <button pButton type="button" [outlined]="true" icon="pi pi-plus" label="Add another dealer" class="mt-2" (click)="addSupplier()"></button>
               }
             </section>
           }
@@ -1742,10 +1738,10 @@
 
               <section class="review-card">
                 <header>
-                  <h3>Supplier</h3>
+                  <h3>Dealer</h3>
                   <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(6)"></button>
                 </header>
-                <p class="muted">{{ suppliersArr.length }} supplier{{ suppliersArr.length === 1 ? '' : 's' }} configured.</p>
+                <p class="muted">{{ suppliersArr.length }} dealer{{ suppliersArr.length === 1 ? '' : 's' }} configured.</p>
               </section>
 
               <section class="review-card">

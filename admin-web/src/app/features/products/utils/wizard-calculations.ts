@@ -141,7 +141,10 @@ export function computeCompleteness(form: ProductWizardData): CompletenessSectio
   ];
   const pricingFields = [form.mrp, form.sellingPrice, form.purchasePrice, form.gst];
   const inventoryFields = [form.warehouse, form.availableStock || form.openingStock];
-  const supplierFields = form.suppliers.flatMap((s: SupplierEntry) => [s.supplier, s.paymentTerms]);
+  const supplierFields = form.suppliers.flatMap((s: SupplierEntry) => [
+    s.dealer || s.supplier,
+    s.paymentTerms,
+  ]);
   const deliveryFields = [form.weight, form.deliveryDays, form.dispatchSla];
   const seoFields = [form.slug, form.metaTitle, form.metaDescription];
 
@@ -170,7 +173,7 @@ export function computeCompleteness(form: ProductWizardData): CompletenessSectio
     { key: 'inventory', label: 'Inventory', percent: score(inventoryFields.filter(Boolean).length, inventoryFields.length) },
     {
       key: 'supplier',
-      label: 'Supplier',
+      label: 'Dealer',
       percent: supplierFields.filter(Boolean).length
         ? score(supplierFields.filter(Boolean).length, Math.max(supplierFields.length, 2))
         : 0,

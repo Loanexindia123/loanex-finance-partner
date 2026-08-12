@@ -215,9 +215,19 @@ export function normalizeVariant(raw: unknown, index = 0): ProductVariant {
   };
 }
 
+/** Product source partner type — Dealer / Supplier / Wholesaler. */
+export const PRODUCT_SOURCE_TYPES = ['Dealer'] as const;
+export type ProductSourceType = (typeof PRODUCT_SOURCE_TYPES)[number];
+
 /** Matches admin-app SupplierEntry — persisted inside wizardData.suppliers. */
 export interface SupplierEntry {
   id: string;
+  /** Partner type for this source row. */
+  productSourceType: ProductSourceType | '';
+  /** Employee who created/sourced this product link. */
+  sourceCreatedBy: string;
+  /** Selected dealer master id (when productSourceType = Dealer). */
+  dealerId: string;
   supplier: string;
   dealer: string;
   wholesaler: string;
@@ -255,6 +265,9 @@ export const CUSTOMER_VISIBILITY = ['Visible', 'Hidden'];
 export function createEmptySupplier(): SupplierEntry {
   return {
     id: `sup-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    productSourceType: 'Dealer',
+    sourceCreatedBy: '',
+    dealerId: '',
     supplier: '',
     dealer: '',
     wholesaler: '',
@@ -287,6 +300,9 @@ export function normalizeSupplier(raw: unknown): SupplierEntry {
   return {
     ...base,
     id: pick(row, 'id', base.id),
+    productSourceType: inferProductSourceType(row),
+    sourceCreatedBy: pick(row, 'sourceCreatedBy'),
+    dealerId: pick(row, 'dealerId'),
     supplier: pick(row, 'supplier'),
     dealer: pick(row, 'dealer'),
     wholesaler: pick(row, 'wholesaler'),
@@ -313,8 +329,24 @@ export function normalizeSupplier(raw: unknown): SupplierEntry {
   };
 }
 
+function inferProductSourceType(row: Record<string, unknown>): ProductSourceType | '' {
+  const explicit = pick(row, 'productSourceType');
+  if (explicit === 'Dealer') return 'Dealer';
+  if (
+    pick(row, 'dealer') ||
+    pick(row, 'dealerId') ||
+    pick(row, 'supplier') ||
+    pick(row, 'wholesaler') ||
+    explicit === 'Supplier' ||
+    explicit === 'Wholesaler'
+  ) {
+    return 'Dealer';
+  }
+  return '';
+}
+
 export function formatDealerPaymentSchedule(supplier?: SupplierEntry | null): string {
-  if (!supplier) return 'No supplier schedule';
+  if (!supplier) return 'No dealer schedule';
   const first = Number(supplier.firstPaymentPercent) || 0;
   const delivery = Number(supplier.deliveryPaymentPercent) || 0;
   const hold = Number(supplier.holdPaymentPercent) || 0;
@@ -604,7 +636,7 @@ export const WIZARD_STEPS = [
   'Images',
   'Pricing',
   'Inventory',
-  'Supplier',
+  'Dealer',
   'Delivery',
   'EMI',
   'SEO',
@@ -622,7 +654,7 @@ export const WIZARD_STEP_META: ReadonlyArray<{
   { title: 'Images', description: 'Primary and gallery image URLs used on the storefront.', icon: 'pi-images' },
   { title: 'Pricing', description: 'MRP, selling price and marketplace comparison.', icon: 'pi-wallet' },
   { title: 'Inventory', description: 'Stock, warehouse and order quantity rules.', icon: 'pi-box' },
-  { title: 'Supplier', description: 'Vendor, lead time and commercial terms.', icon: 'pi-truck' },
+  { title: 'Dealer', description: 'Link dealer master data and commercial terms.', icon: 'pi-shop' },
   { title: 'Delivery', description: 'Dispatch SLA, charges and fulfilment options.', icon: 'pi-send' },
   { title: 'EMI', description: 'LoanEx EMI availability and plan configuration.', icon: 'pi-credit-card' },
   { title: 'SEO', description: 'Slug, meta tags and search keywords.', icon: 'pi-search' },

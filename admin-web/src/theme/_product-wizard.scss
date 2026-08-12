@@ -941,3 +941,99 @@
     font-size: 0.8125rem;
   }
 }
+
+.source-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dealer-select-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+
+  p-select {
+    flex: 1 1 220px;
+    min-width: 200px;
+  }
+}
+
+.dealer-info-panel {
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid #c7d2fe;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+
+  &__head {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+
+    i {
+      color: #4338ca;
+      margin-top: 0.15rem;
+    }
+
+    strong {
+      display: block;
+      font-size: 0.875rem;
+    }
+
+    p {
+      margin: 0.2rem 0 0;
+      font-size: 0.75rem;
+      color: var(--admin-text-muted);
+    }
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem 1rem;
+    margin: 0;
+
+    dt {
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+
+    dd {
+      margin: 0.1rem 0 0;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: #0f172a;
+    }
+  }
+}
+
+.coming-soon-banner {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin: 1rem 0;
+  padding: 0.875rem 1rem;
+  border-radius: 10px;
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.8125rem;
+
+  i {
+    color: #64748b;
+    margin-top: 0.1rem;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .dealer-info-panel__grid {
+    grid-template-columns: 1fr;
+  }
+}

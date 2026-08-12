@@ -139,6 +139,15 @@ export class EmiApplicationController {
     return sendSuccess(res, data, 'Application approved (dev)');
   };
 
+  adminAssignFi = async (req: Request, res: Response) => {
+    const applicationId = String(req.params.applicationId);
+    const data = await emiApplicationService.adminAssignFi(
+      applicationId,
+      requireUserId(req as AuthenticatedRequest),
+    );
+    return sendSuccess(res, data, 'FI case assigned');
+  };
+
   adminApprove = async (req: Request, res: Response) => {
     const applicationId = String(req.params.applicationId);
     const data = await emiApplicationService.adminApprove(

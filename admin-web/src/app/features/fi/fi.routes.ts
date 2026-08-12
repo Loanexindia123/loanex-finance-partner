@@ -4,9 +4,11 @@ export const FI_ROUTES: Routes = [
   {
     path: '',
     loadComponent: () =>
-      import('../../shared/pages/module-placeholder/module-placeholder').then(
-        (m) => m.ModulePlaceholder,
-      ),
-    data: { title: 'FI Cases' },
+      import('./pages/fi-case-list/fi-case-list').then((m) => m.FiCaseList),
+  },
+  {
+    path: ':fiCaseId',
+    loadComponent: () =>
+      import('./pages/fi-case-detail/fi-case-detail').then((m) => m.FiCaseDetail),
   },
 ];

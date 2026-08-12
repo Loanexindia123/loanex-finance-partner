@@ -9,7 +9,7 @@ const NAV_GROUPS: readonly { routes: readonly string[] }[] = [
   { routes: ['/dashboard', '/products', '/customers', '/orders'] },
   { routes: ['/emi', '/loans', '/fi'] },
   { routes: ['/users', '/roles', '/notifications'] },
-  { routes: ['/masters', '/reports', '/settings'] },
+  { routes: ['/masters/dealers', '/masters', '/reports', '/settings'] },
 ];
 
 @Component({

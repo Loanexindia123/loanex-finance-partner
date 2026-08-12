@@ -181,8 +181,8 @@ export function getFiStatusLabel(status: FiCaseStatus): string {
   const labels: Record<FiCaseStatus, string> = {
     pending: 'Pending',
     in_progress: 'In Progress',
-    completed: 'Completed',
-    hold: 'Hold',
+    completed: 'Accepted',
+    hold: 'Rejected',
   };
   return labels[status];
 }

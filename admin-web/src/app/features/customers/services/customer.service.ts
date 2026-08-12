@@ -133,6 +133,17 @@ export class CustomerService {
     );
   }
 
+  /** KYC record for a single user — used by the EMI application detail's eKYC card. */
+  getKycForUser(userId: string): Observable<KycRecord | null> {
+    return this.http
+      .get<ApiEnvelope<KycRecord[]>>(apiUrl(`/admin/users/${userId}/kyc`))
+      .pipe(
+        unwrapApi(),
+        map((records) => (Array.isArray(records) && records.length > 0 ? records[0] : null)),
+        catchError(() => of(null)),
+      );
+  }
+
   private findKycForUser(records: KycRecord[], userId: string): KycRecord | null {
     return (
       records.find((k) => k.userId === userId) ??

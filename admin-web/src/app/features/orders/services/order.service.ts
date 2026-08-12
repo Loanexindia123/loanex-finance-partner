@@ -64,6 +64,10 @@ interface RawOrder {
   nextEmiDueDate?: string | null;
   emiPayments?: unknown[];
   emiSchedule?: unknown[];
+  courierPartner?: string | null;
+  trackingNumber?: string | null;
+  estimatedDeliveryDate?: string | null;
+  warehouse?: string | null;
   application?: {
     productName?: string;
     productImage?: string;
@@ -280,6 +284,10 @@ function normalizeOrder(raw: RawOrder): Order {
     nextEmiDueDate: raw.nextEmiDueDate ?? null,
     emiPayments,
     emiSchedule,
+    courierPartner: raw.courierPartner ?? null,
+    trackingNumber: raw.trackingNumber ?? null,
+    estimatedDeliveryDate: raw.estimatedDeliveryDate ?? null,
+    warehouse: raw.warehouse ?? null,
   };
 }
 

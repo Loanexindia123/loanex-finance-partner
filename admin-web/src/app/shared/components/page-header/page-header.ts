@@ -1,11 +1,24 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { ButtonModule } from 'primeng/button';
 
 @Component({
   selector: 'app-page-header',
   standalone: true,
+  imports: [RouterLink, ButtonModule],
   template: `
     <div class="page-header">
       <div class="page-header__left">
+        @if (backLink()) {
+          <a
+            pButton
+            type="button"
+            icon="pi pi-arrow-left"
+            [label]="backLabel()"
+            [text]="true"
+            [routerLink]="backLink()"
+          ></a>
+        }
         <ng-content select="[leading]" />
         <div class="page-header__titles">
           <h1>{{ title() }}</h1>
@@ -64,4 +77,6 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 export class PageHeader {
   readonly title = input.required<string>();
   readonly subtitle = input<string>();
+  readonly backLink = input<string>();
+  readonly backLabel = input('Back');
 }

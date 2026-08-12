@@ -28,14 +28,47 @@ a {
   text-decoration: none;
 }
 
-/* Product catalogue filter overlay — appended to body by p-select. */
+/* Product catalogue filter overlay — appended by p-select / p-multiselect. */
 .catalog-filter-panel.p-select-overlay,
-.p-select-overlay.catalog-filter-panel {
+.p-select-overlay.catalog-filter-panel,
+.catalog-filter-panel.p-multiselect-overlay,
+.p-multiselect-overlay.catalog-filter-panel {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   box-shadow: 0 10px 28px -8px rgb(15 23 42 / 0.18);
   overflow: hidden;
-  margin-top: 4px;
+  z-index: 2100;
+}
+
+.dealer-select-panel.p-select-overlay,
+.p-select-overlay.dealer-select-panel {
+  margin-top: 0.35rem;
+}
+
+.catalog-filter-panel .p-select-header,
+.catalog-filter-panel .p-multiselect-header {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fff;
+}
+
+.catalog-filter-panel .p-select-filter,
+.catalog-filter-panel .p-inputtext.p-select-filter,
+.catalog-filter-panel .p-multiselect-filter,
+.catalog-filter-panel .p-inputtext.p-multiselect-filter {
+  width: 100%;
+  height: 2.25rem;
+  padding: 0 0.65rem 0 2rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: #f8fafc;
+  box-shadow: none;
+}
+
+.catalog-filter-panel .p-select-list-container,
+.catalog-filter-panel .p-multiselect-list-container {
+  max-height: 240px;
 }
 
 .catalog-filter-panel .p-select-list,

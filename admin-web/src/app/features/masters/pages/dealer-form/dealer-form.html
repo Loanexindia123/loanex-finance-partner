@@ -1,0 +1,360 @@
+<header class="form-header">
+  <div class="form-header__left">
+    <button pButton type="button" icon="pi pi-arrow-left" [text]="true" [label]="returnLabel" (click)="cancel()"></button>
+    <div>
+      <h1>{{ isEdit ? 'Edit Dealer' : 'Add Dealer' }}</h1>
+      <p>Complete dealer onboarding — all sections match the LoanEx dealer registration flow.</p>
+    </div>
+  </div>
+</header>
+
+@if (loading()) {
+  <app-branded-loader message="Loading dealer..." />
+} @else {
+  <form class="dealer-form" [formGroup]="form">
+    <section class="section-card">
+      <header class="section-card__head">
+        <div class="section-card__titles">
+          <h3>Created By</h3>
+          <p>Record who initiated this dealer onboarding.</p>
+        </div>
+      </header>
+      <div class="grid-3">
+        <div class="field" [class.field--invalid]="isInvalid('creatorType')">
+          <label for="creatorType">Creator Type *</label>
+          <p-select
+            inputId="creatorType"
+            formControlName="creatorType"
+            [options]="creatorTypeOptions"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select type"
+            styleClass="dealer-select"
+            panelStyleClass="catalog-filter-panel"
+            [showClear]="true"
+          />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('creatorName')">
+          <label for="creatorName">Search Creator *</label>
+          <p-select
+            inputId="creatorName"
+            formControlName="creatorName"
+            [options]="staffOptions()"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select employee"
+            styleClass="dealer-select"
+            panelStyleClass="catalog-filter-panel dealer-select-panel"
+            [filter]="true"
+            filterPlaceholder="Search employee..."
+            filterBy="label,email"
+            scrollHeight="240px"
+            [showClear]="true"
+          />
+        </div>
+        <div class="field">
+          <label for="creatorId">Creator ID</label>
+          <input pInputText id="creatorId" formControlName="creatorId" readonly placeholder="Auto-filled when employee is selected" />
+          <span class="field-hint">Populated automatically from the selected employee.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <header class="section-card__head">
+        <div class="section-card__titles">
+          <h3>Dealer Basic Details</h3>
+          <p>Firm identity, contact information, and business classification.</p>
+        </div>
+      </header>
+      <div class="grid-3">
+        <div class="field" [class.field--invalid]="isInvalid('dealerName')">
+          <label>Firm / Shop Name *</label>
+          <input pInputText formControlName="dealerName" placeholder="Enter firm name" />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('ownerName')">
+          <label>Owner Name *</label>
+          <input pInputText formControlName="ownerName" placeholder="Enter owner name" />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('businessType')">
+          <label>Business Type *</label>
+          <p-select
+            formControlName="businessType"
+            [options]="businessTypeOptions"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Proprietorship / Partnership / Company"
+            styleClass="dealer-select"
+            panelStyleClass="catalog-filter-panel"
+            [showClear]="true"
+          />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('mobile')">
+          <label>Mobile Number *</label>
+          <input pInputText formControlName="mobile" placeholder="OTP Verified" />
+        </div>
+        <div class="field">
+          <label>WhatsApp Number</label>
+          <input pInputText formControlName="whatsapp" placeholder="Same as mobile" />
+        </div>
+        <div class="field">
+          <label>Email ID</label>
+          <input pInputText formControlName="email" type="email" placeholder="Enter email" />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('dealerType')">
+          <label>Dealer Type *</label>
+          <p-select
+            formControlName="dealerType"
+            [options]="dealerTypeOptions"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Retailer / Wholesaler / Distributor"
+            styleClass="dealer-select"
+            panelStyleClass="catalog-filter-panel"
+            [showClear]="true"
+          />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('categoryDepartments')">
+          <label>Category / Department *</label>
+          <p-multiselect
+            formControlName="categoryDepartments"
+            [options]="categoryDepartmentOptions()"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select multiple"
+            styleClass="dealer-multiselect"
+            panelStyleClass="catalog-filter-panel"
+            display="chip"
+            [showClear]="true"
+            [filter]="true"
+            filterPlaceholder="Search category..."
+          />
+        </div>
+        <div class="field">
+          <label>Established Year</label>
+          <input pInputText formControlName="establishedYear" placeholder="YYYY" maxlength="4" />
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <header class="section-card__head">
+        <div class="section-card__titles">
+          <h3>Address &amp; Service Area</h3>
+          <p>Shop location, pincode, and delivery coverage.</p>
+        </div>
+      </header>
+      <div class="grid-2">
+        <div class="field field--full" [class.field--invalid]="isInvalid('shopAddress')">
+          <label>Complete Shop Address *</label>
+          <textarea pTextarea formControlName="shopAddress" rows="3"></textarea>
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('pincode')">
+          <label>Pincode *</label>
+          <input pInputText formControlName="pincode" />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('googleLocation')">
+          <label>Google Location *</label>
+          <input pInputText formControlName="googleLocation" placeholder="Maps link or coordinates" />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('deliveryArea')">
+          <label>Delivery Area *</label>
+          <input pInputText formControlName="deliveryArea" />
+        </div>
+        <div class="field">
+          <label>Delivery Time</label>
+          <input pInputText formControlName="deliveryTime" placeholder="e.g. 24–48 hrs" />
+        </div>
+        <div class="field field--full">
+          <label>Warehouse Address</label>
+          <textarea pTextarea formControlName="warehouseAddress" rows="2"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <header class="section-card__head">
+        <div class="section-card__titles">
+          <h3>Document Upload</h3>
+          <p>Upload required KYC and shop documents.</p>
+        </div>
+      </header>
+      <div class="grid-3 doc-grid">
+        @for (doc of documentFields; track doc.key) {
+          <div class="field" [class.field--invalid]="isInvalid(doc.key)">
+            <label>{{ doc.label }}</label>
+            <label
+              class="doc-upload-zone"
+              [class.doc-upload-zone--filled]="hasDocument(doc.key)"
+              [class.doc-upload-zone--loading]="submitting() && isPendingDocument(doc.key)"
+            >
+              <input type="file" accept="image/*,.pdf" hidden (change)="onDocumentSelected($event, doc.key)" />
+              @if (submitting() && isPendingDocument(doc.key)) {
+                <span class="doc-upload-zone__text">
+                  <i class="pi pi-spin pi-spinner"></i>
+                  Saving...
+                </span>
+              } @else if (isPendingDocument(doc.key)) {
+                <span class="doc-upload-zone__text doc-upload-zone__text--done">
+                  <i class="pi pi-file"></i>
+                  Selected — saves with dealer
+                </span>
+              } @else if (hasDocument(doc.key)) {
+                <span class="doc-upload-zone__text doc-upload-zone__text--done">
+                  <i class="pi pi-check"></i>
+                  Uploaded
+                </span>
+              } @else {
+                <span class="doc-upload-zone__text">
+                  <span class="doc-upload-zone__action">UPLOAD</span>
+                  <span class="doc-upload-zone__sep">|</span>
+                  <span class="doc-upload-zone__hint">{{ doc.hint }}</span>
+                </span>
+              }
+            </label>
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="section-card">
+      <header class="section-card__head">
+        <div class="section-card__titles">
+          <h3>Bank &amp; Commercial Details</h3>
+          <p>Bank account, payment cycle, and delivery terms.</p>
+        </div>
+      </header>
+      <div class="grid-2">
+        <div class="field" [class.field--invalid]="isInvalid('accountHolderName')">
+          <label>Account Holder Name *</label>
+          <input pInputText formControlName="accountHolderName" />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('accountNumber')">
+          <label>Account Number *</label>
+          <input pInputText formControlName="accountNumber" />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('ifscCode')">
+          <label>IFSC Code *</label>
+          <input pInputText formControlName="ifscCode" />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('paymentCycle')">
+          <label>Payment Cycle *</label>
+          <p-select formControlName="paymentCycle" [options]="paymentCycleOptions" optionLabel="label" optionValue="value" placeholder="Select payment cycle" styleClass="dealer-select" panelStyleClass="catalog-filter-panel" [showClear]="true" />
+        </div>
+        <div class="field">
+          <label>Hold Percentage</label>
+          <input pInputText formControlName="holdPercentage" placeholder="e.g. 10" />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('productDeliveryBy')">
+          <label>Product Delivery By *</label>
+          <p-select formControlName="productDeliveryBy" [options]="productDeliveryOptions" optionLabel="label" optionValue="value" placeholder="Select delivery by" styleClass="dealer-select" panelStyleClass="catalog-filter-panel" [showClear]="true" />
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <header class="section-card__head">
+        <div class="section-card__titles">
+          <h3>Internal Verification &amp; Approval</h3>
+          <p>Assign manager, set verification status, and upload signed agreement.</p>
+        </div>
+      </header>
+      <div class="grid-3">
+        <div class="field" [class.field--invalid]="isInvalid('assignedB2BManager')">
+          <label>Assigned B2B Manager *</label>
+          <p-select
+            formControlName="assignedB2BManager"
+            [options]="staffOptions()"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select employee"
+            styleClass="dealer-select"
+            panelStyleClass="catalog-filter-panel dealer-select-panel"
+            [filter]="true"
+            filterPlaceholder="Search employee..."
+            filterBy="label,email"
+            scrollHeight="240px"
+            [showClear]="true"
+          />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('verificationStatus')">
+          <label>Verification Status *</label>
+          <p-select
+            formControlName="verificationStatus"
+            [options]="verificationOptions"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Pending / Approved / Reject / Hold"
+            styleClass="dealer-select"
+            panelStyleClass="catalog-filter-panel"
+          />
+        </div>
+        <div class="field">
+          <label>Dealer Agreement</label>
+          <label
+            class="doc-upload-zone"
+            [class.doc-upload-zone--filled]="hasDocument('dealerAgreement')"
+            [class.doc-upload-zone--loading]="submitting() && isPendingDocument('dealerAgreement')"
+          >
+            <input type="file" accept="image/*,.pdf" hidden (change)="onDocumentSelected($event, 'dealerAgreement')" />
+            @if (submitting() && isPendingDocument('dealerAgreement')) {
+              <span class="doc-upload-zone__text">
+                <i class="pi pi-spin pi-spinner"></i>
+                Saving...
+              </span>
+            } @else if (isPendingDocument('dealerAgreement')) {
+              <span class="doc-upload-zone__text doc-upload-zone__text--done">
+                <i class="pi pi-file"></i>
+                Selected — saves with dealer
+              </span>
+            } @else if (hasDocument('dealerAgreement')) {
+              <span class="doc-upload-zone__text doc-upload-zone__text--done">
+                <i class="pi pi-check"></i>
+                Uploaded
+              </span>
+            } @else {
+              <span class="doc-upload-zone__text">
+                <span class="doc-upload-zone__action">UPLOAD</span>
+                <span class="doc-upload-zone__sep">|</span>
+                <span class="doc-upload-zone__hint">Auto-generate + Signed Upload</span>
+              </span>
+            }
+          </label>
+        </div>
+      </div>
+      <footer class="form-footer">
+        <div class="form-footer__actions">
+          <button
+            pButton
+            type="button"
+            severity="secondary"
+            [outlined]="true"
+            icon="pi pi-save"
+            label="Save Draft"
+            [loading]="submitting()"
+            (click)="saveDraft()"
+          ></button>
+          <button
+            pButton
+            type="button"
+            severity="secondary"
+            [outlined]="true"
+            icon="pi pi-eye"
+            label="Preview"
+            [disabled]="submitting()"
+            (click)="preview()"
+          ></button>
+          <button
+            pButton
+            type="button"
+            icon="pi pi-check"
+            label="Submit for Approval"
+            class="form-footer__submit"
+            [loading]="submitting()"
+            (click)="submit()"
+          ></button>
+        </div>
+      </footer>
+    </section>
+  </form>
+}

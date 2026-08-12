@@ -1,0 +1,186 @@
+<app-page-header title="Credit Review" [subtitle]="applicationId">
+  <button
+    leading
+    pButton
+    type="button"
+    icon="pi pi-arrow-left"
+    label="Back to EMI Application"
+    [text]="true"
+    (click)="back()"
+  ></button>
+  @if (review(); as review) {
+    <div actions>
+      <app-status-badge [status]="review.decision" />
+    </div>
+  }
+</app-page-header>
+
+@if (reviewLoading() || applicationLoading()) {
+  <app-branded-loader message="Loading Credit Review..." />
+} @else if (fiRejected()) {
+  <app-empty-state
+    icon="pi-times-circle"
+    title="FI Rejected"
+    description="Field verification failed. This application is not eligible for Credit Review. See the FI rejection reason on the EMI application."
+  >
+    <button
+      pButton
+      type="button"
+      label="Back to EMI Application"
+      icon="pi pi-arrow-left"
+      (click)="back()"
+    ></button>
+  </app-empty-state>
+} @else if (awaitingFi()) {
+  <app-empty-state
+    icon="pi-map-marker"
+    title="Awaiting Field Investigation"
+    description="Credit Review opens after the FI executive Accepts the field investigation in the FI Mobile App."
+  >
+    <button
+      pButton
+      type="button"
+      label="Back to EMI Application"
+      icon="pi pi-arrow-left"
+      (click)="back()"
+    ></button>
+  </app-empty-state>
+} @else if (!review()) {
+  <app-empty-state
+    icon="pi-shield"
+    title="No Credit Review Available"
+    description="No credit review record was found. It is created automatically when FI is accepted. Try refreshing, or return to the EMI application."
+  >
+    <button
+      pButton
+      type="button"
+      label="Back to EMI Application"
+      icon="pi pi-arrow-left"
+      (click)="back()"
+    ></button>
+  </app-empty-state>
+} @else if (review(); as review) {
+  <div class="hero">
+    <div>
+      <p class="hero__kicker">Application ID</p>
+      <h2 class="hero__id">{{ application()?.id ?? applicationId }}</h2>
+      <p class="hero__customer">
+        {{ application()?.customerName || 'Customer' }} · {{ application()?.mobile || 'No mobile' }}
+      </p>
+    </div>
+    <div class="hero__aside">
+      <app-status-badge [status]="review.decision" />
+      <p class="hero__date">
+        Reviewed
+        @if (review.reviewDate && review.reviewDate !== '—') {
+          {{ review.reviewDate | date: 'dd MMM y' }}
+        } @else {
+          —
+        }
+      </p>
+    </div>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <div class="card__head"><h3>Application Summary</h3></div>
+      <dl class="facts">
+        <div>
+          <dt>Application</dt>
+          <dd>{{ application()?.id ?? applicationId }}</dd>
+        </div>
+        <div>
+          <dt>Customer</dt>
+          <dd>{{ application()?.customerName || '—' }}</dd>
+        </div>
+        <div>
+          <dt>Credit Status</dt>
+          <dd>{{ review.creditStatus }}</dd>
+        </div>
+        <div>
+          <dt>Reviewer</dt>
+          <dd>{{ review.reviewer }}</dd>
+        </div>
+        <div>
+          <dt>Review Date</dt>
+          <dd>
+            @if (review.reviewDate && review.reviewDate !== '—') {
+              {{ review.reviewDate | date: 'dd MMM y' }}
+            } @else {
+              —
+            }
+          </dd>
+        </div>
+        <div>
+          <dt>Decision</dt>
+          <dd><app-status-badge [status]="review.decision" /></dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="card">
+      <div class="card__head"><h3>KYC & Identity</h3></div>
+      <dl class="facts">
+        <div><dt>KYC Status</dt><dd>{{ review.kycStatus }}</dd></div>
+        <div><dt>Aadhaar Status</dt><dd>{{ review.aadhaarStatus }}</dd></div>
+        <div><dt>PAN Status</dt><dd>{{ review.panStatus }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="card">
+      <div class="card__head"><h3>Banking & FI</h3></div>
+      <dl class="facts">
+        <div class="facts--wide"><dt>Banking Details</dt><dd>{{ review.bankingDetails }}</dd></div>
+        <div class="facts--wide"><dt>FI Report</dt><dd>{{ review.fiReport }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="card">
+      <div class="card__head"><h3>Eligibility & Product</h3></div>
+      <dl class="facts">
+        <div><dt>EMI Eligibility</dt><dd>{{ review.emiEligibility }}</dd></div>
+        <div><dt>Repayment Capacity</dt><dd>{{ review.repaymentCapacity }}</dd></div>
+        <div class="facts--wide"><dt>Selected Product</dt><dd>{{ review.selectedProduct }}</dd></div>
+        <div><dt>Product Margin</dt><dd>{{ review.productMargin }}</dd></div>
+        <div><dt>Down Payment</dt><dd>{{ review.downPayment }}</dd></div>
+        <div><dt>Risk Category</dt><dd>{{ review.riskCategory }}</dd></div>
+        @if (review.recommendedProduct) {
+          <div class="facts--wide">
+            <dt>Recommended Product</dt>
+            <dd>{{ review.recommendedProduct }}</dd>
+          </div>
+        }
+        <div class="facts--wide"><dt>Remarks</dt><dd>{{ review.remarks }}</dd></div>
+      </dl>
+    </section>
+  </div>
+
+  @if (canDecide()) {
+    <div class="footer" *appCan="'emi.edit'">
+      <button
+        pButton
+        type="button"
+        label="Approve"
+        icon="pi pi-check"
+        [loading]="submitting() === 'approve'"
+        [disabled]="submitting() !== null"
+        (click)="confirmApprove()"
+      ></button>
+      <button
+        pButton
+        type="button"
+        severity="danger"
+        label="Reject"
+        icon="pi pi-times"
+        [loading]="submitting() === 'reject'"
+        [disabled]="submitting() !== null"
+        (click)="confirmReject()"
+      ></button>
+    </div>
+  } @else if (review.decision === 'Approved') {
+    <p class="helper footer-note">
+      Credit review approved. Return to the EMI application to adjust Down Payment / loan terms if
+      needed, then Publish to Customer.
+    </p>
+  }
+}

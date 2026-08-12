@@ -13,7 +13,7 @@
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": "{dist/**,docs/openapi.json,node_modules/@prisma/client/**,node_modules/.prisma/**}",
+      "includeFiles": "{dist/**,docs/**,node_modules/@prisma/client/**,node_modules/.prisma/**}",
       "maxDuration": 60
     }
   },

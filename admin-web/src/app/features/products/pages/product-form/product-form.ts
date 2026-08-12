@@ -47,7 +47,6 @@ import {
   EmiPlanEntry,
   INVOICE_SETTINGS,
   PAYMENT_TERMS,
-  PRODUCT_SOURCES,
   Product,
   ProductPayload,
   ProductVariant,
@@ -88,6 +87,13 @@ import {
   getSelectedEmiPlan,
   parseAmount,
 } from '../../utils/wizard-calculations';
+import { DealerService } from '../../../masters/services/dealer.service';
+import { StaffUserService } from '../../../masters/services/staff-user.service';
+import {
+  Dealer,
+  dealerToProductPatch,
+  DEALER_PATCHED_PRODUCT_FIELDS,
+} from '../../../masters/models/dealer.models';
 
 @Component({
   selector: 'app-product-form',
@@ -114,6 +120,8 @@ export class ProductForm {
   private readonly fb = inject(FormBuilder);
   private readonly products = inject(ProductService);
   readonly options = inject(WizardOptionsService);
+  private readonly dealerService = inject(DealerService);
+  private readonly staffUsers = inject(StaffUserService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly messages = inject(MessageService);
@@ -154,6 +162,11 @@ export class ProductForm {
   };
   private loadedWizard: Partial<ProductWizardData> = {};
   private readonly pendingUploads = new Map<string, File>();
+  private readonly dealerPatchedByIndex = new Map<number, Set<string>>();
+
+  readonly dealerCatalog = signal<Dealer[]>([]);
+  readonly staffOptions = signal<{ label: string; value: string; code: string; email: string }[]>([]);
+  readonly dealersLoading = signal(true);
 
   readonly productTypeOptions = PRODUCT_TYPES.map((v) => ({ label: v, value: v }));
   readonly countryOptions = COUNTRIES.map((v) => ({ label: v, value: v }));
@@ -182,7 +195,20 @@ export class ProductForm {
   readonly galleryLimit = GALLERY_IMAGE_LIMIT;
   readonly paymentTermsOptions = PAYMENT_TERMS.map((v) => ({ label: v, value: v }));
   readonly settlementCycleOptions = SETTLEMENT_CYCLES.map((v) => ({ label: v, value: v }));
-  readonly productSourceOptions = PRODUCT_SOURCES.map((v) => ({ label: v, value: v }));
+  readonly dealerSelectOptions = computed(() =>
+    this.dealerCatalog()
+      .filter((d) => d.status === 'active')
+      .map((d) => ({
+        label: `${d.dealerName} (${d.dealerCode})`,
+        value: d.id,
+      })),
+  );
+  readonly variantDealerSelectOptions = computed(() =>
+    this.dealerCatalog().map((d) => ({
+      label: `${d.dealerName} (${d.dealerCode})`,
+      value: d.dealerName,
+    })),
+  );
   readonly stockOwnershipOptions = STOCK_OWNERSHIP_TYPES.map((v) => ({ label: v, value: v }));
   readonly serviceChargeMethodOptions = SERVICE_CHARGE_METHODS.map((v) => ({ label: v, value: v }));
   readonly invoiceSettingOptions = INVOICE_SETTINGS.map((v) => ({ label: v, value: v }));
@@ -379,6 +405,30 @@ export class ProductForm {
       });
     this.destroyRef.onDestroy(() => this.releaseAllLocalImages());
 
+    this.dealerService.list().subscribe({
+      next: (dealers) => {
+        this.dealerCatalog.set(dealers);
+        this.dealersLoading.set(false);
+        this.suppliersArr.controls.forEach((_, index) => this.syncDealerReadOnlyState(index));
+        this.applyReturnDealerSelection();
+      },
+      error: () => this.dealersLoading.set(false),
+    });
+    this.staffUsers.listStaff().subscribe({
+      next: (users) => {
+        this.staffOptions.set(
+          users.map((u) => ({
+            label: formatStaffOptionLabel(u),
+            value: u.id,
+            code: u.code,
+            email: u.email ?? '',
+          })),
+        );
+        this.resolveSourceCreatedByValues();
+      },
+      error: () => void 0,
+    });
+
     if (this.productId) {
       this.products.getById(this.productId).subscribe({
         next: (product) => {
@@ -534,7 +584,13 @@ export class ProductForm {
     this.variantsArr.clear();
     rawVariants.forEach((v, index) => this.variantsArr.push(this.createVariantGroup(normalizeVariant(v, index))));
     this.suppliersArr.clear();
-    (wizard.suppliers ?? []).forEach((s) => this.suppliersArr.push(this.createSupplierGroup(normalizeSupplier(s))));
+    (wizard.suppliers ?? []).forEach((s) => {
+      const normalized = normalizeSupplier(s);
+      normalized.productSourceType = 'Dealer';
+      this.suppliersArr.push(this.createSupplierGroup(normalized));
+    });
+    this.suppliersArr.controls.forEach((_, index) => this.syncDealerReadOnlyState(index));
+    this.resolveSourceCreatedByValues();
     this.emiPlansArr.clear();
     (wizard.emiPlans ?? []).forEach((p) => this.emiPlansArr.push(this.createEmiPlanGroup(normalizeEmiPlan(p))));
   }
@@ -1162,6 +1218,8 @@ export class ProductForm {
 
   addSupplier(): void {
     this.suppliersArr.push(this.createSupplierGroup(createEmptySupplier()));
+    const index = this.suppliersArr.length - 1;
+    this.asGroup(this.suppliersArr.at(index)).patchValue({ productSourceType: 'Dealer' });
   }
 
   removeSupplier(index: number): void {
@@ -1183,6 +1241,9 @@ export class ProductForm {
   private createSupplierGroup(supplier: SupplierEntry): FormGroup {
     return this.fb.group({
       id: [supplier.id],
+      productSourceType: [supplier.productSourceType || 'Dealer'],
+      sourceCreatedBy: [supplier.sourceCreatedBy],
+      dealerId: [supplier.dealerId],
       supplier: [supplier.supplier],
       dealer: [supplier.dealer],
       wholesaler: [supplier.wholesaler],
@@ -1335,12 +1396,166 @@ export class ProductForm {
       if (master?.gstin) patch['supplierGstin'] = master.gstin;
       if (master?.phone) patch['supplierContact'] = master.phone;
     }
-    if (field === 'dealer') {
-      const master = this.options.findDealerByName(value);
-      if (master?.dealerBranch) patch['dealerBranch'] = master.dealerBranch;
-      if (master?.paymentSettlementTerms) patch['paymentTerms'] = master.paymentSettlementTerms;
-    }
     this.suppliersArr.at(index).patchValue(patch);
+  }
+
+  onProductSourceTypeChange(index: number, type: string): void {
+    const group = this.asGroup(this.suppliersArr.at(index));
+    this.clearDealerDerivedFields(index);
+    group.patchValue({
+      productSourceType: type,
+      supplier: '',
+      dealer: '',
+      dealerId: '',
+      wholesaler: '',
+    });
+    if (type !== 'Dealer') {
+      this.dealerPatchedByIndex.delete(index);
+    }
+  }
+
+  onDealerSelected(index: number, dealerId: string | null): void {
+    this.clearDealerDerivedFields(index);
+    const group = this.asGroup(this.suppliersArr.at(index));
+    if (!dealerId) {
+      group.patchValue({ dealerId: '', dealer: '' });
+      return;
+    }
+    const dealer = this.dealerCatalog().find((d) => d.id === dealerId);
+    if (!dealer) return;
+    this.applyDealerPatch(index, dealer);
+  }
+
+  selectedDealer(index: number): Dealer | null {
+    const dealerId = String(this.asGroup(this.suppliersArr.at(index)).get('dealerId')?.value ?? '');
+    if (!dealerId) return null;
+    return this.dealerCatalog().find((d) => d.id === dealerId) ?? null;
+  }
+
+  isDealerFieldReadOnly(index: number, field: string): boolean {
+    const group = this.asGroup(this.suppliersArr.at(index));
+    if (!this.isDealerSourceRow(group)) return false;
+    return this.dealerPatchedByIndex.get(index)?.has(field) ?? false;
+  }
+
+  navigateToAddDealer(supplierIndex: number): void {
+    const returnTo = this.router.url;
+    this.router.navigate(['/masters/dealers/new'], {
+      queryParams: {
+        returnTo,
+        returnLabel: 'Back to Product',
+        supplierIndex,
+      },
+    });
+  }
+
+  navigateToAddDealerFromVariant(): void {
+    const returnTo = this.router.url;
+    this.router.navigate(['/masters/dealers/new'], {
+      queryParams: {
+        returnTo,
+        returnLabel: 'Back to Product',
+      },
+    });
+  }
+
+  onVariantDealerChange(variantIndex: number): void {
+    this.markVariantUnsaved(variantIndex);
+  }
+
+  private applyReturnDealerSelection(): void {
+    const state = history.state as {
+      selectedDealerId?: string;
+      selectedDealerName?: string;
+    } | null;
+    if (!state?.selectedDealerId) return;
+    const index = Number(this.route.snapshot.queryParamMap.get('supplierIndex') ?? 0);
+    const group =
+      this.suppliersArr.at(index) ?? this.suppliersArr.at(this.suppliersArr.length - 1);
+    if (!group) {
+      this.addSupplier();
+    }
+    const targetIndex = group ? index : this.suppliersArr.length - 1;
+    const target = this.asGroup(this.suppliersArr.at(targetIndex));
+    target.patchValue({ productSourceType: 'Dealer' });
+    this.onDealerSelected(targetIndex, state.selectedDealerId);
+  }
+
+  private applyDealerPatch(index: number, dealer: Dealer): void {
+    const patch = dealerToProductPatch(dealer);
+    const patched = new Set<string>();
+    for (const field of DEALER_PATCHED_PRODUCT_FIELDS) {
+      if (field === 'dealerId') continue;
+      const value = patch[field];
+      if (value) patched.add(field);
+    }
+    this.dealerPatchedByIndex.set(index, patched);
+    this.asGroup(this.suppliersArr.at(index)).patchValue(patch);
+    this.syncDealerReadOnlyState(index);
+  }
+
+  private clearDealerDerivedFields(index: number): void {
+    const group = this.asGroup(this.suppliersArr.at(index));
+    const patched = this.dealerPatchedByIndex.get(index);
+    if (patched) {
+      const reset: Record<string, string> = {};
+      for (const field of patched) {
+        reset[field] = '';
+      }
+      reset['dealer'] = '';
+      reset['dealerId'] = '';
+      group.patchValue(reset);
+      for (const field of patched) {
+        group.get(field)?.enable({ emitEvent: false });
+      }
+    }
+    this.dealerPatchedByIndex.delete(index);
+  }
+
+  private resolveSourceCreatedByValues(): void {
+    const staff = this.staffOptions();
+    if (!staff.length) return;
+    for (const ctrl of this.suppliersArr.controls) {
+      const current = String(ctrl.get('sourceCreatedBy')?.value ?? '').trim();
+      if (!current) continue;
+      if (staff.some((s) => s.value === current)) continue;
+      const match = staff.find((s) => {
+        const nameOnly = s.label.replace(/\s+\([^)]+\)\s*$/, '').trim();
+        return nameOnly === current || s.label === current || s.code === current;
+      });
+      if (match) {
+        ctrl.patchValue({ sourceCreatedBy: match.value }, { emitEvent: false });
+      }
+    }
+  }
+
+  private syncDealerReadOnlyState(index: number): void {
+    const group = this.asGroup(this.suppliersArr.at(index));
+    const dealerId = String(group.get('dealerId')?.value ?? '');
+    if (this.isDealerSourceRow(group) && dealerId) {
+      const dealer = this.dealerCatalog().find((d) => d.id === dealerId);
+      if (dealer) {
+        const patch = dealerToProductPatch(dealer);
+        const patched = new Set<string>();
+        for (const field of DEALER_PATCHED_PRODUCT_FIELDS) {
+          if (field === 'dealerId') continue;
+          if (patch[field]) patched.add(field);
+        }
+        this.dealerPatchedByIndex.set(index, patched);
+        group.patchValue({ ...patch, productSourceType: 'Dealer' }, { emitEvent: false });
+      }
+    }
+    const patched = this.dealerPatchedByIndex.get(index);
+    if (this.isDealerSourceRow(group) && patched) {
+      for (const field of patched) {
+        group.get(field)?.disable({ emitEvent: false });
+      }
+    }
+  }
+
+  private isDealerSourceRow(group: FormGroup): boolean {
+    const type = String(group.get('productSourceType')?.value ?? '');
+    return !type || type === 'Dealer';
   }
 
   renameSupplierEverywhere(from: string, to: string): void {
@@ -1785,4 +2000,11 @@ function mapProductCondition(value: unknown): string {
   if (lower === 'refurbished - good') return 'Refurbished - Good';
   if (lower === 'open-box' || lower === 'open box') return 'Open Box';
   return matchOption(raw, PRODUCT_CONDITIONS) || raw;
+}
+
+function formatStaffOptionLabel(user: { name: string; code: string }): string {
+  const name = user.name?.trim();
+  const code = user.code?.trim();
+  if (name && code) return `${name} (${code})`;
+  return name || code || 'Unknown';
 }

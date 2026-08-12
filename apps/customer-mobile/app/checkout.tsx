@@ -921,7 +921,7 @@ export default function CheckoutScreen() {
         <View style={{ flex: 1, backgroundColor: Colors.background }}>
           <View style={[s.payHeader, { paddingTop: insets.top + Spacing.md }]}>
             <Text style={s.payHeaderTitle}>KYC Verification Fee</Text>
-            <Text style={s.payHeaderAmount}>{APP_CONFIG.currency}299</Text>
+            <Text style={s.payHeaderAmount}>{APP_CONFIG.currency}399</Text>
             <Pressable style={s.payHeaderClose} onPress={() => { setShowKycFeeModal(false); setKycFeeOrder(null); }}>
               <MaterialIcons name="close" size={22} color={Colors.textPrimary} />
             </Pressable>

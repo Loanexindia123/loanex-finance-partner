@@ -473,6 +473,22 @@
                 <dd><app-status-badge [status]="o.loanStatus" /></dd>
               </div>
             }
+            @if (o.courierPartner || o.trackingNumber) {
+              <div>
+                <dt>Courier</dt>
+                <dd>{{ o.courierPartner || '—' }}</dd>
+              </div>
+              <div>
+                <dt>Tracking number</dt>
+                <dd class="mono">{{ o.trackingNumber || '—' }}</dd>
+              </div>
+            }
+            @if (o.estimatedDeliveryDate) {
+              <div>
+                <dt>Est. delivery</dt>
+                <dd>{{ o.estimatedDeliveryDate | date: 'MMM d, y' }}</dd>
+              </div>
+            }
             <div>
               <dt>Selling price</dt>
               <dd>

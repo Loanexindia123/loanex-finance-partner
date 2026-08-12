@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { getEmiApplicationById, getAllFiCases, approveEmiApplication, rejectEmiApplication, modifyEmiApplicationTerms, EmiApplication } from '../../services/emiService';
+import { getEmiApplicationById, getAllFiCases, approveEmiApplication, rejectEmiApplication, modifyEmiApplicationTerms, assignFiForApplication, EmiApplication } from '../../services/emiService';
 import { getOrderById } from '../../services/orderService';
 import { Order, OrderStatus } from '../../types/order';
 import { findCreditReview } from '../data/creditReviewMockData';
@@ -100,6 +100,7 @@ export function EmiApplicationDetailsScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState<boolean>(true);
   const [approving, setApproving] = useState<boolean>(false);
   const [rejecting, setRejecting] = useState<boolean>(false);
+  const [assigningFi, setAssigningFi] = useState<boolean>(false);
   const [publishing, setPublishing] = useState<boolean>(false);
   const [rejectionReason, setRejectionReason] = useState<string>('');
   const [showRejectBox, setShowRejectBox] = useState<boolean>(false);
@@ -165,12 +166,30 @@ export function EmiApplicationDetailsScreen({ navigation, route }: Props) {
       await approveEmiApplication(application.id);
       setApplication((prev) => (prev ? { ...prev, status: 'approved' } : prev));
       await reloadApplication();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to approve EMI application:', error);
+      // eslint-disable-next-line no-alert
+      window.alert(error?.message || 'Unable to approve. Field Investigation must be accepted first.');
     } finally {
       setApproving(false);
     }
   }, [application, approving, reloadApplication]);
+
+  const handleAssignFi = useCallback(async () => {
+    if (!application || assigningFi) return;
+    setAssigningFi(true);
+    try {
+      const created = await assignFiForApplication(application.id);
+      setFiCase(created);
+      await reloadApplication();
+    } catch (error: any) {
+      console.error('Failed to assign FI:', error);
+      // eslint-disable-next-line no-alert
+      window.alert(error?.message || 'Unable to assign Field Investigation.');
+    } finally {
+      setAssigningFi(false);
+    }
+  }, [application, assigningFi, reloadApplication]);
 
   useFocusEffect(
     useCallback(() => {
@@ -221,16 +240,27 @@ export function EmiApplicationDetailsScreen({ navigation, route }: Props) {
 
   const fiStatus: FiCaseStatus | undefined = fiCase?.status;
   const fiPending = fiStatus === 'pending';
-  const fiButtonTitle = fiPending ? 'Start FI' : 'View FI';
+  const fiButtonTitle =
+    fiStatus === 'pending' || fiStatus === 'in_progress' ? 'View FI Status' : 'View FI';
   const fiCompleted = fiStatus === 'completed';
+  const fiRejected = fiStatus === 'hold';
+
+  const canAssignFi =
+    !fiCase &&
+    (application?.status === 'pending' || application?.status === 'under_review');
 
   const canApprove =
-    application?.status === 'pending' || application?.status === 'under_review';
+    (application?.status === 'pending' || application?.status === 'under_review') &&
+    fiCompleted;
 
   const canEditSanction =
-    application?.status === 'pending' ||
-    application?.status === 'under_review' ||
-    application?.status === 'approved';
+    application?.status === 'approved' ||
+    (application?.status === 'under_review' && fiCompleted);
+
+  const fiRejectionReason =
+    (fiRejected && fiCase?.remarks?.trim()) ||
+    (application?.status === 'rejected' ? (application as any).rejectionReason : null) ||
+    null;
 
   const handleReject = useCallback(async () => {
     if (!application || rejecting) return;
@@ -471,8 +501,34 @@ export function EmiApplicationDetailsScreen({ navigation, route }: Props) {
           <DetailRow
             label="Completed Date & Time"
             value={fiCompleted ? formatDate(fiCase?.assignedDate ?? '—') : '—'}
-            isLast={!fiCase}
+            isLast={!fiCase && !canAssignFi && !fiRejectionReason}
           />
+          {fiRejectionReason ? (
+            <DetailRow label="FI Rejection Reason" value={String(fiRejectionReason)} isLast={false} />
+          ) : null}
+          {fiCase && (fiPending || fiStatus === 'in_progress') ? (
+            <DetailRow
+              label="Note"
+              value="FI Accept / Reject is completed in the FI Mobile App."
+              isLast={!canAssignFi}
+            />
+          ) : null}
+          {fiCompleted && application.status === 'under_review' ? (
+            <DetailRow
+              label="Next Step"
+              value="FI Accepted. Continue with Credit Review, then Publish to Customer."
+              isLast={!canAssignFi}
+            />
+          ) : null}
+          {canAssignFi && (
+            <Button
+              title={assigningFi ? 'Assigning...' : 'Assign FI'}
+              variant="primary"
+              disabled={assigningFi}
+              onPress={handleAssignFi}
+              style={styles.workflowBtn}
+            />
+          )}
           {fiCase && (
             <Button
               title={fiButtonTitle}

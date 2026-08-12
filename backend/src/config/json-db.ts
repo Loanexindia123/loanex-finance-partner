@@ -718,6 +718,7 @@ const DEFERRED_HYDRATE_COLLECTIONS = Array.from(
     'mobileVerification',
     'autopayMandate',
     'fi_cases',
+    'credit_reviews',
     'roles',
     'job_openings',
     'job_applications',

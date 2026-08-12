@@ -69,6 +69,11 @@ export interface Order {
   nextEmiDueDate?: string | null;
   emiPayments: EmiPaymentEntry[];
   emiSchedule: EmiScheduleEntry[];
+  /** Fulfillment / dispatch fields set via the order status update. */
+  courierPartner?: string | null;
+  trackingNumber?: string | null;
+  estimatedDeliveryDate?: string | null;
+  warehouse?: string | null;
 }
 
 export interface UpdateOrderStatusPayload {

@@ -8,6 +8,11 @@ import type { AuthenticatedRequest } from './authenticate';
  * grants `permission`. Must run after `authenticate`.
  */
 export function requirePermission(permission: string) {
+  return requireAnyPermission(permission);
+}
+
+/** Route guard — user must have at least one of the listed permissions. */
+export function requireAnyPermission(...needed: string[]) {
   return async (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
     try {
       if (!req.user?.sub) {
@@ -15,7 +20,7 @@ export function requirePermission(permission: string) {
         return;
       }
       const permissions = await rolesService.resolveUserPermissions(req.user.sub);
-      if (!permissions.includes(permission)) {
+      if (!needed.some((permission) => permissions.includes(permission))) {
         next(new ForbiddenError('You do not have permission to perform this action'));
         return;
       }

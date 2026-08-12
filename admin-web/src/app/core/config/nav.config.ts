@@ -6,6 +6,8 @@ export interface NavItem {
   route: string;
   /** Item is shown if the user has ANY of these permissions. Empty = always shown. */
   permissions?: Permission[];
+  /** When true, active only on exact route match (e.g. Masters hub vs child routes). */
+  exact?: boolean;
 }
 
 /**
@@ -29,7 +31,13 @@ export const NAV_ITEMS: NavItem[] = [
     route: '/notifications',
     permissions: ['notifications.view'],
   },
-  { label: 'Masters', icon: 'pi pi-database', route: '/masters', permissions: ['masters.view'] },
+  {
+    label: 'Dealers',
+    icon: 'pi pi-shop',
+    route: '/masters/dealers',
+    permissions: ['masters.view'],
+  },
+  { label: 'Masters', icon: 'pi pi-database', route: '/masters', permissions: ['masters.view'], exact: true },
   { label: 'Reports', icon: 'pi pi-chart-bar', route: '/reports', permissions: ['reports.view'] },
   { label: 'Settings', icon: 'pi pi-cog', route: '/settings', permissions: ['settings.view'] },
 ];

@@ -1,0 +1,293 @@
+<app-page-header
+  title="Delivery Partners"
+  subtitle="Manage courier partners, serviceable zones, and delivery SLAs"
+  backLink="/masters"
+  backLabel="Back to Masters"
+/>
+
+@if (!loading() && !error()) {
+  <div class="toolbar">
+    <label class="search">
+      <i class="pi pi-search" aria-hidden="true"></i>
+      <input
+        type="search"
+        placeholder="Search partners..."
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event); resetPage()"
+      />
+    </label>
+
+    <button *appCan="'masters.create'" class="toolbar__add" type="button" (click)="openAdd()">
+      <i class="pi pi-plus" aria-hidden="true"></i>
+      Add Delivery Partner
+    </button>
+
+    <p-select
+      [options]="statusOptions"
+      [ngModel]="statusFilter()"
+      (ngModelChange)="statusFilter.set($event); resetPage()"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Status"
+      styleClass="catalog-filter"
+      panelStyleClass="catalog-filter-panel"
+      appendTo="body"
+      [checkmark]="false"
+      scrollHeight="240px"
+    />
+
+    @if (hasActiveFilters()) {
+      <button class="toolbar__clear" type="button" (click)="clearFilters()">
+        <i class="pi pi-filter-slash" aria-hidden="true"></i>
+        Clear
+      </button>
+    }
+  </div>
+}
+
+@if (loading()) {
+  <app-branded-loader message="Loading delivery partners..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" actionLabel="Retry" (action)="load()" />
+} @else if (filtered().length === 0) {
+  <app-empty-state
+    icon="pi-truck"
+    title="No delivery partners found"
+    message="Add your first delivery partner or adjust your search and filters."
+    actionLabel="Add Delivery Partner"
+    (action)="openAdd()"
+  />
+} @else {
+  <div class="table-shell">
+    <p-table [value]="paged()" dataKey="id" [rowHover]="true" styleClass="catalog-table">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Partner Name</th>
+          <th>Contact Person</th>
+          <th>Phone</th>
+          <th>Serviceable Zones</th>
+          <th>Delivery SLA</th>
+          <th>Status</th>
+          <th class="actions-col">Actions</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-partner>
+        <tr>
+          <td><span class="name-cell">{{ partner.name }}</span></td>
+          <td>
+            @if (partner.contactPerson) {
+              <span class="text-cell">{{ partner.contactPerson }}</span>
+            } @else {
+              <span class="muted-pill">Not set</span>
+            }
+          </td>
+          <td>
+            @if (partner.phone) {
+              <span class="mono-cell">{{ partner.phone }}</span>
+            } @else {
+              <span class="muted-pill">Not set</span>
+            }
+          </td>
+          <td>
+            @if (partner.serviceableZones.length) {
+              <div class="zone-chips">
+                @for (zone of partner.serviceableZones; track zone) {
+                  <span class="zone-chip">{{ zone }}</span>
+                }
+              </div>
+            } @else {
+              <span class="muted-pill">No zones</span>
+            }
+          </td>
+          <td>
+            @if (partner.deliverySlaDays != null) {
+              <span class="text-cell">{{ partner.deliverySlaDays }} day(s)</span>
+            } @else {
+              <span class="muted-pill">Not set</span>
+            }
+          </td>
+          <td>
+            <div class="status-cell">
+              <app-status-badge [status]="partner.status === 'active' ? 'active' : 'inactive'" />
+              <p-toggleswitch
+                *appCan="'masters.edit'"
+                [ngModel]="partner.status === 'active'"
+                [disabled]="togglingId() === partner.id"
+                (ngModelChange)="toggleStatus(partner, $event)"
+                [inputId]="'partner-status-' + partner.id"
+              />
+            </div>
+          </td>
+          <td>
+            <div class="row-actions">
+              <button
+                *appCan="'masters.edit'"
+                type="button"
+                class="act act--edit"
+                pTooltip="Edit partner"
+                [tooltipOptions]="actionTooltip"
+                (click)="openEdit(partner)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+              </button>
+              <button
+                *appCan="'masters.delete'"
+                type="button"
+                class="act act--delete"
+                pTooltip="Delete partner"
+                [tooltipOptions]="actionTooltip"
+                (click)="remove(partner)"
+              >
+                <i class="pi pi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <footer class="pager">
+    <p class="pager__meta">
+      Showing <strong>{{ pageFrom() }}–{{ pageTo() }}</strong> of
+      <strong>{{ filtered().length }}</strong> delivery partners
+    </p>
+
+    <div class="pager__nav" role="navigation" aria-label="Pagination">
+      <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(1)" aria-label="First page">
+        <i class="pi pi-angle-double-left"></i>
+      </button>
+      <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" aria-label="Previous page">
+        <i class="pi pi-angle-left"></i>
+      </button>
+      @for (page of pageNumbers(); track page) {
+        <button
+          type="button"
+          class="pager__btn"
+          [class.pager__btn--active]="page === currentPage()"
+          (click)="goToPage(page)"
+        >
+          {{ page }}
+        </button>
+      }
+      <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" aria-label="Next page">
+        <i class="pi pi-angle-right"></i>
+      </button>
+      <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" aria-label="Last page">
+        <i class="pi pi-angle-double-right"></i>
+      </button>
+    </div>
+
+    <div class="pager__size">
+      <span>Rows</span>
+      <p-select
+        [options]="pageSizeOptions"
+        [ngModel]="pageSize()"
+        (ngModelChange)="changePageSize($event)"
+        optionLabel="label"
+        optionValue="value"
+        styleClass="catalog-filter pager-filter"
+        panelStyleClass="catalog-filter-panel"
+        appendTo="body"
+      />
+    </div>
+  </footer>
+}
+
+<p-dialog
+  [header]="dialogTitle()"
+  [visible]="dialogOpen()"
+  (visibleChange)="!$event ? closeDialog() : dialogOpen.set(true)"
+  [modal]="true"
+  [style]="{ width: '34rem' }"
+  [draggable]="false"
+  styleClass="partner-dialog"
+>
+  <div class="partner-form">
+    <label class="field">
+      <span>Partner Name *</span>
+      <input
+        pInputText
+        [ngModel]="draftName()"
+        (ngModelChange)="draftName.set($event)"
+        placeholder="Enter partner name"
+      />
+    </label>
+
+    <label class="field">
+      <span>Contact Person</span>
+      <input
+        pInputText
+        [ngModel]="draftContactPerson()"
+        (ngModelChange)="draftContactPerson.set($event)"
+        placeholder="Contact person name"
+      />
+    </label>
+
+    <label class="field">
+      <span>Phone Number</span>
+      <input
+        pInputText
+        [ngModel]="draftPhone()"
+        (ngModelChange)="draftPhone.set($event)"
+        placeholder="Phone number"
+      />
+    </label>
+
+    <label class="field">
+      <span>Serviceable Zones</span>
+      <p-multiselect
+        [options]="zoneOptions()"
+        [ngModel]="draftZones()"
+        (ngModelChange)="draftZones.set($event)"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="Select zones"
+        styleClass="partner-multiselect"
+        panelStyleClass="catalog-filter-panel"
+        appendTo="body"
+        display="chip"
+        [showToggleAll]="false"
+        [filter]="true"
+        filterPlaceholder="Search zones..."
+      />
+      @if (!zoneOptions().length) {
+        <small class="field-hint">Add delivery zones in Masters first to assign them here.</small>
+      }
+    </label>
+
+    <label class="field">
+      <span>Delivery SLA (days)</span>
+      <input
+        pInputText
+        [ngModel]="draftSlaDays()"
+        (ngModelChange)="draftSlaDays.set($event)"
+        placeholder="e.g. 3"
+        inputmode="numeric"
+      />
+    </label>
+
+    <div class="enable-row">
+      <div>
+        <strong>Status</strong>
+        <p>Active partners are available for product fulfilment.</p>
+      </div>
+      <p-toggleswitch
+        [ngModel]="draftActive()"
+        (ngModelChange)="draftActive.set($event)"
+        inputId="partnerActive"
+      />
+    </div>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <button pButton type="button" severity="secondary" [outlined]="true" label="Cancel" (click)="closeDialog()"></button>
+    <button
+      pButton
+      type="button"
+      [label]="editing() ? 'Update' : 'Save'"
+      [loading]="saving()"
+      (click)="submit()"
+    ></button>
+  </ng-template>
+</p-dialog>

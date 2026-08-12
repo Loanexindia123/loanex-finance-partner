@@ -77,7 +77,13 @@ export class ProductController {
       throw new ForbiddenError('Not authorized for this action');
     }
     const permissions = await rolesService.resolveUserPermissions(userId);
-    const canUpload = permissions.some((p) => p === 'products.create' || p === 'products.edit');
+    const canUpload = permissions.some(
+      (p) =>
+        p === 'products.create' ||
+        p === 'products.edit' ||
+        p === 'masters.create' ||
+        p === 'masters.edit',
+    );
     if (!canUpload) {
       throw new ForbiddenError('You do not have permission to perform this action');
     }

@@ -1,0 +1,302 @@
+<app-page-header title="Loan Details" [subtitle]="loan()?.loanAccountNumber || loanId">
+  <button
+    leading
+    pButton
+    type="button"
+    icon="pi pi-arrow-left"
+    label="Back to Loans"
+    [text]="true"
+    (click)="back()"
+  ></button>
+  @if (loan(); as l) {
+    <div actions>
+      <app-status-badge [status]="l.loanStatus" />
+    </div>
+  }
+</app-page-header>
+
+@if (loading()) {
+  <app-branded-loader message="Loading Loan Details..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (notFound()) {
+  <app-empty-state
+    icon="pi-search"
+    title="Loan not found"
+    description="This loan account could not be found. It may have been removed or the link is invalid."
+  >
+    <button pButton type="button" label="Back to Loans" (click)="back()"></button>
+  </app-empty-state>
+} @else if (loan(); as l) {
+  <div class="detail">
+    <section class="hero">
+      <div>
+        <p class="hero__kicker">Loan Account Number</p>
+        <h2 class="hero__id">{{ l.loanAccountNumber }}</h2>
+        <p class="hero__customer">
+          {{ l.customer?.fullName || 'Customer' }} · {{ l.customer?.mobile || 'No mobile' }}
+        </p>
+      </div>
+      <div class="hero__aside">
+        <app-status-badge [status]="l.loanStatus" />
+        <p class="hero__date">
+          Started
+          @if (l.loanStartDate) {
+            {{ l.loanStartDate | date: 'dd MMM y' }}
+          } @else {
+            —
+          }
+        </p>
+        @if (l.application?.id || l.applicationId) {
+          <button
+            pButton
+            type="button"
+            [text]="true"
+            label="View EMI Application"
+            icon="pi pi-external-link"
+            iconPos="right"
+            (click)="viewApplication()"
+          ></button>
+        }
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <div class="card__head">
+          <h3>Loan Account</h3>
+        </div>
+        <dl class="facts">
+          <div>
+            <dt>Loan ID</dt>
+            <dd class="mono">{{ l.id }}</dd>
+          </div>
+          <div>
+            <dt>Application</dt>
+            <dd>{{ l.application?.applicationNumber || l.applicationNumber || l.applicationId || '—' }}</dd>
+          </div>
+          <div class="facts--wide">
+            <dt>Product</dt>
+            <dd>{{ l.application?.productName || l.productName || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Loan Amount</dt>
+            <dd class="amount">{{ l.loanAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>Down Payment</dt>
+            <dd class="amount">{{ l.downPaymentPaid | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>Processing Fee</dt>
+            <dd class="amount">{{ l.processingFee | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>Interest Rate</dt>
+            <dd>{{ l.interestRate }}% p.a.</dd>
+          </div>
+          <div>
+            <dt>Tenure</dt>
+            <dd>{{ l.loanTenure }} months</dd>
+          </div>
+          <div>
+            <dt>EMI Amount</dt>
+            <dd class="amount">{{ l.emiAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>Total Interest</dt>
+            <dd class="amount">{{ l.totalInterest | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>Total Payable</dt>
+            <dd class="amount">{{ l.totalPayable | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>Loan End Date</dt>
+            <dd>
+              @if (l.loanEndDate) {
+                {{ l.loanEndDate | date: 'dd MMM y' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card">
+        <div class="card__head">
+          <h3>Customer</h3>
+        </div>
+        <dl class="facts">
+          <div class="facts--wide">
+            <dt>Name</dt>
+            <dd>{{ l.customer?.fullName || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Mobile</dt>
+            <dd>{{ l.customer?.mobile || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Email</dt>
+            <dd>{{ l.customer?.email || '—' }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card">
+        <div class="card__head">
+          <h3>Payment Status</h3>
+        </div>
+        <dl class="facts">
+          <div>
+            <dt>Amount Paid</dt>
+            <dd class="amount ok">{{ l.paidAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>Outstanding Balance</dt>
+            <dd class="amount warn">{{ l.outstandingAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>Installments Paid</dt>
+            <dd>{{ installments().paid }} of {{ installments().total }}</dd>
+          </div>
+          <div>
+            <dt>Next EMI Due</dt>
+            <dd>
+              @if (l.nextEmiDueDate) {
+                {{ l.nextEmiDueDate | date: 'dd MMM y' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Last Payment</dt>
+            <dd>
+              @if (l.lastPaymentDate) {
+                {{ l.lastPaymentDate | date: 'dd MMM y' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          @if (overdueRows() > 0) {
+            <div>
+              <dt>Overdue Installments</dt>
+              <dd class="overdue">{{ overdueRows() }}</dd>
+            </div>
+          }
+        </dl>
+        <div class="progress-track" aria-hidden="true">
+          <span [style.width.%]="completionPercent()"></span>
+        </div>
+        <p class="progress-label">{{ completionPercent() }}% of loan repaid</p>
+      </section>
+
+      @if (l.application) {
+        <section class="card">
+          <div class="card__head">
+            <h3>Application Notes</h3>
+          </div>
+          <dl class="facts">
+            <div class="facts--wide">
+              <dt>Application Status</dt>
+              <dd>{{ l.application.status }}</dd>
+            </div>
+            @if (l.application.adminRemarks) {
+              <div class="facts--wide">
+                <dt>Admin Remarks</dt>
+                <dd>{{ l.application.adminRemarks }}</dd>
+              </div>
+            }
+            @if (l.application.rejectionReason) {
+              <div class="facts--wide">
+                <dt>Rejection Reason</dt>
+                <dd>{{ l.application.rejectionReason }}</dd>
+              </div>
+            }
+          </dl>
+        </section>
+      }
+    </div>
+
+    <section class="card card--wide">
+      <div class="card__head">
+        <h3>EMI Schedule</h3>
+        <span class="card__meta">{{ l.schedule.length }} installments</span>
+      </div>
+      @if (l.schedule.length === 0) {
+        <app-empty-state icon="pi-calendar" title="No EMI schedule" description="No installments have been generated for this loan yet." />
+      } @else {
+        <div class="table-scroll">
+          <table class="schedule-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Due Date</th>
+                <th>Status</th>
+                <th class="num">Principal</th>
+                <th class="num">Interest</th>
+                <th class="num">EMI Amount</th>
+                <th>Paid Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of l.schedule; track row.id) {
+                <tr [attr.data-status]="row.paymentStatus">
+                  <td>{{ row.emiNumber }}</td>
+                  <td>{{ row.dueDate | date: 'dd MMM y' }}</td>
+                  <td><app-status-badge [status]="row.paymentStatus" /></td>
+                  <td class="num">{{ row.principalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</td>
+                  <td class="num">{{ row.interestAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</td>
+                  <td class="num amount">{{ row.emiAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</td>
+                  <td>{{ row.paidAt ? (row.paidAt | date: 'dd MMM y') : '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+
+    <section class="card card--wide">
+      <div class="card__head">
+        <h3>Payment History</h3>
+        @if (!paymentsLoading()) {
+          <span class="card__meta">{{ payments().length }} payments</span>
+        }
+      </div>
+      @if (paymentsLoading()) {
+        <p class="helper">Loading payment history…</p>
+      } @else if (payments().length === 0) {
+        <app-empty-state icon="pi-wallet" title="No payments yet" description="No down payment or EMI payments have been recorded for this loan." />
+      } @else {
+        <div class="table-scroll">
+          <table class="schedule-table">
+            <thead>
+              <tr>
+                <th>Payment</th>
+                <th>Date</th>
+                <th class="num">Amount</th>
+                <th>Reference</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (payment of payments(); track payment.id) {
+                <tr>
+                  <td>{{ payment.type === 'EMI' ? 'EMI #' + payment.emiNumber : 'Down Payment' }}</td>
+                  <td>{{ (payment.paidAt || payment.createdAt) | date: 'dd MMM y, h:mm a' }}</td>
+                  <td class="num amount">{{ payment.amount | currency: 'INR' : 'symbol' : '1.0-0' }}</td>
+                  <td class="mono">{{ payment.razorpayPaymentId || payment.razorpayOrderId || '—' }}</td>
+                  <td><app-status-badge [status]="payment.paymentStatus" /></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  </div>
+}

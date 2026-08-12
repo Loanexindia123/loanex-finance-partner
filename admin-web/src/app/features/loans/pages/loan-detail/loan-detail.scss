@@ -1,0 +1,245 @@
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+:host ::ng-deep .empty-state button {
+  margin-top: 1rem;
+}
+
+.hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-surface-border);
+  border-radius: 12px;
+  box-shadow: var(--admin-shadow-sm);
+}
+
+.hero__kicker {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--admin-text-muted);
+}
+
+.hero__id {
+  margin: 0.25rem 0 0.35rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.hero__customer {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--admin-text-muted);
+}
+
+.hero__aside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.hero__date {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--admin-text-muted);
+  white-space: nowrap;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-surface-border);
+  border-radius: 12px;
+  box-shadow: var(--admin-shadow-sm);
+  padding: 1.25rem;
+  min-width: 0;
+}
+
+.card--wide {
+  grid-column: 1 / -1;
+}
+
+.card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+
+  h3 {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--admin-text);
+  }
+}
+
+.card__meta {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--admin-text-muted);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+  margin: 0;
+
+  dt {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--admin-text-muted);
+  }
+
+  dd {
+    margin: 0.25rem 0 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
+    word-break: break-word;
+  }
+}
+
+.facts--wide {
+  grid-column: 1 / -1;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+}
+
+.amount {
+  font-variant-numeric: tabular-nums;
+}
+
+.ok {
+  color: #047857 !important;
+}
+
+.warn {
+  color: #b45309 !important;
+}
+
+.overdue {
+  color: #b91c1c !important;
+  font-weight: 700;
+}
+
+.helper {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--admin-text-muted);
+}
+
+.progress-track {
+  margin-top: 1rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #4f46e5, #6366f1);
+  }
+}
+
+.progress-label {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--admin-text-muted);
+}
+
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+
+  th,
+  td {
+    text-align: left;
+    padding: 0.7rem 0.875rem;
+    border-bottom: 1px solid #f1f5f9;
+    white-space: nowrap;
+  }
+
+  th {
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .amount {
+    font-weight: 700;
+    color: #0f172a;
+  }
+}
+
+.schedule-table tbody tr[data-status='PAID'] td {
+  background: #f0fdf4;
+}
+
+.schedule-table tbody tr[data-status='OVERDUE'] td {
+  background: #fef2f2;
+}
+
+@media (max-width: 900px) {
+  .grid,
+  .facts {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    flex-direction: column;
+  }
+
+  .hero__aside {
+    align-items: flex-start;
+  }
+}

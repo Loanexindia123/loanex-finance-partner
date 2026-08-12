@@ -1,0 +1,205 @@
+<app-page-header title="EMI Applications" [subtitle]="subtitle()" />
+
+<div class="toolbar">
+  <label class="search">
+    <i class="pi pi-search" aria-hidden="true"></i>
+    <input
+      type="search"
+      placeholder="Search by Application ID, Customer Name or Mobile Number"
+      [ngModel]="searchTerm()"
+      (ngModelChange)="searchTerm.set($event)"
+    />
+    @if (searchTerm().length > 0) {
+      <button
+        type="button"
+        class="search__clear"
+        aria-label="Clear search"
+        (click)="clearSearch()"
+      >
+        <i class="pi pi-times-circle" aria-hidden="true"></i>
+      </button>
+    }
+  </label>
+
+  <p-select
+    [options]="statusOptions"
+    [ngModel]="statusFilter()"
+    (ngModelChange)="statusFilter.set($event)"
+    optionLabel="label"
+    optionValue="value"
+    placeholder="Status"
+    styleClass="catalog-filter"
+    panelStyleClass="catalog-filter-panel"
+    appendTo="body"
+    [checkmark]="false"
+    scrollHeight="280px"
+  />
+
+  <p-select
+    [options]="sortOptions"
+    [ngModel]="sortBy()"
+    (ngModelChange)="sortBy.set($event)"
+    optionLabel="label"
+    optionValue="value"
+    placeholder="Sort"
+    styleClass="catalog-filter catalog-filter--sort"
+    panelStyleClass="catalog-filter-panel"
+    appendTo="body"
+    [checkmark]="false"
+    scrollHeight="240px"
+  />
+
+  @if (hasActiveFilters()) {
+    <button class="toolbar__clear" type="button" (click)="clearFilters()">
+      <i class="pi pi-filter-slash" aria-hidden="true"></i>
+      Clear
+    </button>
+  }
+</div>
+
+@if (hasActiveFilters()) {
+  <div class="active-filters" aria-label="Active filters">
+    @if (statusFilter() !== 'all') {
+      <button type="button" class="chip" (click)="clearStatusFilter()">
+        {{ statusChipLabel() }}
+        <i class="pi pi-times" aria-hidden="true"></i>
+      </button>
+    }
+    @if (sortBy() !== 'date') {
+      <button type="button" class="chip" (click)="clearSort()">
+        {{ sortChipLabel() }}
+        <i class="pi pi-times" aria-hidden="true"></i>
+      </button>
+    }
+  </div>
+}
+
+@if (loading()) {
+  <app-branded-loader message="Loading EMI Applications..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (filtered().length === 0) {
+  <app-empty-state
+    icon="pi-credit-card"
+    title="No EMI Applications Found"
+    description="Try adjusting your search or filters"
+  />
+} @else {
+  <div class="table-shell">
+    <p-table [value]="filtered()" dataKey="id" [rowHover]="true" styleClass="catalog-table">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Application</th>
+          <th>Customer</th>
+          <th>Product</th>
+          <th>Loan Amount</th>
+          <th>EMI Plan</th>
+          <th>Status</th>
+          <th>Applied</th>
+          <th class="actions-col">Actions</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-application>
+        <tr>
+          <td>
+            <button
+              type="button"
+              class="app-id"
+              [pTooltip]="application.id"
+              [tooltipOptions]="actionTooltip"
+              (click)="view(application)"
+            >
+              <span class="app-id__label">{{ application.id }}</span>
+            </button>
+          </td>
+          <td>
+            <div class="customer-cell">
+              <span class="customer-cell__name">{{ application.customerName }}</span>
+              @if (application.mobile) {
+                <span class="customer-cell__phone">{{ application.mobile }}</span>
+              }
+            </div>
+          </td>
+          <td>
+            <span class="product-cell">{{ application.selectedProduct }}</span>
+          </td>
+          <td class="amount-cell">
+            {{ application.requestedLoanAmount | currency: 'INR' : 'symbol' : '1.0-0' }}
+          </td>
+          <td>
+            <span class="plan-cell">{{ application.emiPlan || '—' }}</span>
+          </td>
+          <td><app-status-badge [status]="application.status" /></td>
+          <td class="date-cell">
+            @if (application.applicationDate) {
+              {{ application.applicationDate | date: 'dd MMM y' }}
+            } @else {
+              —
+            }
+          </td>
+          <td>
+            <div class="row-actions">
+              <button
+                type="button"
+                class="act act--view"
+                pTooltip="View application"
+                [tooltipOptions]="actionTooltip"
+                (click)="view(application)"
+              >
+                <i class="pi pi-eye" aria-hidden="true"></i>
+                View
+              </button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <div class="card-list" aria-label="EMI application list">
+    @for (application of filtered(); track application.id) {
+      <article class="emi-card">
+        <div class="emi-card__top">
+          <div class="emi-card__meta">
+            <div class="emi-card__id">{{ application.id }}</div>
+            <div class="emi-card__customer">{{ application.customerName }}</div>
+            @if (application.mobile) {
+              <div class="emi-card__mobile">{{ application.mobile }}</div>
+            }
+          </div>
+          <app-status-badge [status]="application.status" />
+        </div>
+        <dl class="emi-card__facts">
+          <div class="emi-card__facts-span">
+            <dt>Product</dt>
+            <dd>{{ application.selectedProduct }}</dd>
+          </div>
+          <div>
+            <dt>Loan Amount</dt>
+            <dd>{{ application.requestedLoanAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>EMI Plan</dt>
+            <dd>{{ application.emiPlan || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Applied</dt>
+            <dd>
+              @if (application.applicationDate) {
+                {{ application.applicationDate | date: 'dd MMM y' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+        </dl>
+        <div class="row-actions row-actions--card">
+          <button type="button" class="act act--view" (click)="view(application)">
+            <i class="pi pi-eye" aria-hidden="true"></i>
+            View
+          </button>
+        </div>
+      </article>
+    }
+  </div>
+}

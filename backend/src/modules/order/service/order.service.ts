@@ -190,6 +190,12 @@ export class OrderService {
         (s: any) => String(s.paymentStatus ?? '').toUpperCase() === 'PAID',
       ).length,
       totalEmiCount: (order.emiSchedules ?? []).length,
+      // Real fulfillment fields (set via adminUpdateStatus) — never fabricate
+      // courier/tracking placeholders here.
+      courierPartner: order.courierPartner ?? null,
+      trackingNumber: order.trackingNumber ?? null,
+      estimatedDeliveryDate: order.estimatedDeliveryDate ?? null,
+      warehouse: order.warehouse ?? null,
       // ── Live loan ledger (same source as the customer payload) ───────────
       downPaymentCollected:
         Boolean(order.applicationId) &&

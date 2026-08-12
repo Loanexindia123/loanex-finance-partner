@@ -1,0 +1,300 @@
+<app-page-header
+  title="Banners"
+  subtitle="Upload banners that appear on the website home and the mobile app home"
+/>
+
+@if (!loading() && !error()) {
+  <div class="toolbar">
+    <label class="search">
+      <i class="pi pi-search" aria-hidden="true"></i>
+      <input
+        type="search"
+        placeholder="Search banners..."
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event); resetPage()"
+      />
+    </label>
+
+    <button *appCan="'masters.create'" class="toolbar__add" type="button" (click)="openAdd()">
+      <i class="pi pi-plus" aria-hidden="true"></i>
+      Add Banner
+    </button>
+
+    <p-select
+      [options]="placementFilterOptions"
+      [ngModel]="placementFilter()"
+      (ngModelChange)="placementFilter.set($event); resetPage()"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Placement"
+      styleClass="catalog-filter"
+      panelStyleClass="catalog-filter-panel"
+      appendTo="body"
+      [checkmark]="false"
+      scrollHeight="240px"
+    />
+
+    <p-select
+      [options]="statusOptions"
+      [ngModel]="statusFilter()"
+      (ngModelChange)="statusFilter.set($event); resetPage()"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Status"
+      styleClass="catalog-filter"
+      panelStyleClass="catalog-filter-panel"
+      appendTo="body"
+      [checkmark]="false"
+      scrollHeight="240px"
+    />
+
+    @if (hasActiveFilters()) {
+      <button class="toolbar__clear" type="button" (click)="clearFilters()">
+        <i class="pi pi-filter-slash" aria-hidden="true"></i>
+        Clear
+      </button>
+    }
+  </div>
+}
+
+@if (loading()) {
+  <app-branded-loader message="Loading banners..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (filtered().length === 0) {
+  <app-empty-state
+    icon="pi-images"
+    title="No banners found"
+    description="Upload a banner to show it on the website and the app."
+  />
+} @else {
+  <div class="table-shell">
+    <p-table [value]="paged()" dataKey="id" [rowHover]="true" styleClass="catalog-table">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Banner</th>
+          <th>Placement</th>
+          <th>Order</th>
+          <th>Status</th>
+          <th class="actions-col">Actions</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-banner>
+        <tr>
+          <td>
+            <div class="banner-cell">
+              @if (hasImage(banner)) {
+                <img class="banner-cell__image" [src]="imageSrc(banner)" [alt]="banner.title" />
+              } @else {
+                <span class="banner-cell__placeholder" aria-hidden="true">
+                  <i class="pi pi-image"></i>
+                </span>
+              }
+              <div class="banner-cell__copy">
+                <span class="banner-cell__name">{{ banner.title }}</span>
+                @if (banner.subtitle) {
+                  <span class="banner-cell__sub">{{ banner.subtitle }}</span>
+                }
+                @if (banner.badgeText) {
+                  <span class="banner-cell__badge">{{ banner.badgeText }}</span>
+                }
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="placement-pill" [attr.data-placement]="banner.placement">
+              {{ placementLabel(banner.placement) }}
+            </span>
+          </td>
+          <td>{{ banner.sortOrder }}</td>
+          <td>
+            <div class="status-cell">
+              <app-status-badge [status]="banner.status === 'active' ? 'active' : 'inactive'" />
+              <p-toggleswitch
+                *appCan="'masters.edit'"
+                [ngModel]="banner.status === 'active'"
+                [disabled]="togglingId() === banner.id"
+                (ngModelChange)="toggleStatus(banner, $event)"
+                [inputId]="'banner-status-' + banner.id"
+              />
+            </div>
+          </td>
+          <td>
+            <div class="row-actions">
+              <button
+                *appCan="'masters.edit'"
+                type="button"
+                class="act act--edit"
+                pTooltip="Edit banner"
+                [tooltipOptions]="actionTooltip"
+                (click)="openEdit(banner)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+              </button>
+              <button
+                *appCan="'masters.delete'"
+                type="button"
+                class="act act--delete"
+                pTooltip="Delete banner"
+                [tooltipOptions]="actionTooltip"
+                (click)="remove(banner)"
+              >
+                <i class="pi pi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <footer class="pager">
+    <p class="pager__meta">
+      Showing <strong>{{ pageFrom() }}–{{ pageTo() }}</strong> of
+      <strong>{{ filtered().length }}</strong> banners
+    </p>
+
+    <div class="pager__nav" role="navigation" aria-label="Pagination">
+      <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(1)" aria-label="First page">
+        <i class="pi pi-angle-double-left"></i>
+      </button>
+      <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" aria-label="Previous page">
+        <i class="pi pi-angle-left"></i>
+      </button>
+      @for (page of pageNumbers(); track page) {
+        <button
+          type="button"
+          class="pager__btn"
+          [class.pager__btn--active]="page === currentPage()"
+          (click)="goToPage(page)"
+        >
+          {{ page }}
+        </button>
+      }
+      <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" aria-label="Next page">
+        <i class="pi pi-angle-right"></i>
+      </button>
+      <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" aria-label="Last page">
+        <i class="pi pi-angle-double-right"></i>
+      </button>
+    </div>
+
+    <div class="pager__size">
+      <span>Rows</span>
+      <p-select
+        [options]="pageSizeOptions"
+        [ngModel]="pageSize()"
+        (ngModelChange)="changePageSize($event)"
+        optionLabel="label"
+        optionValue="value"
+        styleClass="catalog-filter pager-filter"
+        panelStyleClass="catalog-filter-panel"
+        appendTo="body"
+      />
+    </div>
+  </footer>
+}
+
+<p-dialog
+  [header]="dialogTitle()"
+  [visible]="dialogOpen()"
+  (visibleChange)="!$event ? closeDialog() : dialogOpen.set(true)"
+  [modal]="true"
+  [style]="{ width: '40rem' }"
+  [draggable]="false"
+  styleClass="banner-dialog"
+>
+  <div class="banner-form">
+    <div class="field">
+      <span>Banner image *</span>
+      <label class="image-upload" [class.image-upload--filled]="!!draftImage()">
+        <input type="file" accept="image/*" hidden (change)="onImageSelected($event)" />
+        @if (draftImage()) {
+          <img class="image-upload__preview" [src]="previewImage()" alt="Banner preview" />
+          <div class="image-upload__actions">
+            <span class="image-upload__hint">{{ isPendingImage() ? 'Selected — saves with banner' : 'Current image' }}</span>
+            <button pButton type="button" severity="secondary" [text]="true" label="Remove" (click)="removeImage(); $event.preventDefault(); $event.stopPropagation()"></button>
+          </div>
+        } @else {
+          <span class="image-upload__empty">
+            <i class="pi pi-upload"></i>
+            Upload banner (JPG, PNG, WEBP, GIF · max 5MB)
+            <small>Recommended 1440×560 for home hero</small>
+          </span>
+        }
+      </label>
+    </div>
+
+    <label class="field">
+      <span>Title *</span>
+      <input pInputText [ngModel]="draftTitle()" (ngModelChange)="draftTitle.set($event)" placeholder="e.g. Zero Down Payment Festive EMI Offer" />
+    </label>
+
+    <label class="field">
+      <span>Subtitle</span>
+      <textarea
+        pTextarea
+        rows="2"
+        [ngModel]="draftSubtitle()"
+        (ngModelChange)="draftSubtitle.set($event)"
+        placeholder="Short line shown under the title"
+      ></textarea>
+    </label>
+
+    <div class="grid-2">
+      <label class="field">
+        <span>Badge text</span>
+        <input pInputText [ngModel]="draftBadge()" (ngModelChange)="draftBadge.set($event)" placeholder="e.g. 0% EMI" />
+      </label>
+      <label class="field">
+        <span>Link</span>
+        <input pInputText [ngModel]="draftLink()" (ngModelChange)="draftLink.set($event)" placeholder="/products" />
+      </label>
+    </div>
+
+    <div class="grid-2">
+      <label class="field">
+        <span>Where it shows</span>
+        <p-select
+          [options]="placementOptions"
+          [ngModel]="draftPlacement()"
+          (ngModelChange)="onPlacementChange($event)"
+          optionLabel="label"
+          optionValue="value"
+          appendTo="body"
+          styleClass="catalog-filter placement-select"
+          panelStyleClass="catalog-filter-panel"
+        />
+        <small class="field-hint">{{ placementHint() }}</small>
+      </label>
+      <label class="field">
+        <span>Sort order</span>
+        <input
+          pInputText
+          type="number"
+          min="0"
+          [ngModel]="draftSortOrder()"
+          (ngModelChange)="draftSortOrder.set(+$event || 0)"
+        />
+        <small class="field-hint">Lower numbers appear first.</small>
+      </label>
+    </div>
+
+    <div class="enable-row">
+      <div>
+        <strong>Show on website &amp; app</strong>
+        <p>Active banners appear on both the website and the mobile app home.</p>
+      </div>
+      <p-toggleswitch
+        [ngModel]="draftActive()"
+        (ngModelChange)="draftActive.set($event)"
+        inputId="bannerActive"
+      />
+    </div>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <button pButton type="button" severity="secondary" [outlined]="true" label="Cancel" (click)="closeDialog()"></button>
+    <button pButton type="button" [label]="editing() ? 'Update Banner' : 'Save Banner'" [loading]="saving()" (click)="submit()"></button>
+  </ng-template>
+</p-dialog>

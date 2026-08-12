@@ -1,0 +1,178 @@
+<app-page-header title="FI Cases" [subtitle]="subtitle()" />
+
+<div class="toolbar">
+  <label class="search">
+    <i class="pi pi-search" aria-hidden="true"></i>
+    <input
+      type="search"
+      placeholder="Search by FI ID, Customer, Mobile or Application ID"
+      [ngModel]="searchTerm()"
+      (ngModelChange)="searchTerm.set($event)"
+    />
+    @if (searchTerm().length > 0) {
+      <button
+        type="button"
+        class="search__clear"
+        aria-label="Clear search"
+        (click)="clearSearch()"
+      >
+        <i class="pi pi-times-circle" aria-hidden="true"></i>
+      </button>
+    }
+  </label>
+
+  <p-select
+    [options]="statusOptions"
+    [ngModel]="statusFilter()"
+    (ngModelChange)="statusFilter.set($event)"
+    optionLabel="label"
+    optionValue="value"
+    placeholder="Status"
+    styleClass="catalog-filter"
+    panelStyleClass="catalog-filter-panel"
+    appendTo="body"
+    [checkmark]="false"
+    scrollHeight="280px"
+  />
+
+  @if (hasActiveFilters()) {
+    <button class="toolbar__clear" type="button" (click)="clearFilters()">
+      <i class="pi pi-filter-slash" aria-hidden="true"></i>
+      Clear
+    </button>
+  }
+</div>
+
+@if (hasActiveFilters()) {
+  <div class="active-filters" aria-label="Active filters">
+    <button type="button" class="chip" (click)="clearStatusFilter()">
+      {{ statusChipLabel() }}
+      <i class="pi pi-times" aria-hidden="true"></i>
+    </button>
+  </div>
+}
+
+@if (loading()) {
+  <app-branded-loader message="Loading FI Cases..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (filtered().length === 0) {
+  <app-empty-state
+    icon="pi-map-marker"
+    title="No FI Cases Found"
+    description="Assign Field Investigation from an EMI application, or adjust your search/filters."
+  />
+} @else {
+  <div class="table-shell">
+    <p-table [value]="filtered()" dataKey="id" [rowHover]="true" styleClass="catalog-table">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>FI Case</th>
+          <th>Customer</th>
+          <th>Product</th>
+          <th>Executive</th>
+          <th>Status</th>
+          <th>Assigned</th>
+          <th class="actions-col">Actions</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-fiCase>
+        <tr>
+          <td>
+            <button
+              type="button"
+              class="app-id"
+              [pTooltip]="fiCase.id"
+              [tooltipOptions]="actionTooltip"
+              (click)="view(fiCase)"
+            >
+              <span class="app-id__label">{{ fiCase.id }}</span>
+              @if (fiCase.applicationId) {
+                <span class="app-id__sub">App {{ fiCase.applicationId }}</span>
+              }
+            </button>
+          </td>
+          <td>
+            <div class="customer-cell">
+              <span class="customer-cell__name">{{ fiCase.customerName }}</span>
+              @if (fiCase.mobile) {
+                <span class="customer-cell__phone">{{ fiCase.mobile }}</span>
+              }
+            </div>
+          </td>
+          <td>
+            <span class="product-cell">{{ fiCase.productName || '—' }}</span>
+          </td>
+          <td>
+            <span class="plan-cell">{{ fiCase.assignedExecutive || 'Unassigned' }}</span>
+          </td>
+          <td><app-status-badge [status]="statusLabel(fiCase.status)" /></td>
+          <td class="date-cell">
+            @if (fiCase.assignedDate) {
+              {{ fiCase.assignedDate | date: 'dd MMM y' }}
+            } @else {
+              —
+            }
+          </td>
+          <td>
+            <div class="row-actions">
+              <button
+                type="button"
+                class="act act--view"
+                pTooltip="View FI case"
+                [tooltipOptions]="actionTooltip"
+                (click)="view(fiCase)"
+              >
+                <i class="pi pi-eye" aria-hidden="true"></i>
+                View
+              </button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <div class="card-list" aria-label="FI case list">
+    @for (fiCase of filtered(); track fiCase.id) {
+      <article class="emi-card">
+        <div class="emi-card__top">
+          <div class="emi-card__meta">
+            <div class="emi-card__id">{{ fiCase.id }}</div>
+            <div class="emi-card__customer">{{ fiCase.customerName }}</div>
+            @if (fiCase.mobile) {
+              <div class="emi-card__mobile">{{ fiCase.mobile }}</div>
+            }
+          </div>
+          <app-status-badge [status]="statusLabel(fiCase.status)" />
+        </div>
+        <dl class="emi-card__facts">
+          <div class="emi-card__facts-span">
+            <dt>Product</dt>
+            <dd>{{ fiCase.productName || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Executive</dt>
+            <dd>{{ fiCase.assignedExecutive || 'Unassigned' }}</dd>
+          </div>
+          <div>
+            <dt>Assigned</dt>
+            <dd>
+              @if (fiCase.assignedDate) {
+                {{ fiCase.assignedDate | date: 'dd MMM y' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+        </dl>
+        <div class="row-actions row-actions--card">
+          <button type="button" class="act act--view" (click)="view(fiCase)">
+            <i class="pi pi-eye" aria-hidden="true"></i>
+            View
+          </button>
+        </div>
+      </article>
+    }
+  </div>
+}

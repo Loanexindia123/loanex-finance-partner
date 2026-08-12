@@ -32,6 +32,7 @@
             class="sidebar__link"
             [routerLink]="item.route"
             routerLinkActive="sidebar__link--active"
+            [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
             [pTooltip]="collapsed() ? item.label : ''"
             tooltipPosition="right"
             (click)="onLinkClick()"

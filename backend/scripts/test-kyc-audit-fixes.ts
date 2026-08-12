@@ -102,7 +102,7 @@ async function main() {
   await paymentRepository.createKycVerificationTransaction({
     userId: paidUserId,
     razorpayOrderId: `order_test_${suffix}`,
-    amount: 299,
+    amount: 399,
     currency: 'INR',
   });
   const pending = await paymentRepository.findByRazorpayOrderId(`order_test_${suffix}`);

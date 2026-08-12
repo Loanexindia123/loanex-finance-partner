@@ -1,0 +1,64 @@
+.master-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.master-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 1px solid var(--admin-surface-border);
+  background: var(--admin-surface);
+  box-shadow: var(--admin-shadow-sm);
+  text-decoration: none;
+  color: inherit;
+  min-height: 160px;
+
+  i {
+    font-size: 1.5rem;
+    color: var(--admin-primary);
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  p {
+    margin: 0.25rem 0 0;
+    font-size: 0.8125rem;
+    color: var(--admin-text-muted);
+  }
+
+  &--active:hover {
+    border-color: #c7d2fe;
+    box-shadow: 0 8px 24px rgb(79 70 229 / 0.08);
+  }
+
+  &--soon {
+    opacity: 0.72;
+  }
+
+  &__cta {
+    margin-top: auto;
+    font-size: 0.8125rem;
+    font-weight: 650;
+    color: var(--admin-primary);
+  }
+
+  &__badge {
+    margin-top: auto;
+    align-self: flex-start;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+}

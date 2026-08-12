@@ -525,7 +525,7 @@ export default function EmiApplyScreen() {
         <View style={{ flex: 1, backgroundColor: Colors.background }}>
           <View style={[s.payHeader, { paddingTop: insets.top + Spacing.md }]}>
             <Text style={s.payHeaderTitle}>KYC Verification Fee</Text>
-            <Text style={s.payHeaderAmount}>{'₹299'}</Text>
+            <Text style={s.payHeaderAmount}>{'₹399'}</Text>
             <Pressable style={s.iconBtn} onPress={() => { setShowKycFeeModal(false); setKycFeeOrder(null); }}>
               <MaterialIcons name="close" size={22} color={Colors.textPrimary} />
             </Pressable>

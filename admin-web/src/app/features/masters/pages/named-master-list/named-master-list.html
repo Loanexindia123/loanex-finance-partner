@@ -1,0 +1,115 @@
+@if (config) {
+  <app-page-header
+    [title]="config.title"
+    [subtitle]="config.subtitle"
+    backLink="/masters"
+    backLabel="Back to Masters"
+  >
+    <button
+      *appCan="config.addPermission ?? 'masters.create'"
+      actions
+      pButton
+      type="button"
+      icon="pi pi-plus"
+      [label]="'Add ' + config.entityLabel"
+      (click)="openAdd()"
+    ></button>
+  </app-page-header>
+}
+
+@if (loading()) {
+  <app-branded-loader [message]="config ? 'Loading ' + config.title + '...' : 'Loading master data...'" />
+} @else if (error()) {
+  <app-empty-state icon="pi-exclamation-triangle" title="Could not load data" [description]="error()" />
+} @else if (config) {
+  <div class="toolbar">
+    <label class="search">
+      <i class="pi pi-search" aria-hidden="true"></i>
+      <input
+        type="search"
+        [placeholder]="'Search ' + config.title.toLowerCase() + '...'"
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event)"
+      />
+    </label>
+    <span class="toolbar__count">{{ filtered().length }} item(s)</span>
+  </div>
+
+  @if (filtered().length) {
+    <div class="master-table">
+      <div class="master-table__head">
+        <span>Name</span>
+        <span>Status</span>
+        <span class="master-table__actions-head">Actions</span>
+      </div>
+      @for (item of filtered(); track item.id) {
+        <div class="master-table__row">
+          <span class="master-table__name">{{ item.name }}</span>
+          <span class="master-table__status">{{ item.status || 'active' }}</span>
+          <div class="master-table__actions">
+            <button
+              *appCan="'masters.edit'"
+              pButton
+              type="button"
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              (click)="openEdit(item)"
+            ></button>
+            <button
+              *appCan="'masters.delete'"
+              pButton
+              type="button"
+              icon="pi pi-trash"
+              [text]="true"
+              severity="danger"
+              (click)="remove(item)"
+            ></button>
+          </div>
+        </div>
+      }
+    </div>
+  } @else {
+    <app-empty-state
+      icon="pi-database"
+      [title]="'No ' + config.title.toLowerCase() + ' yet'"
+      [description]="'Add your first ' + config.entityLabel.toLowerCase() + ' to use it across the admin portal.'"
+    />
+  }
+}
+
+<p-dialog
+  [header]="config ? 'Add ' + config.entityLabel : 'Add Item'"
+  [visible]="addOpen()"
+  (visibleChange)="addOpen.set($event)"
+  [modal]="true"
+  [style]="{ width: '26rem' }"
+  [draggable]="false"
+>
+  <label class="field">
+    <span>Name</span>
+    <input pInputText [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" />
+  </label>
+  <ng-template pTemplate="footer">
+    <button pButton type="button" severity="secondary" [outlined]="true" label="Cancel" (click)="addOpen.set(false)"></button>
+    <button pButton type="button" label="Save" [loading]="saving()" (click)="submitAdd()"></button>
+  </ng-template>
+</p-dialog>
+
+<p-dialog
+  [header]="config ? 'Edit ' + config.entityLabel : 'Edit Item'"
+  [visible]="editOpen()"
+  (visibleChange)="editOpen.set($event)"
+  [modal]="true"
+  [style]="{ width: '26rem' }"
+  [draggable]="false"
+>
+  <label class="field">
+    <span>Name</span>
+    <input pInputText [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" />
+  </label>
+  <ng-template pTemplate="footer">
+    <button pButton type="button" severity="secondary" [outlined]="true" label="Cancel" (click)="editOpen.set(false)"></button>
+    <button pButton type="button" label="Update" [loading]="saving()" (click)="submitEdit()"></button>
+  </ng-template>
+</p-dialog>

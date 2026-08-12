@@ -1,0 +1,804 @@
+<app-page-header title="EMI Application Details" [subtitle]="application()?.id || applicationId">
+  <button
+    leading
+    pButton
+    type="button"
+    icon="pi pi-arrow-left"
+    label="Back to EMI Applications"
+    [text]="true"
+    (click)="back()"
+  ></button>
+  @if (application(); as app) {
+    <div actions>
+      <app-status-badge [status]="app.status" />
+    </div>
+  }
+</app-page-header>
+
+@if (loading()) {
+  <app-branded-loader message="Loading Application Details..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (notFound()) {
+  <app-empty-state
+    icon="pi-search"
+    title="Application not found"
+    description="This EMI application could not be found. It may have been removed or the link is invalid."
+  >
+    <button pButton type="button" label="Back to EMI Applications" (click)="back()"></button>
+  </app-empty-state>
+} @else if (application(); as app) {
+  <div class="detail">
+    <section class="hero">
+      <div>
+        <p class="hero__kicker">Application ID</p>
+        <h2 class="hero__id">{{ app.id }}</h2>
+        <p class="hero__customer">{{ app.customerName }} · {{ app.mobile || 'No mobile' }}</p>
+      </div>
+      <div class="hero__aside">
+        <app-status-badge [status]="app.status" />
+        <p class="hero__date">
+          Applied
+          @if (app.applicationDate) {
+            {{ app.applicationDate | date: 'dd MMM y' }}
+          } @else {
+            —
+          }
+        </p>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <div class="card__head">
+          <h3>Application Information</h3>
+        </div>
+        <dl class="facts">
+          <div>
+            <dt>Application ID</dt>
+            <dd class="mono">{{ app.id }}</dd>
+          </div>
+          <div>
+            <dt>Application Date</dt>
+            <dd>
+              @if (app.applicationDate) {
+                {{ app.applicationDate | date: 'dd MMM y' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd><app-status-badge [status]="app.status" /></dd>
+          </div>
+        </dl>
+        @if (canApprove()) {
+          <div class="card__actions" *appCan="'emi.edit'">
+            <button
+              pButton
+              type="button"
+              label="Approve Application"
+              icon="pi pi-check"
+              [loading]="approving()"
+              [disabled]="approving() || rejecting()"
+              (click)="confirmApprove()"
+            ></button>
+            <button
+              pButton
+              type="button"
+              severity="danger"
+              [outlined]="true"
+              label="Reject Application"
+              icon="pi pi-times"
+              [disabled]="approving() || rejecting()"
+              (click)="openReject()"
+            ></button>
+          </div>
+        }
+      </section>
+
+      <section class="card">
+        <div class="card__head">
+          <h3>Customer Information</h3>
+        </div>
+        <dl class="facts">
+          <div>
+            <dt>Customer Name</dt>
+            <dd>{{ app.customerName }}</dd>
+          </div>
+          <div>
+            <dt>Mobile Number</dt>
+            <dd>{{ app.mobile || '—' }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card">
+        <div class="card__head">
+          <h3>Product & EMI</h3>
+        </div>
+        <dl class="facts">
+          <div class="facts--wide">
+            <dt>Selected Product</dt>
+            <dd>{{ app.selectedProduct }}</dd>
+          </div>
+          <div>
+            <dt>Requested Loan Amount</dt>
+            <dd class="amount">{{ app.requestedLoanAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>EMI Plan</dt>
+            <dd>{{ app.emiPlan || '—' }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      @if (canEditSanction()) {
+        <section class="card">
+          <div class="card__head">
+            <h3>Sanction / Loan Terms</h3>
+          </div>
+          <p class="helper">
+            After FI Accept and Credit Review, adjust loan terms if needed and publish to the
+            customer. Down Payment is optional to change — leave it unchanged to keep the current
+            value. The customer then accepts the offer and pays the required Down Payment.
+          </p>
+          <div class="form-grid">
+            <label class="field">
+              <span>Loan Amount (₹)</span>
+              <input
+                type="number"
+                [ngModel]="terms().approvedAmount"
+                (ngModelChange)="updateTerm('approvedAmount', $event)"
+                [disabled]="!canEdit()"
+              />
+            </label>
+            <label class="field">
+              <span>Tenure (months)</span>
+              <input
+                type="number"
+                [ngModel]="terms().approvedTenure"
+                (ngModelChange)="updateTerm('approvedTenure', $event)"
+                [disabled]="!canEdit()"
+              />
+            </label>
+            <label class="field">
+              <span>Down Payment (₹)</span>
+              <input
+                type="number"
+                [ngModel]="terms().approvedDownPayment"
+                (ngModelChange)="updateTerm('approvedDownPayment', $event)"
+                [disabled]="!canEdit()"
+              />
+            </label>
+            <label class="field">
+              <span>Interest Rate (% p.a.)</span>
+              <input
+                type="number"
+                [ngModel]="terms().interestRate"
+                (ngModelChange)="updateTerm('interestRate', $event)"
+                [disabled]="!canEdit()"
+              />
+            </label>
+            <label class="field">
+              <span>Processing Fee (₹)</span>
+              <input
+                type="number"
+                [ngModel]="terms().processingFee"
+                (ngModelChange)="updateTerm('processingFee', $event)"
+                [disabled]="!canEdit()"
+              />
+            </label>
+            <label class="field field--wide">
+              <span>Admin Remarks</span>
+              <textarea
+                rows="3"
+                placeholder="Visible to the customer with the modified offer"
+                [ngModel]="terms().adminRemarks"
+                (ngModelChange)="updateTerm('adminRemarks', $event)"
+                [disabled]="!canEdit()"
+              ></textarea>
+            </label>
+          </div>
+          <div class="card__actions" *appCan="'emi.edit'">
+            <button
+              pButton
+              type="button"
+              label="Publish to Customer"
+              icon="pi pi-send"
+              [loading]="publishing()"
+              [disabled]="publishing()"
+              (click)="confirmPublish()"
+            ></button>
+          </div>
+        </section>
+      }
+
+      <section class="card">
+        <div class="card__head">
+          <h3>Field Investigation</h3>
+        </div>
+        <dl class="facts">
+          <div>
+            <dt>Current Status</dt>
+            <dd>{{ fiStatusLabel() }}</dd>
+          </div>
+          <div>
+            <dt>Completed By</dt>
+            <dd>
+              @if (fiCase()?.status === 'completed') {
+                {{ fiCase()?.assignedExecutive || '—' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Completed Date & Time</dt>
+            <dd>
+              @if (fiCase()?.status === 'completed' && fiCase()?.assignedDate) {
+                {{ fiCase()!.assignedDate | date: 'dd MMM y' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          @if (fiRejectionReason(); as reason) {
+            <div class="facts--wide">
+              <dt>FI Rejection Reason</dt>
+              <dd>{{ reason }}</dd>
+            </div>
+          }
+        </dl>
+        @if (fiCase() && (fiCase()!.status === 'pending' || fiCase()!.status === 'in_progress')) {
+          <p class="helper">
+            FI Accept / Reject is completed in the FI Mobile App. Admin FI Case view is read-only.
+          </p>
+        }
+        @if (fiReadyForCreditReview()) {
+          <p class="helper">
+            FI Accepted. Continue with Credit Review, then publish loan terms to the customer.
+          </p>
+        }
+        <div class="card__actions">
+          @if (canAssignFi()) {
+            <button
+              pButton
+              type="button"
+              label="Assign FI"
+              icon="pi pi-map-marker"
+              [loading]="assigningFi()"
+              [disabled]="assigningFi()"
+              *appCan="'emi.edit'"
+              (click)="confirmAssignFi()"
+            ></button>
+          }
+          @if (fiCase()) {
+            <button
+              pButton
+              type="button"
+              [outlined]="true"
+              [label]="fiButtonTitle()"
+              icon="pi pi-map-marker"
+              (click)="viewFi()"
+            ></button>
+          }
+        </div>
+        @if (!fiCase() && !canAssignFi()) {
+          <p class="helper">No Field Investigation case is linked to this application.</p>
+        }
+      </section>
+
+      <section class="card">
+        <div class="card__head">
+          <h3>Credit Review</h3>
+        </div>
+        <dl class="facts">
+          <div>
+            <dt>Current Status</dt>
+            <dd>{{ creditReviewStatus() }}</dd>
+          </div>
+          <div>
+            <dt>Completed By</dt>
+            <dd>
+              @if (creditReview()?.creditStatus === 'Completed') {
+                {{ creditReview()?.reviewer || '—' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Completed Date & Time</dt>
+            <dd>
+              @if (creditReview()?.creditStatus === 'Completed' && creditReview()?.reviewDate) {
+                {{ creditReview()!.reviewDate | date: 'dd MMM y' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+        </dl>
+        @if (!creditReview()) {
+          <p class="helper">No credit review has been recorded yet for this application.</p>
+        }
+        <div class="card__actions">
+          <button
+            pButton
+            type="button"
+            [outlined]="true"
+            label="View Credit Review"
+            icon="pi pi-eye"
+            (click)="viewCreditReview()"
+          ></button>
+        </div>
+      </section>
+    </div>
+
+    <section class="card card--wide">
+      <div class="card__head">
+        <h3>{{ hasLoanLedger() ? 'Loan Ledger' : 'Down Payment' }}</h3>
+      </div>
+
+      @if (hasLoanLedger() && order(); as o) {
+        <dl class="facts facts--dense">
+          <div>
+            <dt>EMI Plan</dt>
+            <dd>{{ o.emiPlan || '—' }}</dd>
+          </div>
+          <div>
+            <dt>EMI Amount</dt>
+            <dd>
+              @if (o.emiAmount != null) {
+                {{ o.emiAmount | currency: 'INR' : 'symbol' : '1.0-0' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>EMI Duration</dt>
+            <dd>{{ o.emiDuration || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Loan Status</dt>
+            <dd>
+              @if (o.loanStatus) {
+                <app-status-badge [status]="o.loanStatus" />
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Loan Account</dt>
+            <dd>{{ o.loanAccountNumber || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Loan Amount</dt>
+            <dd>
+              @if (o.loanAmount != null) {
+                {{ o.loanAmount | currency: 'INR' : 'symbol' : '1.0-0' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Down Payment</dt>
+            <dd>
+              @if (o.downPayment != null) {
+                {{ o.downPayment | currency: 'INR' : 'symbol' : '1.0-0' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Down Payment Collected</dt>
+            <dd>
+              @if (o.downPaymentCollected != null && o.downPaymentCollected > 0) {
+                {{ o.downPaymentCollected | currency: 'INR' : 'symbol' : '1.0-0' }}
+              } @else {
+                Not paid
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Amount Paid</dt>
+            <dd>
+              @if (o.amountPaid != null && o.amountPaid > 0) {
+                {{ o.amountPaid | currency: 'INR' : 'symbol' : '1.0-0' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Outstanding Balance</dt>
+            <dd>
+              @if (o.outstandingAmount != null) {
+                {{ o.outstandingAmount | currency: 'INR' : 'symbol' : '1.0-0' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Installments Paid</dt>
+            <dd>
+              @if (o.paidEmiCount != null && o.totalEmiCount != null) {
+                {{ o.paidEmiCount }} of {{ o.totalEmiCount }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          @if (o.nextEmiDueDate) {
+            <div>
+              <dt>Next EMI Due</dt>
+              <dd>{{ o.nextEmiDueDate | date: 'dd MMM y' }}</dd>
+            </div>
+          }
+          <div>
+            <dt>Interest Rate</dt>
+            <dd>
+              @if (o.interestRate != null) {
+                {{ o.interestRate }}% p.a.
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Processing Fee</dt>
+            <dd>
+              @if (o.processingFee != null) {
+                {{ o.processingFee | currency: 'INR' : 'symbol' : '1.0-0' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+        </dl>
+
+        @if (paymentHistory().length > 0) {
+          <h4 class="subhead">Payment History</h4>
+          <ul class="ledger-list">
+            @for (row of paymentHistory(); track row.label) {
+              <li>
+                <div>
+                  <strong>{{ row.label }}</strong>
+                  <span>
+                    @if (row.date) {
+                      {{ row.date | date: 'dd MMM y' }}
+                    } @else {
+                      —
+                    }
+                  </span>
+                </div>
+                <em>{{ row.amount | currency: 'INR' : 'symbol' : '1.0-0' }}</em>
+              </li>
+            }
+          </ul>
+        }
+
+        @if (upcomingInstallments().length > 0) {
+          <h4 class="subhead">Upcoming Installments</h4>
+          <ul class="ledger-list">
+            @for (row of upcomingInstallments(); track row.emiNumber) {
+              <li>
+                <div>
+                  <strong>EMI #{{ row.emiNumber }}</strong>
+                  <span>
+                    Due
+                    @if (row.dueDate) {
+                      {{ row.dueDate | date: 'dd MMM y' }}
+                    } @else {
+                      —
+                    }
+                    ·
+                    <span [class.overdue]="row.paymentStatus === 'OVERDUE'">
+                      {{ row.paymentStatus === 'OVERDUE' ? 'Overdue' : 'Pending' }}
+                    </span>
+                  </span>
+                </div>
+                <em>{{ row.amount | currency: 'INR' : 'symbol' : '1.0-0' }}</em>
+              </li>
+            }
+          </ul>
+        }
+      } @else {
+        <dl class="facts">
+          <div>
+            <dt>Current Status</dt>
+            <dd>{{ downPaymentStatus() }}</dd>
+          </div>
+        </dl>
+        <p class="helper">
+          Down payment is collected after offer acceptance. The loan ledger will appear after
+          payment.
+        </p>
+      }
+
+      @if (app.loanId) {
+        <div class="card__actions">
+          <button
+            pButton
+            type="button"
+            [outlined]="true"
+            label="View Full Ledger"
+            icon="pi pi-wallet"
+            (click)="viewLedger()"
+          ></button>
+        </div>
+      }
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <div class="card__head">
+          <h3>eKYC</h3>
+          <span class="card__meta">Customer KYC records</span>
+        </div>
+        @if (kyc(); as k) {
+          <dl class="facts">
+            <div>
+              <dt>Current Status</dt>
+              <dd>{{ kycStatusLabel() }}</dd>
+            </div>
+            <div>
+              <dt>Aadhaar Verified</dt>
+              <dd>{{ kycAadhaar() ? 'Yes' : 'No' }}</dd>
+            </div>
+            <div>
+              <dt>PAN Verified</dt>
+              <dd>{{ kycPan() ? 'Yes' : 'No' }}</dd>
+            </div>
+            <div>
+              <dt>Face Match</dt>
+              <dd>{{ kycFace() ? 'Yes' : 'No' }}</dd>
+            </div>
+            @if (kycCibil() !== null) {
+              <div>
+                <dt>CIBIL Score</dt>
+                <dd>{{ kycCibil() }}</dd>
+              </div>
+            }
+            <div>
+              <dt>Completed Date & Time</dt>
+              <dd>
+                @if (k.kycCompletedAt) {
+                  {{ k.kycCompletedAt | date: 'dd MMM y' }}
+                } @else {
+                  —
+                }
+              </dd>
+            </div>
+          </dl>
+        } @else {
+          <dl class="facts">
+            <div><dt>Current Status</dt><dd>{{ kycStatusLabel() }}</dd></div>
+            <div><dt>Completed By</dt><dd>—</dd></div>
+            <div><dt>Completed Date & Time</dt><dd>—</dd></div>
+          </dl>
+          <p class="helper">No eKYC record found yet for this customer. eKYC is completed in the Customer App.</p>
+        }
+      </section>
+
+      <section class="card">
+        <div class="card__head"><h3>eSign</h3></div>
+        <dl class="facts">
+          <div><dt>Current Status</dt><dd>—</dd></div>
+          <div><dt>Completed By</dt><dd>—</dd></div>
+          <div><dt>Completed Date & Time</dt><dd>—</dd></div>
+        </dl>
+        <p class="helper">Signing is handled in the Customer App after offer acceptance.</p>
+      </section>
+
+      <section class="card">
+        <div class="card__head">
+          <h3>eMandate</h3>
+          <span class="card__meta">AutoPay mandate</span>
+        </div>
+        @if (mandate(); as m) {
+          <dl class="facts">
+            <div>
+              <dt>Current Status</dt>
+              <dd>{{ mandateStatusLabel() }}</dd>
+            </div>
+            <div>
+              <dt>Payment Method</dt>
+              <dd>{{ m.paymentMethod }}</dd>
+            </div>
+            <div>
+              <dt>Mandate Reference</dt>
+              <dd class="mono">{{ m.mandateReference }}</dd>
+            </div>
+            @if (m.bankName) {
+              <div><dt>Bank</dt><dd>{{ m.bankName }}</dd></div>
+            }
+            @if (m.upiId) {
+              <div><dt>UPI ID</dt><dd>{{ m.upiId }}</dd></div>
+            }
+            <div>
+              <dt>Max Debit Amount</dt>
+              <dd>{{ m.maximumDebitAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+            </div>
+            <div>
+              <dt>Next Debit Date</dt>
+              <dd>
+                @if (m.nextDebitDate) {
+                  {{ m.nextDebitDate | date: 'dd MMM y' }}
+                } @else {
+                  —
+                }
+              </dd>
+            </div>
+            <div>
+              <dt>Registered On</dt>
+              <dd>{{ m.createdAt | date: 'dd MMM y' }}</dd>
+            </div>
+            @if (m.failureReason) {
+              <div class="facts--wide">
+                <dt>Failure Reason</dt>
+                <dd>{{ m.failureReason }}</dd>
+              </div>
+            }
+          </dl>
+        } @else {
+          <dl class="facts">
+            <div><dt>Current Status</dt><dd>{{ mandateStatusLabel() }}</dd></div>
+            <div><dt>Completed By</dt><dd>—</dd></div>
+            <div><dt>Completed Date & Time</dt><dd>—</dd></div>
+          </dl>
+          <p class="helper">
+            @if (app.loanId) {
+              No eMandate has been registered for this loan yet.
+            } @else {
+              eMandate becomes available once the loan is active.
+            }
+          </p>
+        }
+      </section>
+
+      <section class="card">
+        <div class="card__head"><h3>Disbursement</h3></div>
+        <dl class="facts">
+          <div><dt>Current Status</dt><dd>—</dd></div>
+          <div><dt>Completed By</dt><dd>—</dd></div>
+          <div><dt>Completed Date & Time</dt><dd>—</dd></div>
+        </dl>
+        <p class="helper">Handled by Finance Portal.</p>
+      </section>
+
+      <section class="card">
+        <div class="card__head"><h3>Order</h3></div>
+        <dl class="facts">
+          <div>
+            <dt>Current Status</dt>
+            <dd>
+              @if (order()) {
+                <app-status-badge [status]="order()!.status" />
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Order ID</dt>
+            <dd>{{ order()?.id || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Order Date</dt>
+            <dd>
+              @if (order()?.createdAt) {
+                {{ order()!.createdAt | date: 'dd MMM y' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+        </dl>
+        @if (order()) {
+          <div class="card__actions">
+            <button
+              pButton
+              type="button"
+              [outlined]="true"
+              label="View Order"
+              icon="pi pi-shopping-cart"
+              (click)="viewOrder()"
+            ></button>
+          </div>
+        } @else {
+          <p class="helper">Order is created automatically after the customer completes the down payment.</p>
+        }
+      </section>
+
+      <section class="card">
+        <div class="card__head"><h3>Dispatch</h3></div>
+        <dl class="facts">
+          <div>
+            <dt>Current Status</dt>
+            <dd>
+              @if (order()) {
+                <app-status-badge [status]="order()!.status" />
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Courier</dt>
+            <dd>{{ order()?.courierPartner || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Tracking Number</dt>
+            <dd class="mono">{{ order()?.trackingNumber || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Estimated Delivery</dt>
+            <dd>
+              @if (order()?.estimatedDeliveryDate) {
+                {{ order()!.estimatedDeliveryDate | date: 'dd MMM y' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+        </dl>
+        @if (order()) {
+          <div class="card__actions">
+            <button
+              pButton
+              type="button"
+              [outlined]="true"
+              label="Manage Dispatch"
+              icon="pi pi-truck"
+              (click)="viewOrder()"
+            ></button>
+          </div>
+        } @else {
+          <p class="helper">Dispatch is managed from the Order once it is created.</p>
+        }
+      </section>
+    </div>
+  </div>
+}
+
+<p-dialog
+  header="Reject Application"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '28rem' }"
+  [visible]="rejectVisible()"
+  (visibleChange)="rejectVisible.set($event)"
+>
+  <p class="dialog-copy">Provide a reason for rejection. This is required.</p>
+  <label class="field">
+    <span>Reason for rejection</span>
+    <textarea
+      rows="4"
+      placeholder="Reason for rejection"
+      [ngModel]="rejectionReason()"
+      (ngModelChange)="rejectionReason.set($event)"
+    ></textarea>
+  </label>
+  @if (rejectError()) {
+    <p class="field-error">{{ rejectError() }}</p>
+  }
+  <div class="dialog-actions">
+    <button pButton type="button" [text]="true" label="Cancel" [disabled]="rejecting()" (click)="closeReject()"></button>
+    <button
+      pButton
+      type="button"
+      severity="danger"
+      label="Confirm Rejection"
+      [loading]="rejecting()"
+      [disabled]="rejecting()"
+      (click)="confirmReject()"
+    ></button>
+  </div>
+</p-dialog>

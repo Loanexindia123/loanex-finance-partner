@@ -9,6 +9,11 @@ import {
   createBranchBodySchema,
   updateBranchBodySchema,
 } from './branch/branch.validator';
+import { dealerController } from './dealer/dealer.controller';
+import {
+  createDealerBodySchema,
+  updateDealerBodySchema,
+} from './dealer/dealer.validator';
 import { emiApplicationController } from '../emi-application/controller/emi-application.controller';
 import { emiPaymentController } from '../emi-payment/controller/emi-payment.controller';
 import { autopayController } from '../autopay/controller/autopay.controller';
@@ -73,6 +78,12 @@ adminRouter.get(
   '/emi-applications/:applicationId',
   requirePermission('emi.view'),
   asyncHandler(emiApplicationController.getByIdForAdmin),
+);
+
+adminRouter.post(
+  '/emi-applications/:applicationId/assign-fi',
+  requirePermission('emi.edit'),
+  asyncHandler(emiApplicationController.adminAssignFi),
 );
 
 adminRouter.post(
@@ -147,6 +158,18 @@ adminRouter.get('/fi-cases', requirePermission('fi.view'), asyncHandler(adminCon
 adminRouter.get('/fi-cases/:fiCaseId', requirePermission('fi.view'), asyncHandler(adminController.getFiCase));
 adminRouter.patch('/fi-cases/:fiCaseId', requirePermission('fi.edit'), asyncHandler(adminController.updateFiCase));
 
+// —— Credit review (by EMI application id) ——
+adminRouter.get(
+  '/credit-reviews/:applicationId',
+  requirePermission('emi.view'),
+  asyncHandler(adminController.getCreditReview),
+);
+adminRouter.patch(
+  '/credit-reviews/:applicationId',
+  requirePermission('emi.edit'),
+  asyncHandler(adminController.upsertCreditReview),
+);
+
 // —— Branches (dedicated: validation + GET by id; same /admin/branches contract) ——
 adminRouter.get(
   '/branches',
@@ -176,10 +199,38 @@ adminRouter.delete(
   asyncHandler(branchController.remove),
 );
 
-// —— Master data (other collections; branches handled above) ——
+// —— Dealers (dedicated: validation + GET by id; same /admin/dealers contract) ——
+adminRouter.get(
+  '/dealers',
+  requirePermission('masters.view'),
+  asyncHandler(dealerController.list),
+);
+adminRouter.post(
+  '/dealers',
+  requirePermission('masters.create'),
+  validateRequest(createDealerBodySchema),
+  asyncHandler(dealerController.create),
+);
+adminRouter.get(
+  '/dealers/:id',
+  requirePermission('masters.view'),
+  asyncHandler(dealerController.getById),
+);
+adminRouter.put(
+  '/dealers/:id',
+  requirePermission('masters.edit'),
+  validateRequest(updateDealerBodySchema),
+  asyncHandler(dealerController.update),
+);
+adminRouter.delete(
+  '/dealers/:id',
+  requirePermission('masters.delete'),
+  asyncHandler(dealerController.remove),
+);
+
+// —— Master data (other collections; branches + dealers handled above) ——
 for (const collection of [
   'suppliers',
-  'dealers',
   'warehouses',
   'brands',
   'pincodes',

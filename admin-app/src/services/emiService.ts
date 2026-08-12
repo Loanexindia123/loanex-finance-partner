@@ -132,6 +132,14 @@ export const getEmiApplicationById = async (applicationId: string): Promise<EmiA
 };
 
 /**
+ * Assign Field Investigation for an EMI application (does not approve the loan).
+ */
+export const assignFiForApplication = async (applicationId: string): Promise<FiCase> => {
+  const response = await api.post(`/admin/emi-applications/${applicationId}/assign-fi`);
+  return mapFiCase(response.data.data);
+};
+
+/**
  * Approve an EMI application (admin endpoint)
  */
 export const approveEmiApplication = async (applicationId: string): Promise<any> => {

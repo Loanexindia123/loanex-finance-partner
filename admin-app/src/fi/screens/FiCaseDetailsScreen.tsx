@@ -63,9 +63,10 @@ export function FiCaseDetailsScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState<boolean>(!fiCase);
 
   const isCompleted = fiStatus === 'completed';
-  const readOnly = isCompleted;
-  const showPerformActions = !isCompleted;
-  const showSubmittedActions = isCompleted;
+  const isRejected = fiStatus === 'hold';
+  const readOnly = isCompleted || isRejected;
+  const showPerformActions = !readOnly;
+  const showSubmittedActions = readOnly;
 
   useFocusEffect(
     useCallback(() => {
@@ -162,12 +163,12 @@ export function FiCaseDetailsScreen({ navigation, route }: Props) {
 
   const handleSubmitFi = () => {
     Alert.alert(
-      'Submit FI',
-      'Submit this Field Investigation? Status will change to Completed.',
+      'FI Accept',
+      'Accept this Field Investigation? This confirms FI completed successfully and returns the EMI application to Admin for Credit Review — it is not final application approval.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Submit',
+          text: 'FI Accept',
           onPress: () => {
             submitFiCase(fiCaseId, draft);
             const latest = getFiCaseById(fiCaseId);
@@ -184,7 +185,44 @@ export function FiCaseDetailsScreen({ navigation, route }: Props) {
               })
               .catch((err) => console.warn('[FI] Failed to submit FI to API:', err));
             setDraft(getFiWorkflowDraft(fiCaseId));
-            Alert.alert('Submitted', 'FI status updated to Completed.');
+            Alert.alert(
+              'FI Accepted',
+              'Field Investigation accepted. Application is back with Admin for Credit Review.',
+            );
+          },
+        },
+      ],
+    );
+  };
+
+  const handleRejectFi = () => {
+    const reason = draft.remarks.trim();
+    if (!reason) {
+      Alert.alert('Remarks required', 'Enter the FI rejection reason in Remarks before rejecting.');
+      return;
+    }
+    Alert.alert(
+      'FI Reject',
+      'Reject this Field Investigation? The EMI application will move to Rejected with this reason.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'FI Reject',
+          style: 'destructive',
+          onPress: () => {
+            updateFiCase(fiCaseId, {
+              status: 'hold',
+              remarks: reason,
+              gpsLocation: draft.gpsCaptured ? draft.address || MOCK_GPS.address : '',
+              photoCount: Object.values(draft.photos).filter(Boolean).length,
+            })
+              .then((updated) => {
+                setLocalFiCase(updated);
+                setFiStatus(updated.status);
+              })
+              .catch((err) => console.warn('[FI] Failed to reject FI to API:', err));
+            setFiStatus('hold');
+            Alert.alert('FI Rejected', 'Field Investigation rejected. Admin can see the reason.');
           },
         },
       ],
@@ -305,8 +343,14 @@ export function FiCaseDetailsScreen({ navigation, route }: Props) {
               style={styles.footerBtn}
             />
             <Button
-              title="Submit FI"
+              title="FI Accept"
               onPress={handleSubmitFi}
+              style={styles.footerBtn}
+            />
+            <Button
+              title="FI Reject"
+              variant="outline"
+              onPress={handleRejectFi}
               style={styles.footerBtn}
             />
           </>
@@ -314,12 +358,14 @@ export function FiCaseDetailsScreen({ navigation, route }: Props) {
         {showSubmittedActions && (
           <>
             <Button
-              title="View Submitted FI"
+              title={isRejected ? 'View Rejected FI' : 'View Accepted FI'}
               variant="outline"
               onPress={() => {
                 Alert.alert(
-                  'Submitted FI',
-                  'This Field Investigation is completed and displayed in read-only mode.',
+                  isRejected ? 'Rejected FI' : 'Accepted FI',
+                  isRejected
+                    ? 'This Field Investigation was rejected and is displayed in read-only mode.'
+                    : 'This Field Investigation was accepted. The EMI application is with Admin for Credit Review.',
                 );
               }}
               style={styles.footerBtn}

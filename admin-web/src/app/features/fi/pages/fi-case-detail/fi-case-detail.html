@@ -1,0 +1,195 @@
+<app-page-header title="FI Case Details" [subtitle]="fiCase()?.id || fiCaseId">
+  <button
+    leading
+    pButton
+    type="button"
+    icon="pi pi-arrow-left"
+    label="Back to FI Cases"
+    [text]="true"
+    (click)="back()"
+  ></button>
+  @if (fiCase(); as fc) {
+    <div actions>
+      <app-status-badge [status]="statusLabel()" />
+    </div>
+  }
+</app-page-header>
+
+@if (loading()) {
+  <app-branded-loader message="Loading FI Case..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (notFound()) {
+  <app-empty-state
+    icon="pi-search"
+    title="FI case not found"
+    description="This field investigation case could not be found. It may have been removed or the link is invalid."
+  >
+    <button pButton type="button" label="Back to FI Cases" (click)="back()"></button>
+  </app-empty-state>
+} @else if (fiCase(); as fc) {
+  <div class="detail">
+    <section class="hero">
+      <div>
+        <p class="hero__kicker">FI Case ID</p>
+        <h2 class="hero__id">{{ fc.id }}</h2>
+        <p class="hero__customer">{{ fc.customerName }} · {{ fc.mobile || 'No mobile' }}</p>
+      </div>
+      <div class="hero__aside">
+        <app-status-badge [status]="statusLabel()" />
+        <p class="hero__date">
+          Assigned
+          @if (fc.assignedDate) {
+            {{ fc.assignedDate | date: 'dd MMM y' }}
+          } @else {
+            —
+          }
+        </p>
+        @if (fc.applicationId) {
+          <button
+            pButton
+            type="button"
+            [text]="true"
+            label="View EMI Application"
+            icon="pi pi-external-link"
+            iconPos="right"
+            (click)="viewApplication()"
+          ></button>
+        }
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <div class="card__head">
+          <h3>Case Information</h3>
+        </div>
+        <dl class="facts">
+          <div>
+            <dt>FI Case ID</dt>
+            <dd class="mono">{{ fc.id }}</dd>
+          </div>
+          <div>
+            <dt>Application ID</dt>
+            <dd class="mono">{{ fc.applicationId || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Assigned Executive</dt>
+            <dd>{{ fc.assignedExecutive || 'Unassigned' }}</dd>
+          </div>
+          <div>
+            <dt>Assigned Date</dt>
+            <dd>
+              @if (fc.assignedDate) {
+                {{ fc.assignedDate | date: 'dd MMM y' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>{{ statusLabel() }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card">
+        <div class="card__head">
+          <h3>Customer & Product</h3>
+        </div>
+        <dl class="facts">
+          <div class="facts--wide">
+            <dt>Customer Name</dt>
+            <dd>{{ fc.customerName }}</dd>
+          </div>
+          <div>
+            <dt>Mobile Number</dt>
+            <dd>{{ fc.mobile || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Product</dt>
+            <dd>{{ fc.productName || '—' }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card card--wide">
+        <div class="card__head">
+          <h3>Verification Details</h3>
+        </div>
+        <dl class="facts facts--dense">
+          <div>
+            <dt>GPS Location</dt>
+            <dd>{{ fc.gpsLocation || 'Not captured' }}</dd>
+          </div>
+          <div>
+            <dt>Photos Captured</dt>
+            <dd>{{ fc.photoCount ?? 0 }}</dd>
+          </div>
+          <div>
+            <dt>Current Status</dt>
+            <dd><app-status-badge [status]="statusLabel()" /></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card card--wide">
+        <div class="card__head">
+          <h3>FI Result</h3>
+        </div>
+        <p class="helper">
+          FI Accept / Reject is completed in the FI Mobile App. This Admin page is read-only and
+          shows the latest result from the backend.
+        </p>
+        <dl class="facts">
+          <div>
+            <dt>Decision</dt>
+            <dd>
+              @if (isAccepted()) {
+                Accepted — field verification successful (not final EMI approval)
+              } @else if (isRejected()) {
+                Rejected — field verification failed
+              } @else if (isInProgress()) {
+                Awaiting FI executive decision in the FI Mobile App
+              } @else {
+                {{ statusLabel() }}
+              }
+            </dd>
+          </div>
+          <div class="facts--wide">
+            <dt>Remarks</dt>
+            <dd>{{ fc.remarks || 'No remarks recorded yet.' }}</dd>
+          </div>
+          @if (isRejected() && fc.remarks) {
+            <div class="facts--wide">
+              <dt>FI Rejection Reason</dt>
+              <dd>{{ fc.remarks }}</dd>
+            </div>
+          }
+        </dl>
+
+        <div class="card__actions">
+          @if (isAccepted() && fc.applicationId) {
+            <button
+              pButton
+              type="button"
+              label="Open EMI Application for Credit Review"
+              icon="pi pi-external-link"
+              (click)="viewApplication()"
+            ></button>
+          } @else if (fc.applicationId) {
+            <button
+              pButton
+              type="button"
+              [outlined]="true"
+              label="View EMI Application"
+              icon="pi pi-external-link"
+              (click)="viewApplication()"
+            ></button>
+          }
+        </div>
+      </section>
+    </div>
+  </div>
+}

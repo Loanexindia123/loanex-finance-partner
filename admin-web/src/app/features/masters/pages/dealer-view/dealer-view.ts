@@ -1,0 +1,168 @@
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { DatePipe } from '@angular/common';
+import { ButtonModule } from 'primeng/button';
+import { MessageService } from 'primeng/api';
+import { PageHeader } from '../../../../shared/components/page-header/page-header';
+import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
+import { StatusBadge } from '../../../../shared/components/status-badge/status-badge';
+import { CanDirective } from '../../../../shared/directives/can.directive';
+import { DealerService } from '../../services/dealer.service';
+import { Dealer } from '../../models/dealer.models';
+
+const AVATAR_TONES = [
+  { bg: '#eef2ff', color: '#4338ca' },
+  { bg: '#ecfdf5', color: '#047857' },
+  { bg: '#fff7ed', color: '#c2410c' },
+  { bg: '#fdf2f8', color: '#be185d' },
+  { bg: '#ecfeff', color: '#0e7490' },
+  { bg: '#fef3c7', color: '#b45309' },
+] as const;
+
+const PROFILE_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
+  { key: 'ownerName', label: 'Owner Name' },
+  { key: 'businessType', label: 'Business Type' },
+  { key: 'dealerType', label: 'Dealer Type' },
+  { key: 'categoryDepartment', label: 'Category / Department' },
+  { key: 'establishedYear', label: 'Established Year' },
+  { key: 'gstNumber', label: 'GST Number' },
+  { key: 'branch', label: 'Branch' },
+];
+
+const CONTACT_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
+  { key: 'mobile', label: 'Mobile' },
+  { key: 'whatsapp', label: 'WhatsApp' },
+  { key: 'email', label: 'Email' },
+];
+
+const ADDRESS_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
+  { key: 'shopAddress', label: 'Shop Address' },
+  { key: 'pincode', label: 'Pincode' },
+  { key: 'googleLocation', label: 'Google Location' },
+  { key: 'deliveryArea', label: 'Delivery Area' },
+  { key: 'deliveryTime', label: 'Delivery Time' },
+  { key: 'warehouseAddress', label: 'Warehouse Address' },
+];
+
+const COMMERCIAL_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
+  { key: 'paymentCycle', label: 'Payment Cycle' },
+  { key: 'holdPercentage', label: 'Hold Percentage' },
+  { key: 'productDeliveryBy', label: 'Product Delivery By' },
+  { key: 'assignedB2BManager', label: 'Assigned B2B Manager' },
+  { key: 'accountHolderName', label: 'Account Holder' },
+  { key: 'accountNumber', label: 'Account Number' },
+  { key: 'ifscCode', label: 'IFSC Code' },
+];
+
+const CREATOR_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
+  { key: 'creatorType', label: 'Creator Type' },
+  { key: 'creatorName', label: 'Creator' },
+  { key: 'creatorId', label: 'Creator ID' },
+];
+
+const DOCUMENT_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
+  { key: 'panCard', label: 'PAN Card' },
+  { key: 'gstCertificate', label: 'GST Certificate' },
+  { key: 'ownerAadhaar', label: 'Owner Aadhaar' },
+  { key: 'shopAddressProof', label: 'Shop Address Proof' },
+  { key: 'cancelledCheque', label: 'Cancelled Cheque' },
+  { key: 'shopPhotos', label: 'Shop Photos' },
+  { key: 'dealerAgreement', label: 'Dealer Agreement' },
+];
+
+@Component({
+  selector: 'app-dealer-view',
+  standalone: true,
+  imports: [DatePipe, ButtonModule, PageHeader, BrandedLoader, StatusBadge, CanDirective],
+  templateUrl: './dealer-view.html',
+  styleUrl: './dealer-view.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class DealerView {
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly dealers = inject(DealerService);
+  private readonly messages = inject(MessageService);
+
+  readonly loading = signal(true);
+  readonly dealer = signal<Dealer | null>(null);
+  readonly dealerId = this.route.snapshot.paramMap.get('id') ?? '';
+
+  readonly profileFields = PROFILE_FIELDS;
+  readonly contactFields = CONTACT_FIELDS;
+  readonly addressFields = ADDRESS_FIELDS;
+  readonly commercialFields = COMMERCIAL_FIELDS;
+  readonly creatorFields = CREATOR_FIELDS;
+  readonly documentFields = DOCUMENT_FIELDS;
+
+  readonly completion = computed(() => {
+    const d = this.dealer();
+    if (!d) return { filled: 0, total: 0, percent: 0 };
+    const keys = [
+      ...PROFILE_FIELDS,
+      ...CONTACT_FIELDS,
+      ...ADDRESS_FIELDS,
+      ...COMMERCIAL_FIELDS,
+      ...CREATOR_FIELDS,
+      ...DOCUMENT_FIELDS,
+    ].map((f) => f.key);
+    const total = keys.length;
+    const filled = keys.filter((key) => this.hasValue(d[key])).length;
+    return { filled, total, percent: total ? Math.round((filled / total) * 100) : 0 };
+  });
+
+  constructor() {
+    this.dealers.getById(this.dealerId).subscribe({
+      next: (dealer) => {
+        this.dealer.set(dealer);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.messages.add({ severity: 'error', summary: 'Dealer not found' });
+        this.router.navigate(['/masters/dealers']);
+      },
+    });
+  }
+
+  avatarInitials(dealer: Dealer): string {
+    const words = dealer.dealerName.trim().split(/\s+/).filter(Boolean);
+    if (words.length >= 2) {
+      return `${words[0][0] ?? ''}${words[1][0] ?? ''}`.toUpperCase();
+    }
+    return (dealer.dealerName || dealer.dealerCode || 'DL').slice(0, 2).toUpperCase();
+  }
+
+  avatarTone(dealer: Dealer): { bg: string; color: string } {
+    const key = dealer.dealerName || dealer.dealerCode || dealer.id;
+    let hash = 0;
+    for (let i = 0; i < key.length; i += 1) {
+      hash = (hash + key.charCodeAt(i)) % AVATAR_TONES.length;
+    }
+    return AVATAR_TONES[hash] ?? AVATAR_TONES[0];
+  }
+
+  hasValue(value: unknown): boolean {
+    return String(value ?? '').trim().length > 0;
+  }
+
+  fieldValue(dealer: Dealer, key: keyof Dealer): string {
+    return String(dealer[key] ?? '').trim();
+  }
+
+  isUrl(value: string): boolean {
+    return /^https?:\/\//i.test(value);
+  }
+
+  filledCount(dealer: Dealer, fields: Array<{ key: keyof Dealer }>): number {
+    return fields.filter((f) => this.hasValue(dealer[f.key])).length;
+  }
+
+  edit(): void {
+    this.router.navigate(['/masters/dealers', this.dealerId, 'edit']);
+  }
+
+  back(): void {
+    this.router.navigate(['/masters/dealers']);
+  }
+}

@@ -775,6 +775,61 @@ export class EmiApplicationService {
     });
   }
 
+  /**
+   * Assign Field Investigation for an EMI application.
+   * Does NOT approve the application — FI Accept later returns it to UNDER_REVIEW.
+   */
+  async adminAssignFi(applicationId: string, adminUserId: string) {
+    const app = await emiApplicationRepository.findById(applicationId);
+    if (!app) {
+      throw new NotFoundError('EMI application not found.');
+    }
+
+    if (
+      app.status !== EmiApplicationStatus.PENDING &&
+      app.status !== EmiApplicationStatus.UNDER_REVIEW
+    ) {
+      throw new BadRequestError('Only PENDING or UNDER_REVIEW applications can be assigned to FI.', {
+        status: app.status,
+      });
+    }
+
+    const existingFi = jsonDb.findOne('fi_cases', { applicationId: app.id });
+    if (existingFi) {
+      return existingFi;
+    }
+
+    const profile = await emiApplicationRepository.findProfileById(app.userId);
+    const created = jsonDb.insert('fi_cases', {
+      applicationId: app.id,
+      userId: app.userId,
+      customerName: profile?.fullName ?? 'Customer',
+      mobile: profile?.mobileNumber ?? profile?.mobile_number ?? '',
+      productName: app.productName ?? 'Product',
+      assignedExecutive: 'Unassigned',
+      assignedDate: new Date().toISOString(),
+      status: 'pending',
+      photoCount: 0,
+      gpsLocation: '',
+      remarks: '',
+    });
+
+    await auditLogService.log({
+      userId: app.userId,
+      action: 'FI_ASSIGNED',
+      entity: 'fi_cases',
+      metadata: {
+        applicationId: app.id,
+        applicationNumber: app.applicationNumber ?? app.id,
+        fiCaseId: created.id,
+        assignedBy: adminUserId,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return created;
+  }
+
   async adminApprove(applicationId: string, adminUserId: string) {
     const app = await emiApplicationRepository.findById(applicationId);
     if (!app) {
@@ -790,6 +845,14 @@ export class EmiApplicationService {
       });
     }
 
+    const fiCase = jsonDb.findOne('fi_cases', { applicationId: app.id });
+    if (!fiCase || String(fiCase.status || '').toLowerCase() !== 'completed') {
+      throw new BadRequestError(
+        'Field Investigation must be accepted before final application approval.',
+        { fiStatus: fiCase?.status ?? null },
+      );
+    }
+
     return this.finalizeApproval(app, this.buildApprovalTerms(app, {
       adminRemarks: 'Approved by admin.',
     }), {
@@ -797,25 +860,6 @@ export class EmiApplicationService {
       userId: app.userId,
       message: 'Application approved',
       approvedBy: adminUserId,
-    }).then(async (result) => {
-      const existingFi = jsonDb.findOne('fi_cases', { applicationId: app.id });
-      if (!existingFi) {
-        const profile = await emiApplicationRepository.findProfileById(app.userId);
-        jsonDb.insert('fi_cases', {
-          applicationId: app.id,
-          userId: app.userId,
-          customerName: profile?.fullName ?? 'Customer',
-          mobile: profile?.mobileNumber ?? profile?.mobile_number ?? '',
-          productName: app.productName ?? 'Product',
-          assignedExecutive: 'Unassigned',
-          assignedDate: new Date().toISOString(),
-          status: 'pending',
-          photoCount: 0,
-          gpsLocation: '',
-          remarks: '',
-        });
-      }
-      return result;
     });
   }
 
@@ -882,6 +926,17 @@ export class EmiApplicationService {
       throw new BadRequestError('Only PENDING, UNDER_REVIEW or APPROVED applications can be modified.', {
         status: app.status,
       });
+    }
+
+    // Publish to Customer requires FI Accept first (unless already APPROVED / republishing).
+    if (app.status !== EmiApplicationStatus.APPROVED) {
+      const fiCase = jsonDb.findOne('fi_cases', { applicationId: app.id });
+      if (!fiCase || String(fiCase.status || '').toLowerCase() !== 'completed') {
+        throw new BadRequestError(
+          'Field Investigation must be accepted before publishing terms to the customer.',
+          { fiStatus: fiCase?.status ?? null },
+        );
+      }
     }
 
     const counterOffer = this.buildApprovalTerms(app, {

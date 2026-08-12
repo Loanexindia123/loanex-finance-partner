@@ -1,0 +1,195 @@
+<app-page-header title="Loans" [subtitle]="subtitle()" />
+
+<div class="toolbar">
+  <label class="search">
+    <i class="pi pi-search" aria-hidden="true"></i>
+    <input
+      type="search"
+      placeholder="Search by Loan Account, Application, Customer Name or Mobile Number"
+      [ngModel]="searchTerm()"
+      (ngModelChange)="searchTerm.set($event)"
+    />
+    @if (searchTerm().length > 0) {
+      <button
+        type="button"
+        class="search__clear"
+        aria-label="Clear search"
+        (click)="clearSearch()"
+      >
+        <i class="pi pi-times-circle" aria-hidden="true"></i>
+      </button>
+    }
+  </label>
+
+  <p-select
+    [options]="statusOptions"
+    [ngModel]="statusFilter()"
+    (ngModelChange)="statusFilter.set($event)"
+    optionLabel="label"
+    optionValue="value"
+    placeholder="Status"
+    styleClass="catalog-filter"
+    panelStyleClass="catalog-filter-panel"
+    appendTo="body"
+    [checkmark]="false"
+    scrollHeight="280px"
+  />
+
+  @if (hasActiveFilters()) {
+    <button class="toolbar__clear" type="button" (click)="clearFilters()">
+      <i class="pi pi-filter-slash" aria-hidden="true"></i>
+      Clear
+    </button>
+  }
+</div>
+
+@if (hasActiveFilters()) {
+  <div class="active-filters" aria-label="Active filters">
+    @if (statusFilter() !== 'all') {
+      <button type="button" class="chip" (click)="clearStatusFilter()">
+        {{ statusChipLabel() }}
+        <i class="pi pi-times" aria-hidden="true"></i>
+      </button>
+    }
+  </div>
+}
+
+@if (loading()) {
+  <app-branded-loader message="Loading Loans..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (filtered().length === 0) {
+  <app-empty-state
+    icon="pi-wallet"
+    title="No Loans Found"
+    description="Try adjusting your search or filters"
+  />
+} @else {
+  <div class="table-shell">
+    <p-table [value]="filtered()" dataKey="id" [rowHover]="true" styleClass="catalog-table">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Loan Account</th>
+          <th>Customer</th>
+          <th>Product</th>
+          <th>Loan Amount</th>
+          <th>EMI</th>
+          <th>Outstanding</th>
+          <th>Status</th>
+          <th>Next EMI Due</th>
+          <th class="actions-col">Actions</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-loan>
+        <tr>
+          <td>
+            <button
+              type="button"
+              class="app-id"
+              [pTooltip]="loan.id"
+              [tooltipOptions]="actionTooltip"
+              (click)="view(loan)"
+            >
+              <span class="app-id__label">{{ loan.loanAccountNumber }}</span>
+            </button>
+          </td>
+          <td>
+            <div class="customer-cell">
+              <span class="customer-cell__name">{{ loan.customer?.fullName || 'Customer' }}</span>
+              @if (loan.customer?.mobile; as mobile) {
+                <span class="customer-cell__phone">{{ mobile }}</span>
+              }
+            </div>
+          </td>
+          <td>
+            <span class="product-cell">{{ loan.productName || '—' }}</span>
+          </td>
+          <td class="amount-cell">
+            {{ loan.loanAmount | currency: 'INR' : 'symbol' : '1.0-0' }}
+          </td>
+          <td>
+            <span class="plan-cell">
+              {{ loan.emiAmount | currency: 'INR' : 'symbol' : '1.0-0' }} · {{ loan.loanTenure }} mo
+            </span>
+          </td>
+          <td class="amount-cell">
+            {{ loan.outstandingAmount | currency: 'INR' : 'symbol' : '1.0-0' }}
+          </td>
+          <td><app-status-badge [status]="loan.loanStatus" /></td>
+          <td class="date-cell">
+            @if (loan.nextEmiDueDate) {
+              {{ loan.nextEmiDueDate | date: 'dd MMM y' }}
+            } @else {
+              —
+            }
+          </td>
+          <td>
+            <div class="row-actions">
+              <button
+                type="button"
+                class="act act--view"
+                pTooltip="View loan"
+                [tooltipOptions]="actionTooltip"
+                (click)="view(loan)"
+              >
+                <i class="pi pi-eye" aria-hidden="true"></i>
+                View
+              </button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <div class="card-list" aria-label="Loan list">
+    @for (loan of filtered(); track loan.id) {
+      <article class="emi-card">
+        <div class="emi-card__top">
+          <div class="emi-card__meta">
+            <div class="emi-card__id">{{ loan.loanAccountNumber }}</div>
+            <div class="emi-card__customer">{{ loan.customer?.fullName || 'Customer' }}</div>
+            @if (loan.customer?.mobile; as mobile) {
+              <div class="emi-card__mobile">{{ mobile }}</div>
+            }
+          </div>
+          <app-status-badge [status]="loan.loanStatus" />
+        </div>
+        <dl class="emi-card__facts">
+          <div class="emi-card__facts-span">
+            <dt>Product</dt>
+            <dd>{{ loan.productName || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Loan Amount</dt>
+            <dd>{{ loan.loanAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>EMI</dt>
+            <dd>{{ loan.emiAmount | currency: 'INR' : 'symbol' : '1.0-0' }} · {{ loan.loanTenure }} mo</dd>
+          </div>
+          <div>
+            <dt>Outstanding</dt>
+            <dd>{{ loan.outstandingAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>Next EMI Due</dt>
+            <dd>
+              @if (loan.nextEmiDueDate) {
+                {{ loan.nextEmiDueDate | date: 'dd MMM y' }}
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+        </dl>
+        <div class="row-actions row-actions--card">
+          <button type="button" class="act act--view" (click)="view(loan)">
+            <i class="pi pi-eye" aria-hidden="true"></i>
+            View
+          </button>
+        </div>
+      </article>
+    }
+  </div>
+}

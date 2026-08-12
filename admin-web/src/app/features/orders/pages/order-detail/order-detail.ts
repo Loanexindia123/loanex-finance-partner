@@ -114,6 +114,8 @@ export class OrderDetail {
       next: (order) => {
         this.order.set(order);
         this.nextStatus.set(order.status);
+        this.trackingNumber.set(order.trackingNumber ?? '');
+        this.courierPartner.set(order.courierPartner ?? '');
         this.loading.set(false);
       },
       error: (err: unknown) => {
@@ -155,6 +157,8 @@ export class OrderDetail {
       .subscribe({
         next: (order) => {
           this.order.set(order);
+          this.trackingNumber.set(order.trackingNumber ?? '');
+          this.courierPartner.set(order.courierPartner ?? '');
           this.updating.set(false);
           this.messages.add({ severity: 'success', summary: 'Order status updated' });
         },
