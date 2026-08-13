@@ -752,6 +752,8 @@ const CATALOG_REFRESH_COLLECTIONS = [
   'product_emi_plans',
 ];
 const CATALOG_REFRESH_TTL_MS = 15_000;
+/** Throttle explicit refreshCollection() calls (admin lists, order lookups). */
+const REFRESH_COLLECTION_TTL_MS = 10_000;
 
 class LocalDatabaseEngine {
   private data: LocalDatabaseSchema;
@@ -760,6 +762,8 @@ class LocalDatabaseEngine {
   /** Collections successfully loaded from Mongo (boot or ensureCollection). */
   private readonly mongoLoaded = new Set<string>();
   private readonly ensureInflight = new Map<string, Promise<void>>();
+  /** Coalesce concurrent refreshCollection() calls for the same name. */
+  private readonly refreshInflight = new Map<string, Promise<void>>();
   /** Resolves when critical (catalog/auth/cart) collections are hydrated. */
   public readonly ready: Promise<void>;
   /** Resolves when deferred (orders/EMI/KYC/…) collections are hydrated. */
@@ -775,8 +779,12 @@ class LocalDatabaseEngine {
 
   constructor() {
     this.data = this.loadData();
-    // Critical first so catalog APIs can serve; deferred continues in background.
-    this.ready = this.hydrateFromMongo(CRITICAL_HYDRATE_COLLECTIONS as unknown as string[], 'critical');
+    // Critical first so catalog/auth can serve quickly; deferred continues after.
+    // (Running both in parallel overloaded Atlas and slowed critical hydrate.)
+    this.ready = this.hydrateFromMongo(
+      CRITICAL_HYDRATE_COLLECTIONS as unknown as string[],
+      'critical',
+    );
     this.deferredReady = this.ready.then(() =>
       this.hydrateFromMongo(DEFERRED_HYDRATE_COLLECTIONS, 'deferred'),
     );
@@ -881,19 +889,18 @@ class LocalDatabaseEngine {
     }
 
     const elapsed = Date.now() - started;
+    // Seed refresh TTL for every collection we just loaded so the first
+    // admin/list call does not immediately re-download the same data.
+    const seededAt = Date.now();
+    for (const name of successfullyHydrated) {
+      this.lastRefreshAt.set(name, seededAt);
+    }
     if (phase === 'critical') {
       this.lastHydrateMs = elapsed;
       this.lastHydrateLoadedCount = loaded;
-      // Boot already loaded catalog collections — avoid an immediate full re-fetch
-      // on the first GET /products. TTL still applies from this timestamp.
-      const seededAt = Date.now();
-      let catalogSeeded = 0;
-      for (const name of CATALOG_REFRESH_COLLECTIONS) {
-        if (successfullyHydrated.has(name)) {
-          this.lastRefreshAt.set(name, seededAt);
-          catalogSeeded += 1;
-        }
-      }
+      const catalogSeeded = CATALOG_REFRESH_COLLECTIONS.filter((name) =>
+        successfullyHydrated.has(name),
+      ).length;
       console.info(
         `[MongoDB] critical hydrated ${loaded}/${names.length} collections in ${elapsed}ms ` +
           `(rows=${rows}, skipped=${skipped}, failed=${failed}, concurrency=${HYDRATE_CONCURRENCY}, ` +
@@ -1013,7 +1020,8 @@ class LocalDatabaseEngine {
       const filter: Record<string, any> = {};
       for (const [key, value] of Object.entries(where || {})) {
         if (value === undefined) continue;
-        if (key === 'id') filter._id = String(value);
+        // Match either Mongo _id or the business `id` field — older rows may diverge.
+        if (key === 'id') filter.$or = [{ _id: String(value) }, { id: String(value) }];
         else filter[key] = value;
       }
       const setDoc = { ...data, updatedAt: data?.updatedAt || new Date().toISOString() };
@@ -1033,7 +1041,7 @@ class LocalDatabaseEngine {
       if (hasFilter) {
         for (const [key, value] of Object.entries(where)) {
           if (value === undefined) continue;
-          if (key === 'id') filter._id = String(value);
+          if (key === 'id') filter.$or = [{ _id: String(value) }, { id: String(value) }];
           else filter[key] = value;
         }
       }
@@ -1043,27 +1051,159 @@ class LocalDatabaseEngine {
     }
   }
 
+  /** Merge a Mongo row into the in-memory collection (by id, else by filter). */
+  private upsertLocalRow(
+    name: string,
+    row: Record<string, any>,
+    filter?: Record<string, any>,
+  ): void {
+    const collection = this.getCollection(name);
+    let idx = -1;
+    if (row?.id != null) {
+      idx = collection.findIndex((item: any) => item.id === row.id);
+    }
+    if (idx === -1 && filter && Object.keys(filter).length > 0) {
+      idx = collection.findIndex((item: any) =>
+        Object.keys(filter).every((key) => item[key] === filter[key]),
+      );
+    }
+    if (idx === -1) {
+      collection.push(row);
+    } else {
+      collection[idx] = { ...collection[idx], ...row };
+    }
+  }
+
   /**
-   * Re-read a collection from MongoDB into memory. Keeps list endpoints
-   * consistent after another instance wiped rows.
+   * Fetch one document from Mongo and merge into memory.
+   * Prefer this over refreshCollection() for status/lookup endpoints —
+   * avoids re-downloading entire collections (often 1–3s+ on Atlas).
    */
+  public isCollectionLoaded(name: string): boolean {
+    return this.mongoLoaded.has(name);
+  }
+
   /**
-   * Re-read a collection from MongoDB into memory. Keeps list endpoints
-   * consistent after another instance wiped rows.
+   * In-memory lookup when the collection is already hydrated; otherwise a
+   * targeted Mongo findOne (never a full collection download).
    */
-  public async refreshCollection(name: string): Promise<void> {
+  public async findOneCached(
+    name: string,
+    filter: Record<string, any>,
+  ): Promise<any | null> {
+    const local = this.findOne(name, filter);
+    if (local || this.mongoLoaded.has(name)) {
+      return local;
+    }
+    return this.findOneFromMongo(name, filter);
+  }
+
+  public async findOneFromMongo(
+    name: string,
+    filter: Record<string, any>,
+  ): Promise<any | null> {
     try {
       const db = await getMongoDb();
-      const data = await db.collection(name).find({}).limit(10000).toArray();
-      const normalized = data.map((row) => {
-        const clean = this.stripMongoId(row as Record<string, any>);
-        return this.normalizeHydratedRow(name, clean);
-      });
-      (this.data as any)[name] = normalized;
-      this.mongoLoaded.add(name);
+      const doc = await db.collection(name).findOne(filter);
+      if (!doc) {
+        return this.findOne(name, filter);
+      }
+      const clean = this.stripMongoId(doc as Record<string, any>);
+      const normalized = this.normalizeHydratedRow(name, clean);
+      this.upsertLocalRow(name, normalized, filter);
+      return cloneValue(normalized);
     } catch (e) {
-      this.logMirrorError(name, 'refresh', String(e));
+      this.logMirrorError(name, 'findOne', String(e));
+      return this.findOne(name, filter);
     }
+  }
+
+  /**
+   * Fetch the latest matching document from Mongo (sorted desc) and merge into memory.
+   */
+  public async findLatestFromMongo(
+    name: string,
+    filter: Record<string, any>,
+    sortField = 'createdAt',
+  ): Promise<any | null> {
+    try {
+      const db = await getMongoDb();
+      const docs = await db
+        .collection(name)
+        .find(filter)
+        .sort({ [sortField]: -1 })
+        .limit(1)
+        .toArray();
+      const doc = docs[0];
+      if (!doc) {
+        const local = this.findMany(name, filter).sort(
+          (a: any, b: any) =>
+            new Date(b[sortField] ?? b.createdAt ?? 0).getTime() -
+            new Date(a[sortField] ?? a.createdAt ?? 0).getTime(),
+        );
+        return local[0] ? cloneValue(local[0]) : null;
+      }
+      const clean = this.stripMongoId(doc as Record<string, any>);
+      const normalized = this.normalizeHydratedRow(name, clean);
+      this.upsertLocalRow(name, normalized, filter);
+      return cloneValue(normalized);
+    } catch (e) {
+      this.logMirrorError(name, 'findLatest', String(e));
+      const local = this.findMany(name, filter).sort(
+        (a: any, b: any) =>
+          new Date(b[sortField] ?? b.createdAt ?? 0).getTime() -
+          new Date(a[sortField] ?? a.createdAt ?? 0).getTime(),
+      );
+      return local[0] ? cloneValue(local[0]) : null;
+    }
+  }
+
+  /**
+   * Re-read a collection from MongoDB into memory. Keeps list endpoints
+   * consistent after another instance wrote rows.
+   * Throttled by default (10s) to avoid full re-downloads on every admin click.
+   * Pass `{ force: true }` only when a cross-instance stale read must be bypassed.
+   */
+  public async refreshCollection(
+    name: string,
+    opts?: { force?: boolean },
+  ): Promise<void> {
+    const force = opts?.force === true;
+    const now = Date.now();
+    if (
+      !force &&
+      this.mongoLoaded.has(name) &&
+      now - (this.lastRefreshAt.get(name) ?? 0) < REFRESH_COLLECTION_TTL_MS
+    ) {
+      return;
+    }
+
+    const inflight = this.refreshInflight.get(name);
+    if (inflight) {
+      await inflight;
+      return;
+    }
+
+    const work = (async () => {
+      try {
+        const db = await getMongoDb();
+        const data = await db.collection(name).find({}).limit(10000).toArray();
+        const normalized = data.map((row) => {
+          const clean = this.stripMongoId(row as Record<string, any>);
+          return this.normalizeHydratedRow(name, clean);
+        });
+        (this.data as any)[name] = normalized;
+        this.mongoLoaded.add(name);
+        this.lastRefreshAt.set(name, Date.now());
+      } catch (e) {
+        this.logMirrorError(name, 'refresh', String(e));
+      }
+    })().finally(() => {
+      this.refreshInflight.delete(name);
+    });
+
+    this.refreshInflight.set(name, work);
+    await work;
   }
 
   /** Empty local collection and await the Mongo delete. */

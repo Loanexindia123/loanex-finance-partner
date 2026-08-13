@@ -13,7 +13,8 @@
 ### Behaviour
 
 - Fail-closed: bank is **never** marked `VERIFIED` without a successful IDSPay response.
-- Provider: **IDSPAY** via `POST .../bank/verify-account`
+- Provider: **IDSPAY** via `POST .../bank-verification/pennyless`
+- Payload: `api_id`, `api_key`, `token_id`, `account_number`, `bank_ifsc`, `ifsc_details`
 - Credentials: `DIGILOCKER_API_ID`, `DIGILOCKER_API_KEY`, `DIGILOCKER_TOKEN_ID`
 - Requires completed PAN verification
 - On success → stores masked account + hash, sets bank verified flags, returns `nextStep: VERIFICATION_SUMMARY`

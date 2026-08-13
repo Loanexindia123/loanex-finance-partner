@@ -14,6 +14,77 @@ const FI_MUTABLE_EMI_STATUSES = new Set<string>([
   EmiApplicationStatus.APPROVED,
 ]);
 
+/** Open EMI statuses compatible with an in-progress FI case. */
+const FI_OPEN_EMI_STATUSES = new Set<string>([
+  EmiApplicationStatus.PENDING,
+  EmiApplicationStatus.UNDER_REVIEW,
+]);
+
+/** Loan/EMI stages that must never coexist with pending/in-progress/rejected FI. */
+const FI_INCOMPATIBLE_EMI_STATUSES = new Set<string>([
+  EmiApplicationStatus.ACTIVE_EMI,
+  EmiApplicationStatus.ORDER_CONFIRMED,
+  EmiApplicationStatus.DOWN_PAYMENT_COMPLETED,
+  EmiApplicationStatus.DOWN_PAYMENT_PENDING,
+  EmiApplicationStatus.OFFER_ACCEPTED,
+]);
+
+function isOpenFiCaseStatus(status: unknown): boolean {
+  const s = String(status || '').toLowerCase();
+  return s === 'pending' || s === 'in_progress' || s === 'hold';
+}
+
+function pickFiCompatibleApplication(candidates: any[], productName: string): any | undefined {
+  const open = candidates.filter((a) => FI_OPEN_EMI_STATUSES.has(String(a.status)));
+  const pool = open.length > 0 ? open : [];
+  if (pool.length === 0) return undefined;
+  if (productName) {
+    const byProduct = pool.find((a) => String(a.productName || '') === productName);
+    if (byProduct) return byProduct;
+  }
+  return pool[0];
+}
+
+/**
+ * Keep fi_cases.applicationId pointing at a live, FI-compatible EMI application.
+ * Never heal a pending/in-progress/rejected FI case onto ACTIVE_EMI (or later) apps.
+ */
+function healFiCaseApplicationLink(fiCase: any): any {
+  if (!fiCase) return fiCase;
+  const applicationId = String(fiCase.applicationId ?? '');
+  const linked = applicationId
+    ? jsonDb.findOne('emi_applications', { id: applicationId })
+    : null;
+
+  if (linked) {
+    // Existing link is fine when EMI is still pre-approval, or FI already accepted.
+    if (
+      !isOpenFiCaseStatus(fiCase.status) ||
+      !FI_INCOMPATIBLE_EMI_STATUSES.has(String(linked.status))
+    ) {
+      return fiCase;
+    }
+    // Fall through and try to re-point to an open application for the same user.
+  }
+
+  const userId = String(fiCase.userId ?? '');
+  if (!userId) return fiCase;
+
+  const candidates = jsonDb
+    .findMany('emi_applications', { userId })
+    .sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+    );
+  const match = pickFiCompatibleApplication(candidates, String(fiCase.productName || ''));
+  if (!match || match.id === applicationId) return fiCase;
+
+  return jsonDb.update('fi_cases', { id: fiCase.id }, { applicationId: match.id }) ?? {
+    ...fiCase,
+    applicationId: match.id,
+  };
+}
+
 /** Resolve role + effective permissions for a user row (sync, in-memory). */
 export function resolveRbacForUser(user: any) {
   const roleId = user?.role_id ?? user?.roleId ?? null;
@@ -179,10 +250,12 @@ export class AdminController {
   /** GET /admin/users — every user with profile (customer + staff). */
   listUsers = async (_req: Request, res: Response) => {
     // Refresh users from Mongo so dashboard-side edits surface without a restart.
-    // (Catalog throttle is product/category only and must not be relied on here.)
-    await jsonDb.refreshCollection('users');
-    await jsonDb.ensureCollection('profiles');
-    await jsonDb.ensureCollection('roles');
+    // refreshCollection is TTL-throttled; profiles/roles load in parallel.
+    await Promise.all([
+      jsonDb.refreshCollection('users'),
+      jsonDb.ensureCollection('profiles'),
+      jsonDb.ensureCollection('roles'),
+    ]);
     const users = jsonDb
       .findMany('users', {})
       .sort((a: any, b: any) =>
@@ -332,6 +405,7 @@ export class AdminController {
   listFiCases = async (_req: Request, res: Response) => {
     const cases = jsonDb
       .findMany('fi_cases', {})
+      .map((item: any) => healFiCaseApplicationLink(item))
       .sort((a: any, b: any) =>
         String(b.createdAt || '').localeCompare(String(a.createdAt || '')),
       );
@@ -345,7 +419,7 @@ export class AdminController {
     if (!item) {
       throw new NotFoundError('FI case not found');
     }
-    return sendSuccess(res, item, 'FI case fetched');
+    return sendSuccess(res, healFiCaseApplicationLink(item), 'FI case fetched');
   };
 
   /**
@@ -379,9 +453,16 @@ export class AdminController {
 
     if (applicationId && (nextStatus === 'completed' || nextStatus === 'hold')) {
       const app = jsonDb.findOne('emi_applications', { id: applicationId });
+      if (app && FI_INCOMPATIBLE_EMI_STATUSES.has(String(app.status))) {
+        throw new BadRequestError(
+          'This EMI application is already past field investigation (loan/EMI active). FI Accept/Reject cannot change it.',
+          { status: app.status },
+        );
+      }
       if (app && FI_MUTABLE_EMI_STATUSES.has(String(app.status))) {
         if (nextStatus === 'completed') {
           // FI Accept — investigation succeeded; Admin continues Credit Review / terms.
+          // Never promotes EMI to ACTIVE_EMI — that happens only after down payment / loan activation.
           jsonDb.update('emi_applications', { id: applicationId }, {
             status: EmiApplicationStatus.UNDER_REVIEW,
             rejectionReason: null,

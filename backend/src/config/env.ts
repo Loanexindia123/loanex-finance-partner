@@ -49,7 +49,7 @@ const envSchema = z.object({
   CORS_ORIGINS: z
     .string()
     .default(
-      'https://customer-web-beige-iota.vercel.app,https://loanex.vercel.app,https://www.mrloanex.com,https://mrloanex.com,https://www.loanex.in,https://loanex.in,https://admin-app-five-tan.vercel.app,http://localhost:4200',
+      'https://customer-web-beige-iota.vercel.app,https://loanex.vercel.app,https://www.mrloanex.com,https://mrloanex.com,https://www.loanex.in,https://loanex.in,https://admin-app-five-tan.vercel.app,https://loanex-admin-web.vercel.app,https://admin.mrloanex.com,http://localhost:4200',
     ),
   FRONTEND_URL: z.string().optional().default('https://www.mrloanex.com'),
   OTP_LENGTH: z.coerce.number().default(6),
@@ -196,6 +196,8 @@ const REQUIRED_PRODUCTION_ORIGINS = [
   'https://www.loanex.in',
   'https://loanex.in',
   'https://admin-app-five-tan.vercel.app',
+  'https://loanex-admin-web.vercel.app',
+  'https://admin.mrloanex.com',
 ];
 
 export const corsOrigins = [

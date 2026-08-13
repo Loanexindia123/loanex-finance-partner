@@ -124,17 +124,9 @@ export class RolesService {
     if (roleId) {
       let role = jsonDb.findOne('roles', { id: roleId });
       if (!role) {
+        // Role may have been created on another serverless instance.
         try {
-          await jsonDb.refreshCollection('roles');
-          role = jsonDb.findOne('roles', { id: roleId });
-        } catch {
-          /* keep local state */
-        }
-      }
-      if (!role) {
-        // A role created on another serverless instance may not be cached yet.
-        try {
-          await jsonDb.refreshCollection('roles');
+          await jsonDb.refreshCollection('roles', { force: true });
           role = jsonDb.findOne('roles', { id: roleId });
         } catch {
           /* keep local state */

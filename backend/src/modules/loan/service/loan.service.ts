@@ -87,7 +87,16 @@ export class LoanService {
   async getDashboard(userId: string, loanId?: string) {
     const loans = await loanRepository.listUserLoans(userId);
     if (!loans.length) {
-      throw new NotFoundError('No active loans found for user');
+      // 200 + empty payload (not 404) so My EMIs can show an empty state
+      // without a failed network request in DevTools.
+      return {
+        hasLoan: false as const,
+        loan: null,
+        summary: null,
+        nextEmi: null,
+        schedule: [],
+        recentPayments: [],
+      };
     }
 
     const selected = loanId
@@ -99,7 +108,7 @@ export class LoanService {
     }
 
     const healed = await this.healUnpaidSchedule(selected);
-    return buildDashboardPayload(healed);
+    return { hasLoan: true as const, ...buildDashboardPayload(healed) };
   }
 
   async getPaymentHistory(userId: string, loanId?: string) {

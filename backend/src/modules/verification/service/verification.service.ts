@@ -1,4 +1,5 @@
 import axios from 'axios';
+import FormData from 'form-data';
 import { env } from '../../../config/env';
 import {
   BadRequestError,
@@ -10,6 +11,7 @@ import { auditLogService } from './audit-log.service';
 
 const DIGILOCKER_BASE = 'https://javabackend.idspay.in/api/v1/prod';
 const DIGILOCKER_ENDPOINT = '/srv2/validation/digilocker-digital-kyc';
+const FACE_MATCH_ENDPOINT = `${DIGILOCKER_BASE}/srv2/face-api/match`;
 
 function requireDigilockerCredentials(): {
   api_id: string;
@@ -32,10 +34,49 @@ function requireDigilockerCredentials(): {
   return { api_id, api_key, token_id };
 }
 
+/** Strip data-URI prefix; return raw base64 for Buffer conversion. */
+function stripImageDataUri(value: string): string {
+  return value.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '');
+}
+
+/**
+ * Build IDSPay face-match multipart body.
+ * Provider requires `person` and `card` as uploaded files (not JSON base64 strings).
+ */
+function buildFaceMatchFormData(input: {
+  api_id: string;
+  api_key: string;
+  token_id: string;
+  personBase64: string;
+  cardBase64: string;
+}): FormData {
+  const form = new FormData();
+  form.append('api_id', input.api_id);
+  form.append('api_key', input.api_key);
+  form.append('token_id', input.token_id);
+  form.append('person', Buffer.from(stripImageDataUri(input.personBase64), 'base64'), {
+    filename: 'person.jpg',
+    contentType: 'image/jpeg',
+  });
+  form.append('card', Buffer.from(stripImageDataUri(input.cardBase64), 'base64'), {
+    filename: 'card.jpg',
+    contentType: 'image/jpeg',
+  });
+  return form;
+}
+
+function extractIdsPayErrorMessage(err: any): string {
+  return (
+    err?.response?.data?.status?.message ||
+    err?.response?.data?.message ||
+    err?.message ||
+    'Face verification failed'
+  );
+}
+
 export class VerificationService {
   async getStatus(userId: string) {
-    const user = await verificationRepository.findUserById(userId);
-    if (!user) throw new NotFoundError('User not found');
+    // JWT already authenticated this user — do not block status on a Mongo user fetch.
     return verificationRepository.getStatus(userId);
   }
 
@@ -290,14 +331,19 @@ export class VerificationService {
   }
 
   async getAadhaarStatus(userId: string) {
-    const user = await verificationRepository.findUserById(userId);
+    let user = verificationRepository.findUserByIdLocal(userId);
+    if (!user) {
+      user = await verificationRepository.findUserById(userId);
+    }
     if (!user) throw new NotFoundError('User not found');
 
-    const profileId = user.profiles?.id;
-    const kyc = await verificationRepository.findKycByUserId(userId);
-    const digilocker = profileId
-      ? await verificationRepository.findDigilockerByProfileId(profileId)
-      : null;
+    const profileId = user.profiles?.id ?? user.id;
+    const [kyc, digilocker] = await Promise.all([
+      verificationRepository.findKycByUserId(userId),
+      profileId
+        ? verificationRepository.findDigilockerByProfileId(profileId)
+        : Promise.resolve(null),
+    ]);
 
     return {
       aadhaarVerified: Boolean(kyc?.aadharVerified),
@@ -417,33 +463,43 @@ export class VerificationService {
       throw new BadRequestError('No photo found in Aadhaar data.');
     }
 
-    const cleanCaptured = capturedImage.replace(/^data:image\/[a-z]+;base64,/, '');
-    const cleanAadhaar = aadhaarPhoto.replace(/^data:image\/[a-z]+;base64,/, '');
+    const cleanCaptured = stripImageDataUri(capturedImage);
+    const cleanAadhaar = stripImageDataUri(aadhaarPhoto);
     const creds = requireDigilockerCredentials();
 
-    const requestPayload = {
+    const form = buildFaceMatchFormData({
       ...creds,
-      person: cleanCaptured,
-      card: cleanAadhaar,
-    };
+      personBase64: cleanCaptured,
+      cardBase64: cleanAadhaar,
+    });
 
     let resp;
     try {
-      const endpoint = 'https://javabackend.idspay.in/api/v1/prod/srv2/face-api/match';
-      resp = await axios.post(endpoint, requestPayload, {
-        headers: { 'Content-Type': 'application/json' },
+      resp = await axios.post(FACE_MATCH_ENDPOINT, form, {
+        headers: form.getHeaders(),
         timeout: 45_000,
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
       });
     } catch (err: any) {
-      throw new BadRequestError(err.response?.data?.message ?? 'Face verification failed');
+      throw new BadRequestError(extractIdsPayErrorMessage(err));
     }
 
     const data = resp.data;
-    if (data?.status !== 'success' && data?.statusCode !== '200') {
-      throw new BadRequestError(data?.message ?? 'Failed to verify face');
+    // IDSPay may return either legacy flat flags or { status: { code, type }, data: { is_same_face... } }.
+    const providerOk =
+      data?.status === 'success' ||
+      data?.statusCode === '200' ||
+      data?.status?.code === 200 ||
+      String(data?.status?.type || '').toLowerCase() === 'success';
+    if (!providerOk) {
+      throw new BadRequestError(
+        data?.status?.message || data?.message || 'Failed to verify face',
+      );
     }
 
-    const result = data?.result;
+    // Multipart IDSPay responses nest match fields under `data`; keep `result` for legacy shape.
+    const result = data?.result ?? data?.data;
     if (!result?.is_same_face) {
       throw new BadRequestError('Face mismatch. Please try again in better lighting.');
     }

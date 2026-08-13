@@ -72,29 +72,40 @@ export class PaymentRepository {
 
   /**
    * Lifetime KYC fee — any prior SUCCESS KYC_VERIFICATION for this user.
-   * Refreshes from Supabase so serverless instances stay consistent.
+   * Uses a targeted Mongo query instead of refreshing the whole payment table.
    */
   async findSuccessKycVerification(userId: string) {
-    await jsonDb.refreshCollection('paymentTransaction');
-    const payments = jsonDb
-      .findMany('paymentTransaction', {
+    const primary = await jsonDb.findLatestFromMongo(
+      'paymentTransaction',
+      {
         userId,
         paymentType: PaymentType.KYC_VERIFICATION,
         paymentStatus: PaymentStatus.SUCCESS,
-      })
-      .sort(
-        (a: any, b: any) =>
-          new Date(b.paidAt ?? b.createdAt).getTime() -
-          new Date(a.paidAt ?? a.createdAt).getTime(),
-      );
-    // Also accept purpose field for rows written with explicit purpose.
-    if (payments.length > 0) return payments[0];
+      },
+      'paidAt',
+    );
+    if (primary) return primary;
 
-    const byPurpose = jsonDb
+    // Fallback: older rows may use purpose/status field names.
+    const byPurpose = await jsonDb.findLatestFromMongo(
+      'paymentTransaction',
+      { userId, purpose: 'KYC_VERIFICATION' },
+      'paidAt',
+    );
+    if (
+      byPurpose &&
+      (byPurpose.paymentStatus === PaymentStatus.SUCCESS || byPurpose.status === 'SUCCESS')
+    ) {
+      return byPurpose;
+    }
+
+    // Last resort: local memory scan (covers recent writes not yet queryable).
+    const local = jsonDb
       .findMany('paymentTransaction', { userId })
       .filter(
         (p: any) =>
-          (p.purpose === 'KYC_VERIFICATION' || p.paymentType === 'KYC_VERIFICATION') &&
+          (p.purpose === 'KYC_VERIFICATION' || p.paymentType === 'KYC_VERIFICATION' ||
+            p.paymentType === PaymentType.KYC_VERIFICATION) &&
           (p.paymentStatus === PaymentStatus.SUCCESS || p.status === 'SUCCESS'),
       )
       .sort(
@@ -102,7 +113,7 @@ export class PaymentRepository {
           new Date(b.paidAt ?? b.createdAt).getTime() -
           new Date(a.paidAt ?? a.createdAt).getTime(),
       );
-    return byPurpose.length > 0 ? byPurpose[0] : null;
+    return local.length > 0 ? local[0] : null;
   }
 
   findByRazorpayOrderId(razorpayOrderId: string) {

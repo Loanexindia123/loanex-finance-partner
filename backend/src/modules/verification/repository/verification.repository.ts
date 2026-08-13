@@ -5,12 +5,10 @@ export class VerificationRepository {
   // ─── KYC status from customer_kyc ───────────────────────────────────────────
 
   /**
-   * Always refresh from MongoDB (when primary) so warm serverless instances
-   * see KYC writes performed by other instances.
+   * Targeted Mongo lookup by userId — avoids full customer_kyc collection refresh.
    */
   async findKycByUserId(userId: string) {
-    await jsonDb.refreshCollection('customer_kyc');
-    return jsonDb.findOne('customer_kyc', { userId });
+    return jsonDb.findOneCached('customer_kyc', { userId });
   }
 
   async upsertKyc(
@@ -34,8 +32,7 @@ export class VerificationRepository {
       faceRawData?: any;
     },
   ) {
-    await jsonDb.refreshCollection('customer_kyc');
-    const existing = jsonDb.findOne('customer_kyc', { userId });
+    const existing = await this.findKycByUserId(userId);
     if (existing) {
       return jsonDb.updateAwaited('customer_kyc', { id: existing.id }, data);
     }
@@ -45,10 +42,7 @@ export class VerificationRepository {
   // ─── DigiLocker reports ──────────────────────────────────────────────────────
 
   async findDigilockerByProfileId(profileId: string) {
-    await jsonDb.refreshCollection('digilocker_reports');
-    const records = jsonDb.findMany('digilocker_reports', { profileId });
-    if (records.length === 0) return null;
-    return records.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    return jsonDb.findLatestFromMongo('digilocker_reports', { profileId }, 'createdAt');
   }
 
   async upsertDigilocker(
@@ -69,8 +63,7 @@ export class VerificationRepository {
       rawData?: any;
     },
   ) {
-    await jsonDb.refreshCollection('digilocker_reports');
-    const existing = jsonDb.findOne('digilocker_reports', { profileId });
+    const existing = await this.findDigilockerByProfileId(profileId);
     if (existing) {
       return jsonDb.updateAwaited('digilocker_reports', { id: existing.id }, data);
     }
@@ -94,9 +87,11 @@ export class VerificationRepository {
   // ─── KYC status summary ──────────────────────────────────────────────────────
 
   async getStatus(userId: string) {
-    const kyc = await this.findKycByUserId(userId);
-    const user = await this.findUserById(userId);
-    const customer = jsonDb.findOne('customerVerification', { userId });
+    const [kyc, customer] = await Promise.all([
+      jsonDb.findOneCached('customer_kyc', { userId }),
+      jsonDb.findOneCached('customerVerification', { userId }),
+    ]);
+    const user = this.findUserByIdLocal(userId);
 
     const mobileVerified = true; // OTP login = mobile verified
     const aadhaarVerified = Boolean(kyc?.aadharVerified || customer?.aadhaarVerified || user?.aadhaarVerified);
@@ -104,10 +99,6 @@ export class VerificationRepository {
     const faceVerified = Boolean(kyc?.face_verified);
     const bankVerified = Boolean(customer?.bankVerified || user?.bankVerified);
 
-    // Bank verification is temporarily disabled — the live KYC flow is
-    // Aadhaar (DigiLocker) → PAN/Experian → EMI. Completion is derived from
-    // the same core steps the web uses (mobile + Aadhaar + PAN); face is a
-    // security re-check on every EMI application, not a completion gate.
     const coreSteps = [mobileVerified, aadhaarVerified, panVerified].filter(
       Boolean,
     ).length;
@@ -130,9 +121,24 @@ export class VerificationRepository {
             ? 'COMPLETED'
             : 'IN_PROGRESS',
       kycCompleted: coreSteps === totalSteps,
-      kyc,
+      // Never return Aadhaar photo / Experian blobs on the status poll.
+      kyc: kyc
+        ? {
+            panNumber: kyc.panNumber ?? null,
+            cibil_score: kyc.cibil_score ?? null,
+            pan_verified: Boolean(kyc.pan_verified),
+            aadharVerified: Boolean(kyc.aadharVerified),
+            kycCompleted: Boolean(kyc.kycCompleted),
+            kycCompletedAt: kyc.kycCompletedAt ?? null,
+          }
+        : null,
       message: 'Status fetched',
     };
+  }
+
+  /** In-memory user lookup — no Mongo. */
+  findUserByIdLocal(userId: string) {
+    return jsonDb.findOne('users', { id: userId });
   }
 }
 

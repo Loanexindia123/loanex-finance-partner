@@ -59,11 +59,15 @@ export function createApp() {
     for (const origin of [
       'http://localhost:4200',
       'http://127.0.0.1:4200',
+      'http://localhost:4201',
+      'http://127.0.0.1:4201',
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       // Expo Metro (customer mobile web / Expo Go debugger)
       'http://localhost:8081',
       'http://127.0.0.1:8081',
+      'http://localhost:8082',
+      'http://127.0.0.1:8082',
     ]) {
       allowedOrigins.add(origin);
     }
@@ -78,6 +82,14 @@ export function createApp() {
           return;
         }
         if (allowedOrigins.has(origin)) {
+          callback(null, true);
+          return;
+        }
+        // Dev: allow any localhost / 127.0.0.1 port (Expo often picks 8081/8082/…)
+        if (
+          env.NODE_ENV !== 'production' &&
+          /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)
+        ) {
           callback(null, true);
           return;
         }

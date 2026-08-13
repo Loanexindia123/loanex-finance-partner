@@ -3,7 +3,7 @@ import { BadRequestError } from '../../../common/errors/app-error';
 import { env } from '../../../config/env';
 
 const IDSPAY_BASE = 'https://javabackend.idspay.in/api/v1/prod';
-const BANK_VERIFY_PATH = '/bank/verify-account';
+const BANK_VERIFY_PATH = '/bank-verification/pennyless';
 
 // --- Bank Statement Analysis (temporarily disabled — IDSPay account not entitled) ---
 // const BANK_STATEMENT_PATH = '/srv2/statement-analyzer';
@@ -95,20 +95,21 @@ function pickAccountExists(data: any): boolean {
 }
 
 /**
- * IDSPay bank account verification (penny-less / verify-account).
+ * IDSPay bank account verification (Penny Less).
  * Temporary active path while Statement Analyzer is unauthorized on this account.
  */
 export async function verifyBankAccountWithIdsPay(
   input: IdsPayBankVerifyInput,
 ): Promise<IdsPayBankVerifyResult> {
   const creds = requireIdsPayCredentials();
+  // Penny Less body only — do not send reference_id / latitude / longitude to IDSPay.
   const payload = {
-    ...creds,
+    api_id: creds.api_id,
+    api_key: creds.api_key,
+    token_id: creds.token_id,
     account_number: input.accountNumber,
     bank_ifsc: input.bankIfsc,
-    reference_id: input.referenceId,
-    latitude: input.latitude,
-    longitude: input.longitude,
+    ifsc_details: true,
   };
 
   let resp;

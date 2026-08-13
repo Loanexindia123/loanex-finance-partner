@@ -242,12 +242,10 @@ export class EmiApplicationRepository {
   }
 
   /**
-   * Refresh from MongoDB before reading so EMI eligibility uses durable KYC,
-   * not a stale warm-instance cache.
+   * Targeted Mongo lookup by userId — avoids full customer_kyc collection refresh.
    */
   async findKycSummary(userId: string) {
-    await jsonDb.refreshCollection('customer_kyc');
-    return jsonDb.findOne('customer_kyc', { userId });
+    return jsonDb.findOneFromMongo('customer_kyc', { userId });
   }
 
   findLatestMobileVerification(userId: string) {

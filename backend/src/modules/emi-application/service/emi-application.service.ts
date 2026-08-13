@@ -697,7 +697,37 @@ export class EmiApplicationService {
   }
 
   async getForAdmin(applicationId: string) {
-    const row = await emiApplicationRepository.findById(applicationId);
+    let row = await emiApplicationRepository.findById(applicationId);
+
+    // Heal orphaned FI → EMI links (applicationId on fi_cases can lag after reseed/replace).
+    // Only re-point open FI cases onto PENDING / UNDER_REVIEW applications — never ACTIVE_EMI.
+    if (!row) {
+      const fiCase = jsonDb.findOne('fi_cases', { applicationId });
+      const fiStatus = String(fiCase?.status || '').toLowerCase();
+      const fiIsOpen = fiStatus === 'pending' || fiStatus === 'in_progress' || fiStatus === 'hold';
+      if (fiCase?.userId && fiIsOpen) {
+        const candidates = jsonDb
+          .findMany('emi_applications', { userId: fiCase.userId })
+          .filter((a: any) =>
+            a.status === EmiApplicationStatus.PENDING ||
+            a.status === EmiApplicationStatus.UNDER_REVIEW,
+          )
+          .sort(
+            (a: any, b: any) =>
+              new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+          );
+        const productName = String(fiCase.productName || '');
+        const match =
+          (productName
+            ? candidates.find((a: any) => String(a.productName || '') === productName)
+            : undefined) || candidates[0];
+        if (match) {
+          jsonDb.update('fi_cases', { id: fiCase.id }, { applicationId: match.id });
+          row = match;
+        }
+      }
+    }
+
     if (!row) {
       throw new NotFoundError('EMI application not found');
     }
