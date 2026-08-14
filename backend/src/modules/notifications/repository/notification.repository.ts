@@ -39,8 +39,16 @@ export enum NotificationType {
   LOAN_CLOSED = 'LOAN_CLOSED',
   OFFER_ACCEPTED = 'OFFER_ACCEPTED',
   OFFER_RECEIVED = 'OFFER_RECEIVED',
+  // ORDER_CONFIRMED = 'ORDER_CONFIRMED',
+  // SYSTEM = 'SYSTEM',
   ORDER_CONFIRMED = 'ORDER_CONFIRMED',
   SYSTEM = 'SYSTEM',
+  // FI/admin-facing EMI application lifecycle events (broadcast to FI-permission
+  // admins — see notifications/service/fi-recipients.helper.ts). Distinct from the
+  // existing APPLICATION_* types above, which are the customer-facing equivalents.
+  EMI_REQUEST_RECEIVED = 'EMI_REQUEST_RECEIVED',
+  EMI_REQUEST_ACCEPTED = 'EMI_REQUEST_ACCEPTED',
+  EMI_REQUEST_REJECTED = 'EMI_REQUEST_REJECTED',
 }
 
 export type NotificationListFilters = {

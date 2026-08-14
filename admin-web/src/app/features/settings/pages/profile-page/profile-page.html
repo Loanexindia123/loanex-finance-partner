@@ -1,0 +1,104 @@
+<div class="profile-grid">
+  <section class="profile-card">
+    <div class="profile-identity">
+      <span class="profile-avatar">{{ initials() }}</span>
+      <div>
+        <h2>{{ user()?.fullName || user()?.email }}</h2>
+        <app-status-badge [status]="user()?.status ?? 'active'" />
+      </div>
+    </div>
+
+    <dl class="profile-details">
+      <div>
+        <dt>Email</dt>
+        <dd>{{ user()?.email || '—' }}</dd>
+      </div>
+      <div>
+        <dt>Mobile</dt>
+        <dd>{{ user()?.mobile || '—' }}</dd>
+      </div>
+      <div>
+        <dt>Role</dt>
+        <dd>{{ user()?.roleName || '—' }}</dd>
+      </div>
+      <div>
+        <dt>Member Since</dt>
+        <dd>{{ memberSince() }}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="profile-card">
+    <h3>Change Password</h3>
+
+    @if (!passwordFormOpen()) {
+      <p class="profile-card__hint">Keep your account secure with a strong password.</p>
+      <button
+        pButton
+        type="button"
+        label="Change Password"
+        icon="pi pi-lock"
+        [outlined]="true"
+        (click)="passwordFormOpen.set(true)"
+      ></button>
+    } @else {
+      <p class="profile-card__hint">Use at least 8 characters. You'll stay signed in after this change.</p>
+
+      <form [formGroup]="form" class="profile-form" (ngSubmit)="changePassword()">
+        <div class="field">
+          <label for="currentPassword">Current Password</label>
+          <p-password
+            inputId="currentPassword"
+            formControlName="currentPassword"
+            [feedback]="false"
+            [toggleMask]="true"
+            styleClass="profile-password"
+          />
+        </div>
+        <div class="field">
+          <label for="newPassword">New Password</label>
+          <p-password
+            inputId="newPassword"
+            formControlName="newPassword"
+            [feedback]="true"
+            [toggleMask]="true"
+            styleClass="profile-password"
+          />
+        </div>
+        <div class="field">
+          <label for="confirmPassword">Confirm New Password</label>
+          <p-password
+            inputId="confirmPassword"
+            formControlName="confirmPassword"
+            [feedback]="false"
+            [toggleMask]="true"
+            styleClass="profile-password"
+          />
+          @if (form.errors?.['mismatch'] && form.get('confirmPassword')?.touched) {
+            <small class="field-error">Passwords do not match.</small>
+          }
+        </div>
+
+        <div class="profile-form__actions">
+          <button
+            pButton
+            type="button"
+            label="Cancel"
+            severity="secondary"
+            [outlined]="true"
+            [disabled]="saving()"
+            (click)="cancelPasswordChange()"
+          ></button>
+          <button
+            pButton
+            type="submit"
+            label="Update Password"
+            icon="pi pi-lock"
+            [loading]="saving()"
+            [disabled]="saving()"
+          ></button>
+        </div>
+      </form>
+    }
+  </section>
+</div>

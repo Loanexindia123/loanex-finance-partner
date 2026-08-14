@@ -24,6 +24,9 @@ import {
   KYC_FEE_AMOUNT_INR,
   KYC_VERIFICATION_PURPOSE,
 } from '../../payment/kyc-fee.constants';
+import { notificationService } from '../../notifications/service/notification.service';
+import { NotificationType } from '../../notifications/repository/notification.repository';
+import { findFiAdminRecipients } from '../../notifications/service/fi-recipients.helper';
 
 function toNumber(value: { toString(): string } | number | null | undefined): number | null {
   if (value === null || value === undefined) return null;
@@ -281,6 +284,46 @@ export class EmiApplicationService {
     });
   }
 
+  /**
+   * Notifies every admin holding fi.view/fi.edit about an EMI-request lifecycle event
+   * (received / accepted / rejected). Broadcasts to all eligible FI admins rather than
+   * a single assignee — see fi-recipients.helper.ts for why. Failures for individual
+   * recipients are swallowed (Promise.allSettled) so a notification problem never blocks
+   * the underlying EMI application flow.
+   */
+  private async notifyFiAdmins(input: {
+    type: NotificationType;
+    title: string;
+    message: string;
+    applicationId: string;
+    applicationNumber?: string | null;
+  }): Promise<void> {
+    const recipients = findFiAdminRecipients();
+    if (recipients.length === 0) return;
+
+    const results = await Promise.allSettled(
+      recipients.map((userId) =>
+        notificationService.dispatch({
+          userId,
+          type: input.type,
+          title: input.title,
+          message: input.message,
+          metadata: {
+            applicationId: input.applicationId,
+            applicationNumber: input.applicationNumber ?? null,
+          },
+          channels: ['inapp'],
+        }),
+      ),
+    );
+
+    results.forEach((result) => {
+      if (result.status === 'rejected') {
+        console.error('[EmiApplication] Failed to notify FI admin:', result.reason);
+      }
+    });
+  }
+
   async create(
     userId: string,
     input: CreateEmiApplicationBody,
@@ -372,6 +415,18 @@ export class EmiApplicationService {
         ipAddress: meta?.ipAddress ?? null,
         device: meta?.userAgent ?? null,
       },
+    });
+
+    const customerProfile = await emiApplicationRepository.findProfileById(userId);
+    const customerName = customerProfile?.fullName ?? 'A customer';
+    await this.notifyFiAdmins({
+      type: NotificationType.EMI_REQUEST_RECEIVED,
+      title: 'New EMI request received',
+      message: `${customerName} submitted a new EMI application${
+        input.productName ? ` for ${input.productName}` : ''
+      } (${applicationNumber}).`,
+      applicationId: created.id,
+      applicationNumber,
     });
 
     return {
@@ -860,6 +915,34 @@ export class EmiApplicationService {
       userId: app.userId,
       message: 'Application approved',
       approvedBy: adminUserId,
+    }).then(async (result) => {
+      const existingFi = jsonDb.findOne('fi_cases', { applicationId: app.id });
+      if (!existingFi) {
+        const profile = await emiApplicationRepository.findProfileById(app.userId);
+        jsonDb.insert('fi_cases', {
+          applicationId: app.id,
+          userId: app.userId,
+          customerName: profile?.fullName ?? 'Customer',
+          mobile: profile?.mobileNumber ?? profile?.mobile_number ?? '',
+          productName: app.productName ?? 'Product',
+          assignedExecutive: 'Unassigned',
+          assignedDate: new Date().toISOString(),
+          status: 'pending',
+          photoCount: 0,
+          gpsLocation: '',
+          remarks: '',
+        });
+      }
+
+      await this.notifyFiAdmins({
+        type: NotificationType.EMI_REQUEST_ACCEPTED,
+        title: 'EMI request accepted',
+        message: `EMI application ${app.applicationNumber ?? app.id} was accepted.`,
+        applicationId: app.id,
+        applicationNumber: app.applicationNumber,
+      });
+      
+      return result;
     });
   }
 
@@ -880,6 +963,20 @@ export class EmiApplicationService {
 
     const updated = await emiApplicationRepository.reject(app.id, reason ?? '');
 
+    // await auditLogService.log({
+    //   userId: app.userId,
+    //   action: 'APPLICATION_REJECTED',
+    //   entity: 'emi_applications',
+    //   metadata: {
+    //     applicationNumber: updated.applicationNumber ?? updated.id,
+    //     status: updated.status,
+    //     rejectionReason: updated.rejectionReason,
+    //     rejectedBy: adminUserId,
+    //     timestamp: new Date().toISOString(),
+    //   },
+    // });
+
+    // return {
     await auditLogService.log({
       userId: app.userId,
       action: 'APPLICATION_REJECTED',
@@ -891,6 +988,16 @@ export class EmiApplicationService {
         rejectedBy: adminUserId,
         timestamp: new Date().toISOString(),
       },
+    });
+
+    await this.notifyFiAdmins({
+      type: NotificationType.EMI_REQUEST_REJECTED,
+      title: 'EMI request rejected',
+      message: `EMI application ${updated.applicationNumber ?? updated.id} was rejected${
+        reason ? `: ${reason}` : '.'
+      }`,
+      applicationId: updated.id,
+      applicationNumber: updated.applicationNumber,
     });
 
     return {
