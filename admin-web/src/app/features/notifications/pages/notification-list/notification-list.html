@@ -1,0 +1,59 @@
+<div class="notif-toolbar">
+  <div class="notif-tabs">
+    <button
+      type="button"
+      class="notif-tabs__btn"
+      [class.notif-tabs__btn--active]="!unreadOnly()"
+      (click)="unreadOnly.set(false)"
+    >
+      All
+    </button>
+    <button
+      type="button"
+      class="notif-tabs__btn"
+      [class.notif-tabs__btn--active]="unreadOnly()"
+      (click)="unreadOnly.set(true)"
+    >
+      Unread
+      @if (unreadCount() > 0) {
+        <span class="notif-tabs__count">{{ unreadCount() }}</span>
+      }
+    </button>
+  </div>
+
+  @if (unreadCount() > 0) {
+    <button pButton type="button" label="Mark all as read" [text]="true" (click)="markAllRead()"></button>
+  }
+</div>
+
+@if (loading()) {
+  <app-branded-loader message="Loading notifications..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (visible().length === 0) {
+  <app-empty-state
+    icon="pi-bell"
+    title="No notifications"
+    [description]="unreadOnly() ? 'You\'re all caught up.' : 'You have no notifications yet.'"
+  />
+} @else {
+  <ul class="notif-list">
+    @for (n of visible(); track n.id) {
+      <li class="notif-item" [class.notif-item--unread]="!n.isRead" (click)="open(n)">
+        <span class="notif-item__icon" [attr.data-tone]="tone(n.type)">
+          <i class="pi" [class]="icon(n.type)" aria-hidden="true"></i>
+        </span>
+        <div class="notif-item__body">
+          <p class="notif-item__title">{{ n.title }}</p>
+          <p class="notif-item__message">{{ n.message }}</p>
+        </div>
+        <div class="notif-item__meta">
+          <span class="notif-item__time">{{ timeAgo(n.createdAt) }}</span>
+          @if (!n.isRead) {
+            <span class="notif-item__dot" aria-label="Unread"></span>
+          }
+        </div>
+      </li>
+    }
+  </ul>
+}

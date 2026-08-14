@@ -11,7 +11,12 @@ export function categoryForType(type: NotificationType): NotificationCategory {
     case NotificationType.APPLICATION_REJECTED:
     case NotificationType.EMI_DUE_REMINDER:
     case NotificationType.EMI_OVERDUE:
+    // case NotificationType.LOAN_CLOSED:
+    //   return NotificationCategory.LOAN;
     case NotificationType.LOAN_CLOSED:
+    case NotificationType.EMI_REQUEST_RECEIVED:
+    case NotificationType.EMI_REQUEST_ACCEPTED:
+    case NotificationType.EMI_REQUEST_REJECTED:
       return NotificationCategory.LOAN;
     case NotificationType.OFFER_RECEIVED:
     case NotificationType.OFFER_ACCEPTED:
@@ -36,7 +41,10 @@ export function defaultPriority(type: NotificationType): NotificationPriority {
     case NotificationType.APPLICATION_REJECTED:
     case NotificationType.EMI_FAILED:
     case NotificationType.AUTOPAY_FAILED:
+    // case NotificationType.EMI_OVERDUE:
+    //   return NotificationPriority.HIGH;
     case NotificationType.EMI_OVERDUE:
+    case NotificationType.EMI_REQUEST_REJECTED:
       return NotificationPriority.HIGH;
     case NotificationType.EMI_DUE_REMINDER:
     case NotificationType.ORDER_DELIVERED:
@@ -44,7 +52,11 @@ export function defaultPriority(type: NotificationType): NotificationPriority {
       return NotificationPriority.MEDIUM;
     case NotificationType.DOWN_PAYMENT_SUCCESS:
     case NotificationType.EMI_PAID:
+    // case NotificationType.APPLICATION_APPROVED:
+    //   return NotificationPriority.MEDIUM;
     case NotificationType.APPLICATION_APPROVED:
+    case NotificationType.EMI_REQUEST_RECEIVED:
+    case NotificationType.EMI_REQUEST_ACCEPTED:
       return NotificationPriority.MEDIUM;
     default:
       return NotificationPriority.LOW;
