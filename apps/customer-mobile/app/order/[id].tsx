@@ -8,6 +8,8 @@ import { Colors, Fonts, Spacing, Radius, Shadow } from '../../constants/theme';
 import { APP_CONFIG } from '../../constants/config';
 import { getOrderById } from '../../services/orderService';
 import { Order, OrderStatus } from '../../types';
+import AutoEmiCard from '../../components/feature/AutoEmiCard';
+import { isEmiPaymentMethod } from '../../utils/autopayUi';
 
 // ─── Timeline Config ──────────────────────────────────────────────────────────
 const STEPS = [
@@ -231,6 +233,8 @@ export default function OrderDetailScreen() {
   const meta  = STATUS_META[order.status] || STATUS_META['pending'];
   const eta   = getETA(order);
   const isLive = !['delivered', 'cancelled'].includes(order.status);
+  const isEmiOrder =
+    order.paymentMethod === 'emi' || isEmiPaymentMethod(order.paymentMethod);
 
   return (
     <View style={[st.container, { paddingTop: insets.top }]}>
@@ -349,6 +353,18 @@ export default function OrderDetailScreen() {
             </View>
           </View>
         </View>
+
+        {/* ── Auto EMI (EMI orders only; Full Payment never loads Autopay) ── */}
+        {isEmiOrder && (
+          <View style={st.sec}>
+            <AutoEmiCard
+              enabled
+              variant="manage"
+              hideWhileLoading
+              onManagePress={() => router.push('/autopay' as any)}
+            />
+          </View>
+        )}
 
         {/* ── EMI Details ────────────────────────────── */}
         {order.paymentMethod === 'emi' && order.emiDetails && (

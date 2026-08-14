@@ -131,18 +131,6 @@
                 </div>
               </div>
             }
-
-            <!-- Bank skipped for now — next step is EMI verification summary -->
-            <div class="lx-idv__actions mt-4">
-              <p-button
-                type="button"
-                label="Continue to Verification Summary"
-                icon="pi pi-arrow-right"
-                iconPos="right"
-                styleClass="lx-idv__btn w-full"
-                (onClick)="goToSummary()"
-              ></p-button>
-            </div>
           } @else {
             <form class="lx-idv__form mt-4" [formGroup]="experianForm" (ngSubmit)="verifyPanAndCredit()">
               
@@ -214,7 +202,7 @@
         </div>
       }
 
-      <!-- Section 3: Bank Account Verification — temporarily disabled; KYC via Aadhaar for now
+      <!-- Section 3: Bank Account Verification -->
       @if (panVerified()) {
         <hr class="mb-5" style="border: 0; border-top: 1px solid var(--surface-border);" />
 
@@ -238,6 +226,17 @@
                 <p>Account: {{ maskedBankAccount() || 'XXXXXXXXXXXX' }}</p>
                 <p>Bank: {{ verifiedBankName() || '—' }}</p>
               </div>
+            </div>
+
+            <div class="lx-idv__actions mt-4">
+              <p-button
+                type="button"
+                label="Continue to Verification Summary"
+                icon="pi pi-arrow-right"
+                iconPos="right"
+                styleClass="lx-idv__btn w-full"
+                (onClick)="goToSummary()"
+              ></p-button>
             </div>
           } @else {
             @if (bankFormError(); as bankErr) {
@@ -355,7 +354,6 @@
           }
         </div>
       }
-      -->
 
     </p-card>
   }

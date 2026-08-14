@@ -24,6 +24,7 @@ import { SelectModule } from 'primeng/select';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { ButtonModule } from 'primeng/button';
 import { MessageService } from 'primeng/api';
+import { AuthService } from '../../../../core/services/auth.service';
 import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
 import { DealerService } from '../../services/dealer.service';
 import { StaffUserService } from '../../services/staff-user.service';
@@ -32,6 +33,7 @@ import {
   CREATOR_TYPES,
   DEALER_TYPES,
   PAYMENT_CYCLES,
+  PAYMENT_SETTLEMENT_TERMS,
   PRODUCT_DELIVERY_BY,
   VERIFICATION_STATUS_OPTIONS,
   DealerPayload,
@@ -60,7 +62,7 @@ const SUBMIT_REQUIRED_FIELDS: ReadonlyArray<{
 }> = [
   { key: 'creatorType', label: 'Creator Type' },
   { key: 'creatorName', label: 'Search Creator' },
-  { key: 'dealerName', label: 'Firm / Shop Name' },
+  { key: 'dealerName', label: 'Dealer Name' },
   { key: 'ownerName', label: 'Owner Name' },
   { key: 'businessType', label: 'Business Type' },
   { key: 'mobile', label: 'Mobile Number' },
@@ -106,6 +108,7 @@ export class DealerForm {
   private readonly router = inject(Router);
   private readonly dealers = inject(DealerService);
   private readonly staffUsers = inject(StaffUserService);
+  private readonly auth = inject(AuthService);
   private readonly products = inject(ProductService);
   private readonly wizard = inject(WizardOptionsService);
   private readonly messages = inject(MessageService);
@@ -129,6 +132,7 @@ export class DealerForm {
   readonly businessTypeOptions = BUSINESS_TYPES.map((v) => ({ label: v, value: v }));
   readonly dealerTypeOptions = DEALER_TYPES.map((v) => ({ label: v, value: v }));
   readonly paymentCycleOptions = PAYMENT_CYCLES.map((v) => ({ label: v, value: v }));
+  readonly paymentTermsOptions = PAYMENT_SETTLEMENT_TERMS.map((v) => ({ label: v, value: v }));
   readonly productDeliveryOptions = PRODUCT_DELIVERY_BY.map((v) => ({ label: v, value: v }));
   readonly verificationOptions = VERIFICATION_STATUS_OPTIONS;
 
@@ -163,7 +167,7 @@ export class DealerForm {
     businessType: ['', Validators.required],
     mobile: ['', Validators.required],
     whatsapp: [''],
-    email: [''],
+    email: ['', optionalEmail],
     dealerType: ['', Validators.required],
     categoryDepartments: [[], requiredNonEmptyArray],
     establishedYear: [''],
@@ -183,12 +187,14 @@ export class DealerForm {
     accountNumber: ['', Validators.required],
     ifscCode: ['', Validators.required],
     paymentCycle: ['', Validators.required],
-    holdPercentage: [''],
+    paymentSettlementTerms: [''],
+    holdPercentage: ['', nonNegativePercent],
+    commission: ['', nonNegativePercent],
     productDeliveryBy: ['', Validators.required],
     assignedB2BManager: ['', Validators.required],
     verificationStatus: ['pending', Validators.required],
     dealerAgreement: [''],
-    gstNumber: [''],
+    gstNumber: ['', optionalGstin],
     branch: [''],
     status: [true],
     formStatus: ['draft'],
@@ -223,7 +229,18 @@ export class DealerForm {
             ...dealer,
             categoryDepartments: this.splitCategories(dealer.categoryDepartment),
             status: dealer.status === 'active',
+            branch: dealer.branch || dealer.dealerBranch || '',
+            paymentSettlementTerms: dealer.paymentSettlementTerms || '',
+            commission:
+              dealer.commission != null && dealer.commission !== 0
+                ? String(dealer.commission)
+                : '',
+            holdPercentage: dealer.holdPercentage || (dealer.holdDays > 0 ? String(dealer.holdDays) : ''),
           });
+          // Ownership is server-authoritative and immutable for non–Super Admin editors.
+          this.form.get('creatorType')?.disable({ emitEvent: false });
+          this.form.get('creatorName')?.disable({ emitEvent: false });
+          this.form.get('creatorId')?.disable({ emitEvent: false });
           this.loading.set(false);
         },
         error: (err) => {
@@ -235,7 +252,27 @@ export class DealerForm {
           });
         },
       });
+    } else {
+      this.applyCurrentUserAsCreator();
     }
+  }
+
+  /** Backend overwrites creatorId from the session; UI defaults to the signed-in user. */
+  private applyCurrentUserAsCreator(): void {
+    const user = this.auth.user();
+    if (!user) return;
+    const name = user.fullName || user.email || user.mobile || 'Employee';
+    this.form.patchValue(
+      {
+        creatorType: 'Employee',
+        creatorName: name,
+        creatorId: user.id,
+      },
+      { emitEvent: false },
+    );
+    this.form.get('creatorType')?.disable({ emitEvent: false });
+    this.form.get('creatorName')?.disable({ emitEvent: false });
+    this.form.get('creatorId')?.disable({ emitEvent: false });
   }
 
   onCreatorSelected(name: string): void {
@@ -249,6 +286,27 @@ export class DealerForm {
   isInvalid(key: string): boolean {
     const control = this.form.get(key);
     return !!control && control.invalid && (control.dirty || control.touched);
+  }
+
+  fieldError(key: string): string {
+    const control = this.form.get(key);
+    if (!control || !this.isInvalid(key)) return '';
+    if (control.hasError('email')) return 'Enter a valid email address.';
+    if (control.hasError('gstin')) return 'Enter a valid 15-character GSTIN.';
+    if (control.hasError('percent')) return 'Enter a valid non-negative percentage.';
+    if (control.hasError('required')) return 'This field is required.';
+    return 'Invalid value.';
+  }
+
+  mergedSelectOptions(
+    current: unknown,
+    options: Array<{ label: string; value: string }>,
+  ): Array<{ label: string; value: string }> {
+    const value = String(current ?? '').trim();
+    if (value && !options.some((opt) => opt.value === value)) {
+      return [{ label: value, value }, ...options];
+    }
+    return options;
   }
 
   isPendingDocument(field: string): boolean {
@@ -317,7 +375,19 @@ export class DealerForm {
       this.messages.add({
         severity: 'warn',
         summary: 'Required fields',
-        detail: 'Firm / Shop Name is required.',
+        detail: 'Dealer Name is required.',
+      });
+      return;
+    }
+
+    const formatKeys = ['email', 'gstNumber', 'holdPercentage', 'commission'] as const;
+    const formatInvalid = formatKeys.some((key) => this.form.get(key)?.invalid);
+    if (formatInvalid) {
+      this.form.markAllAsTouched();
+      this.messages.add({
+        severity: 'warn',
+        summary: 'Invalid fields',
+        detail: 'Please correct GSTIN, email, or percentage values.',
       });
       return;
     }
@@ -340,25 +410,12 @@ export class DealerForm {
     const dealerCode =
       String(raw.dealerCode ?? '').trim() || this.generateDealerCode(dealerName);
     const categoryDepartment = this.joinCategories(raw.categoryDepartments);
-    const { categoryDepartments: _categories, ...rest } = raw;
-    const payload: DealerPayload = {
-      ...emptyDealer(),
-      ...rest,
-      name: dealerName,
+    const payload: DealerPayload = this.toPayload(raw, {
       dealerName,
       dealerCode,
       categoryDepartment,
-      status: raw.status ? 'active' : 'inactive',
       formStatus,
-      verificationStatus: raw.verificationStatus || 'pending',
-      dealer_address: raw.shopAddress || '',
-      dealerMobile: raw.mobile || '',
-      dealerBranch: raw.branch || '',
-      paymentSchedule: raw.paymentCycle || '',
-      paymentSettlementTerms: raw.paymentCycle || '',
-      holdDays: Number(raw.holdPercentage) || 0,
-      commission: 0,
-    };
+    });
 
     this.submitting.set(true);
     this.flushPendingDocuments()
@@ -372,24 +429,14 @@ export class DealerForm {
           const latest = this.form.getRawValue();
           const latestPayload: DealerPayload = {
             ...payload,
-            ...latest,
-            name: dealerName,
-            dealerName,
-            dealerCode,
-            categoryDepartment,
-            status: latest.status ? 'active' : 'inactive',
-            formStatus,
-            verificationStatus: latest.verificationStatus || 'pending',
-            dealer_address: latest.shopAddress || '',
-            dealerMobile: latest.mobile || '',
-            dealerBranch: latest.branch || '',
-            paymentSchedule: latest.paymentCycle || '',
-            paymentSettlementTerms: latest.paymentCycle || '',
-            holdDays: Number(latest.holdPercentage) || 0,
-            commission: 0,
+            ...this.toPayload(latest, {
+              dealerName,
+              dealerCode,
+              categoryDepartment,
+              formStatus,
+            }),
             ...uploadedUrls,
           };
-          delete (latestPayload as Record<string, unknown>)['categoryDepartments'];
 
           return this.isEdit
             ? this.dealers.update(this.dealerId, latestPayload)
@@ -495,6 +542,47 @@ export class DealerForm {
     return value.map((part) => String(part).trim()).filter(Boolean).join(', ');
   }
 
+  private toPayload(
+    raw: Record<string, unknown>,
+    extras: {
+      dealerName: string;
+      dealerCode: string;
+      categoryDepartment: string;
+      formStatus: 'draft' | 'pending';
+    },
+  ): DealerPayload {
+    const branch = String(raw['branch'] ?? '').trim();
+    const paymentCycle = String(raw['paymentCycle'] ?? '').trim();
+    const paymentSettlementTerms = String(raw['paymentSettlementTerms'] ?? '').trim();
+    const holdPercentage = String(raw['holdPercentage'] ?? '').trim();
+    const commissionRaw = String(raw['commission'] ?? '').trim();
+    const { categoryDepartments: _categories, commission: _commissionInput, ...rest } = raw;
+    return {
+      ...emptyDealer(),
+      ...(rest as Partial<DealerPayload>),
+      name: extras.dealerName,
+      dealerName: extras.dealerName,
+      dealerCode: extras.dealerCode,
+      categoryDepartment: extras.categoryDepartment,
+      status: raw['status'] ? 'active' : 'inactive',
+      formStatus: extras.formStatus,
+      verificationStatus:
+        (raw['verificationStatus'] as DealerPayload['verificationStatus']) || 'pending',
+      dealer_address: String(raw['shopAddress'] ?? ''),
+      dealerMobile: String(raw['mobile'] ?? ''),
+      branch,
+      dealerBranch: branch,
+      paymentCycle,
+      paymentSchedule: paymentCycle,
+      paymentSettlementTerms,
+      holdPercentage,
+      holdDays: Number(holdPercentage) || 0,
+      commission: commissionRaw ? Number(commissionRaw) || 0 : 0,
+      gstNumber: String(raw['gstNumber'] ?? '').trim().toUpperCase(),
+      warehouseAddress: String(raw['warehouseAddress'] ?? '').trim(),
+    };
+  }
+
   private generateDealerCode(dealerName: string): string {
     const slug = dealerName
       .toUpperCase()
@@ -525,4 +613,23 @@ function formatStaffLabel(user: { name: string; email?: string; role?: string })
 function requiredNonEmptyArray(control: AbstractControl): ValidationErrors | null {
   const value = control.value;
   return Array.isArray(value) && value.length > 0 ? null : { required: true };
+}
+
+function optionalEmail(control: AbstractControl): ValidationErrors | null {
+  const value = String(control.value ?? '').trim();
+  if (!value) return null;
+  return Validators.email(control);
+}
+
+function optionalGstin(control: AbstractControl): ValidationErrors | null {
+  const value = String(control.value ?? '').trim();
+  if (!value) return null;
+  return /^[0-9A-Z]{15}$/i.test(value) ? null : { gstin: true };
+}
+
+function nonNegativePercent(control: AbstractControl): ValidationErrors | null {
+  const value = String(control.value ?? '').trim();
+  if (!value) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? null : { percent: true };
 }

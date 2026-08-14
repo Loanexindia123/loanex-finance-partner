@@ -1,4 +1,5 @@
 import { api } from '../lib/apiClient';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 // ─── Types (mirror the backend /emi/payments responses) ─────────────────────
 
@@ -140,14 +141,30 @@ export interface LoanDashboard {
 
 export async function getLoanDashboard(): Promise<LoanDashboard | null> {
   const res = await api.get('/loans/dashboard');
-  return res.data ?? null;
+  const data = res.data ?? null;
+  // Backend returns 200 with loan: null when the user has no EMI loans yet.
+  if (!data?.loan) return null;
+  return {
+    ...data,
+    loan: {
+      ...data.loan,
+      productImage: resolveMediaUrl(data.loan.productImage),
+    },
+  } as LoanDashboard;
 }
 
 // ─── EMI payment ─────────────────────────────────────────────────────────────
 
 export async function getEmiPaymentDetails(emiId: string): Promise<EmiPaymentDetails> {
   const res = await api.get(`/emi/payments/${emiId}`);
-  return res.data;
+  const data = res.data as EmiPaymentDetails;
+  return {
+    ...data,
+    loan: {
+      ...data.loan,
+      productImage: resolveMediaUrl(data.loan?.productImage),
+    },
+  };
 }
 
 export async function createEmiPaymentOrder(emiId: string): Promise<CreateEmiPaymentOrderResponse> {

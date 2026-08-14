@@ -82,6 +82,16 @@
             <span>Profile</span>
           </a>
 
+          <a
+            role="menuitem"
+            class="topbar__menu-item"
+            routerLink="/auth/change-password"
+            (click)="closeMenu()"
+          >
+            <i class="pi pi-key" aria-hidden="true"></i>
+            <span>Change password</span>
+          </a>
+
           @if (canOpenSettings()) {
             <a
               role="menuitem"

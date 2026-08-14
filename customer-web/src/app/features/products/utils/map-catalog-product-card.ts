@@ -1,5 +1,6 @@
 import { ProductCardItem } from '../../../shared/models/product-card.model';
 import { formatInr } from '../../../shared/utils/currency';
+import { resolveMediaUrl } from '../../../shared/utils/media-url';
 import { CatalogProduct } from '../services/products-api.service';
 
 export function toProductCardItem(product: CatalogProduct): ProductCardItem {
@@ -20,7 +21,7 @@ export function toProductCardItem(product: CatalogProduct): ProductCardItem {
           : 'EMI not available',
     deliveryLabel:
       product.deliveryCharge > 0 ? `Delivery ${formatInr(product.deliveryCharge)}` : 'Free Delivery',
-    imageSrc: product.imageUrl || product.thumbnail,
+    imageSrc: resolveMediaUrl(product.imageUrl || product.thumbnail),
     imageAlt: product.name,
     path: `/products/${product.slug || product.id}`,
     rating: product.averageRating,

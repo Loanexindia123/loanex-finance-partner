@@ -20,13 +20,17 @@ const AVATAR_TONES = [
 ] as const;
 
 const PROFILE_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
+  { key: 'dealerCode', label: 'Dealer Code' },
   { key: 'ownerName', label: 'Owner Name' },
   { key: 'businessType', label: 'Business Type' },
   { key: 'dealerType', label: 'Dealer Type' },
   { key: 'categoryDepartment', label: 'Category / Department' },
   { key: 'establishedYear', label: 'Established Year' },
-  { key: 'gstNumber', label: 'GST Number' },
-  { key: 'branch', label: 'Branch' },
+  { key: 'branch', label: 'Dealer Branch' },
+];
+
+const TAX_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
+  { key: 'gstNumber', label: 'GSTIN / GST Number' },
 ];
 
 const CONTACT_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
@@ -41,12 +45,17 @@ const ADDRESS_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
   { key: 'googleLocation', label: 'Google Location' },
   { key: 'deliveryArea', label: 'Delivery Area' },
   { key: 'deliveryTime', label: 'Delivery Time' },
-  { key: 'warehouseAddress', label: 'Warehouse Address' },
+];
+
+const DISPATCH_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
+  { key: 'warehouseAddress', label: 'Dispatch From' },
 ];
 
 const COMMERCIAL_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
-  { key: 'paymentCycle', label: 'Payment Cycle' },
-  { key: 'holdPercentage', label: 'Hold Percentage' },
+  { key: 'paymentSettlementTerms', label: 'Payment Terms' },
+  { key: 'paymentCycle', label: 'Settlement Cycle' },
+  { key: 'holdPercentage', label: 'Hold Payment %' },
+  { key: 'commission', label: 'Dealer Incentive %' },
   { key: 'productDeliveryBy', label: 'Product Delivery By' },
   { key: 'assignedB2BManager', label: 'Assigned B2B Manager' },
   { key: 'accountHolderName', label: 'Account Holder' },
@@ -89,8 +98,10 @@ export class DealerView {
   readonly dealerId = this.route.snapshot.paramMap.get('id') ?? '';
 
   readonly profileFields = PROFILE_FIELDS;
+  readonly taxFields = TAX_FIELDS;
   readonly contactFields = CONTACT_FIELDS;
   readonly addressFields = ADDRESS_FIELDS;
+  readonly dispatchFields = DISPATCH_FIELDS;
   readonly commercialFields = COMMERCIAL_FIELDS;
   readonly creatorFields = CREATOR_FIELDS;
   readonly documentFields = DOCUMENT_FIELDS;
@@ -100,8 +111,10 @@ export class DealerView {
     if (!d) return { filled: 0, total: 0, percent: 0 };
     const keys = [
       ...PROFILE_FIELDS,
+      ...TAX_FIELDS,
       ...CONTACT_FIELDS,
       ...ADDRESS_FIELDS,
+      ...DISPATCH_FIELDS,
       ...COMMERCIAL_FIELDS,
       ...CREATOR_FIELDS,
       ...DOCUMENT_FIELDS,

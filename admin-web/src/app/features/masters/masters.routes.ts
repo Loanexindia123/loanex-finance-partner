@@ -15,6 +15,12 @@ export const MASTERS_ROUTES: Routes = [
     data: { title: 'Brands' },
   },
   {
+    path: 'product-types',
+    loadComponent: () =>
+      import('./pages/product-type-list/product-type-list').then((m) => m.ProductTypeList),
+    data: { title: 'Product Types' },
+  },
+  {
     path: 'categories',
     loadComponent: () =>
       import('./pages/category-list/category-list').then((m) => m.CategoryList),

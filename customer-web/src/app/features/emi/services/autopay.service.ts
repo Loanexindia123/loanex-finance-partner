@@ -72,6 +72,18 @@ export class AutopayService {
     );
   }
 
+  /** Bank-account eMandate via existing Autopay API (no UPI ID). */
+  createEmandate(payload?: {
+    bankName?: string;
+    maximumDebitAmount?: number;
+  }): Observable<AutopayMandate> {
+    return this.createMandate({
+      paymentMethod: 'EMANDATE',
+      bankName: payload?.bankName,
+      maximumDebitAmount: payload?.maximumDebitAmount,
+    });
+  }
+
   cancelMandate(): Observable<AutopayMandate> {
     return this.wrap(
       this.http.post<ApiSuccess<AutopayMandate>>(`${this.baseUrl}/cancel-mandate`, {}),

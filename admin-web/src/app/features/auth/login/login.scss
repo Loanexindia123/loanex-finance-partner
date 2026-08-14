@@ -345,10 +345,21 @@
 }
 
 .login__reset-note {
-  margin: -0.25rem 0 0;
-  font-size: 0.8rem;
-  line-height: 1.45;
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
   color: var(--muted);
+  text-align: right;
+}
+
+.login__forgot-link {
+  color: var(--navy);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login__forgot-link:hover {
+  color: var(--gold);
+  text-decoration: underline;
 }
 
 :host .login__submit {

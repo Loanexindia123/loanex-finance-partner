@@ -18,7 +18,10 @@ export interface StaffUser {
 export class StaffUserService {
   private readonly http = inject(HttpClient);
 
-  /** Staff members for Created By / manager pickers — excludes customers. */
+  /**
+   * Staff members for Reporting Person / manager pickers.
+   * Only admin portal accounts — never customers or generic "authenticated" app users.
+   */
   listStaff(): Observable<StaffUser[]> {
     return this.http.get<ApiEnvelope<unknown>>(apiUrl('/admin/users')).pipe(
       unwrapApi(),
@@ -26,7 +29,7 @@ export class StaffUserService {
         const rows = Array.isArray(raw) ? raw : [];
         return rows
           .map((row) => normalizeStaff(row))
-          .filter((u) => u.role !== 'customer' && u.name);
+          .filter((u) => isAdminStaff(u) && u.name);
       }),
     );
   }
@@ -50,6 +53,14 @@ function normalizeStaff(raw: unknown): StaffUser {
     mobile: row['mobile'] == null ? undefined : String(row['mobile'] ?? row['phone']),
     role: row['role'] == null ? undefined : String(row['role']),
   };
+}
+
+/** Admin portal staff only — excludes customers and app-only authenticated users. */
+function isAdminStaff(user: StaffUser): boolean {
+  const role = String(user.role ?? '')
+    .trim()
+    .toLowerCase();
+  return role === 'admin';
 }
 
 function pickEmployeeCode(

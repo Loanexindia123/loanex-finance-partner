@@ -1,0 +1,119 @@
+<app-page-header
+  title="Employee Profile"
+  subtitle="Read-only preview of the onboarding record"
+  backLink="/employees"
+  backLabel="Back to Employees"
+>
+  <button
+    actions
+    *appCan="'users.edit'"
+    pButton
+    type="button"
+    icon="pi pi-pencil"
+    label="Continue Onboarding"
+    (click)="edit()"
+  ></button>
+</app-page-header>
+
+@if (loading()) {
+  <app-branded-loader message="Loading profile..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (employee(); as emp) {
+  <div class="profile-head">
+    <div>
+      <h2>{{ emp.fullName || 'Untitled draft' }}</h2>
+      <p>{{ emp.employeeId }} · {{ emp.designation || 'No designation' }} · {{ emp.department || 'No department' }}</p>
+    </div>
+    <app-status-badge [status]="emp.formStatus" />
+  </div>
+
+  <div class="review-grid">
+    <section class="review-card">
+      <h3>Created By</h3>
+      <dl>
+        <div><dt>Onboarded By</dt><dd>{{ display(emp.onboardedBy) }}</dd></div>
+        <div><dt>Employee ID</dt><dd>{{ display(emp.employeeId) }}</dd></div>
+        <div><dt>Onboarding Date</dt><dd>{{ display(emp.onboardingDate) }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="review-card">
+      <h3>Personal Details</h3>
+      <dl>
+        <div><dt>Full Name</dt><dd>{{ display(emp.fullName) }}</dd></div>
+        <div><dt>Father / Husband</dt><dd>{{ display(emp.fatherHusbandName) }}</dd></div>
+        <div><dt>Date of Birth</dt><dd>{{ display(emp.dateOfBirth) }}</dd></div>
+        <div><dt>Mobile</dt><dd>{{ display(emp.mobile) }}</dd></div>
+        <div><dt>WhatsApp</dt><dd>{{ display(emp.whatsapp) }}</dd></div>
+        <div><dt>Email</dt><dd>{{ display(emp.email) }}</dd></div>
+        <div><dt>Gender</dt><dd>{{ display(emp.gender) }}</dd></div>
+        <div><dt>Marital Status</dt><dd>{{ display(emp.maritalStatus) }}</dd></div>
+        <div><dt>Emergency Contact</dt><dd>{{ display(emp.emergencyContact) }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="review-card">
+      <h3>Job &amp; Reporting</h3>
+      <dl>
+        <div><dt>Department</dt><dd>{{ display(emp.department) }}</dd></div>
+        <div><dt>Designation</dt><dd>{{ display(emp.designation) }}</dd></div>
+        <div><dt>Employment Type</dt><dd>{{ display(emp.employmentType) }}</dd></div>
+        <div><dt>Date of Joining</dt><dd>{{ display(emp.dateOfJoining) }}</dd></div>
+        <div><dt>Branch</dt><dd>{{ display(emp.branch) }}</dd></div>
+        <div><dt>Work Mode</dt><dd>{{ display(emp.workMode) }}</dd></div>
+        <div><dt>Reporting Person</dt><dd>{{ display(emp.reportingPerson) }}</dd></div>
+        <div><dt>Reporting ID</dt><dd>{{ display(emp.reportingPersonId) }}</dd></div>
+        <div><dt>Reporting Post</dt><dd>{{ display(emp.reportingPersonPost) }}</dd></div>
+        <div><dt>Shift</dt><dd>{{ display(emp.shift) }}</dd></div>
+        <div><dt>Probation</dt><dd>{{ display(emp.probationPeriod) }}</dd></div>
+        <div><dt>Notice Period</dt><dd>{{ display(emp.noticePeriod) }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="review-card">
+      <h3>Salary Structure</h3>
+      <dl>
+        <div><dt>Monthly CTC</dt><dd>{{ inr(emp.monthlyCtc) }}</dd></div>
+        <div><dt>Basic</dt><dd>{{ inr(emp.basicSalary) }}</dd></div>
+        <div><dt>HRA</dt><dd>{{ inr(emp.hra) }}</dd></div>
+        <div><dt>Conveyance</dt><dd>{{ inr(emp.conveyanceAllowance) }}</dd></div>
+        <div><dt>Special Allowance</dt><dd>{{ inr(emp.specialAllowance) }}</dd></div>
+        <div><dt>Other Allowance</dt><dd>{{ inr(emp.otherAllowance) }}</dd></div>
+        <div><dt>Fixed Gross</dt><dd>{{ inr(emp.fixedGrossSalary) }}</dd></div>
+        <div><dt>Variable</dt><dd>{{ inr(emp.variableIncentive) }}</dd></div>
+        <div><dt>Total CTC</dt><dd>{{ inr(emp.totalMonthlyCtc) }}</dd></div>
+        <div><dt>PF Applicable</dt><dd>{{ display(emp.pfApplicable) }}</dd></div>
+        <div><dt>ESI Applicable</dt><dd>{{ display(emp.esiApplicable) }}</dd></div>
+        <div><dt>Other Deduction</dt><dd>{{ inr(emp.otherDeduction) }}</dd></div>
+        <div><dt>Net Take-Home</dt><dd>{{ inr(emp.netTakeHome) }}</dd></div>
+        <div><dt>Effective From</dt><dd>{{ display(emp.salaryEffectiveFrom) }}</dd></div>
+        <div><dt>Payment Mode</dt><dd>{{ display(emp.paymentMode) }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="review-card">
+      <h3>Documents &amp; Verification</h3>
+      <dl>
+        @for (doc of documentFields; track doc.key) {
+          <div>
+            <dt>{{ doc.label }}</dt>
+            <dd>{{ hasDocument(emp, doc.key) ? 'Uploaded' : '—' }}</dd>
+          </div>
+        }
+      </dl>
+    </section>
+
+    <section class="review-card">
+      <h3>Bank &amp; Statutory</h3>
+      <dl>
+        <div><dt>Account Holder</dt><dd>{{ display(emp.accountHolderName) }}</dd></div>
+        <div><dt>Account Number</dt><dd>{{ display(emp.accountNumber) }}</dd></div>
+        <div><dt>IFSC</dt><dd>{{ display(emp.ifscCode) }}</dd></div>
+        <div><dt>UAN</dt><dd>{{ display(emp.uanNumber) }}</dd></div>
+        <div><dt>ESIC</dt><dd>{{ display(emp.esicNumber) }}</dd></div>
+        <div><dt>Verification</dt><dd>{{ display(emp.verificationStatus) }}</dd></div>
+      </dl>
+    </section>
+  </div>
+}

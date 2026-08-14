@@ -123,8 +123,12 @@ export class DealerList {
         d.ownerName,
         d.mobile,
         d.email,
+        d.whatsapp,
         d.branch,
         d.dealerBranch,
+        d.gstNumber,
+        d.paymentCycle,
+        d.paymentSettlementTerms,
       ]
         .join(' ')
         .toLowerCase();

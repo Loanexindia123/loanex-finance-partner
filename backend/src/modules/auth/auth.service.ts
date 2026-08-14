@@ -22,6 +22,9 @@ import { comparePassword, hashPassword } from '../../common/utils/password';
 import { generateOtp, getOtpExpiryDate } from '../../common/utils/otp';
 import {
   AdminLoginBody,
+  AdminForgotPasswordBody,
+  AdminResetPasswordBody,
+  AdminVerifyResetOtpBody,
   ChangePasswordBody,
   CompleteRegistrationBody,
   ForgotPasswordBody,
@@ -59,6 +62,18 @@ function resolveRbacInfo(user: any) {
     return { roleId: null, roleName: 'Super Admin', permissions: [...SUPER_ADMIN_PERMISSIONS] };
   }
   return { roleId: null, roleName: null, permissions: [] };
+}
+
+/** Staff portal accounts only — excludes customers / app-only users. */
+function isStaffAccount(user: any): boolean {
+  if (!user) return false;
+  return String(user.role ?? '') === 'admin' || Boolean(user.role_id ?? user.roleId);
+}
+
+function maskMobile(mobile: string): string {
+  const digits = String(mobile ?? '').replace(/\D/g, '');
+  if (digits.length < 4) return '****';
+  return `${digits.slice(0, 2)}******${digits.slice(-2)}`;
 }
 
 /**
@@ -145,6 +160,7 @@ function toPublicUser(user: any) {
     roleId: rbac.roleId,
     roleName: rbac.roleName,
     permissions: rbac.permissions,
+    mustChangePassword: Boolean(user.mustChangePassword),
     createdAt: user.createdAt ?? user.created_at ?? new Date(),
     updatedAt: user.updatedAt ?? user.updated_at ?? new Date(),
   };
@@ -319,6 +335,7 @@ export class AuthService {
         roleId: rbac.roleId,
         roleName: rbac.roleName,
         permissions: rbac.permissions,
+        mustChangePassword: Boolean(user.mustChangePassword),
         created_at: user.created_at,
         updated_at: user.updated_at,
       },
@@ -631,6 +648,103 @@ export class AuthService {
     };
   }
 
+  /**
+   * Admin/Employee forgot password — reuses the existing Authkey OTP pipeline.
+   * Only staff accounts (role admin or assigned role_id) are eligible.
+   * Customers are ignored with a generic response (no enumeration).
+   */
+  async adminForgotPassword(input: AdminForgotPasswordBody) {
+    const genericMessage =
+      'If an eligible staff account matches, an OTP has been sent to the registered mobile number.';
+
+    const resolved = await this.resolveStaffUserForPasswordReset(input.identifier);
+    if (!resolved?.mobile) {
+      return {
+        otpSent: false,
+        mobile: '',
+        mobileMasked: '',
+        expiresInMinutes: env.OTP_EXPIRES_MINUTES,
+        resendCooldownSeconds: env.OTP_RESEND_COOLDOWN_SECONDS,
+        message: genericMessage,
+      };
+    }
+
+    await this.sendAuthkeyOtp(resolved.mobile, OtpPurpose.FORGOT_PASSWORD, resolved.user.id);
+
+    return {
+      otpSent: true,
+      mobile: resolved.mobile,
+      mobileMasked: maskMobile(resolved.mobile),
+      expiresInMinutes: env.OTP_EXPIRES_MINUTES,
+      resendCooldownSeconds: env.OTP_RESEND_COOLDOWN_SECONDS,
+      message: genericMessage,
+    };
+  }
+
+  /** Verify OTP for admin reset without consuming it (same as existing FORGOT_PASSWORD verify). */
+  async adminVerifyResetOtp(input: AdminVerifyResetOtpBody) {
+    const user = await authRepository.findByMobile(input.mobile);
+    if (!user || !isStaffAccount(user)) {
+      throw new BadRequestError('Invalid or expired OTP');
+    }
+
+    const otpHash = hashToken(input.otp);
+    const otpRecord = await authRepository.findValidOtp(
+      input.mobile,
+      OtpPurpose.FORGOT_PASSWORD,
+      otpHash,
+    );
+    if (!otpRecord) {
+      throw new BadRequestError('Invalid or expired OTP');
+    }
+
+    return {
+      verified: true,
+      mobile: input.mobile,
+      message: 'OTP verified. You may reset your password.',
+    };
+  }
+
+  /** Staff-only password reset using the existing OTP records. */
+  async adminResetPassword(input: AdminResetPasswordBody) {
+    if (!/^\d{6}$/.test(input.otp)) {
+      throw new BadRequestError('OTP must be a 6-digit code.');
+    }
+
+    const otpHash = hashToken(input.otp);
+    const record = await authRepository.findValidOtp(
+      input.mobile,
+      OtpPurpose.FORGOT_PASSWORD,
+      otpHash,
+    );
+    const otpRecord =
+      record ??
+      (await authRepository.findValidOtp(input.mobile, OtpPurpose.RESET_PASSWORD, otpHash));
+
+    if (!otpRecord) {
+      throw new BadRequestError('Invalid or expired OTP');
+    }
+
+    const user = await authRepository.findByMobile(input.mobile);
+    if (!user || !isStaffAccount(user)) {
+      throw new BadRequestError('Invalid or expired OTP');
+    }
+
+    const passwordHash = await hashPassword(input.newPassword);
+    await authRepository.updateUser(user.id, {
+      encryptedPassword: passwordHash,
+      mustChangePassword: false,
+    });
+    await authRepository.markOtpUsed(otpRecord.id);
+    await authRepository.invalidateOtps(input.mobile, OtpPurpose.FORGOT_PASSWORD);
+    await authRepository.deleteUserRefreshTokens(user.id);
+
+    return {
+      reset: true,
+      message: 'Password reset successfully.',
+    };
+  }
+
   async resetPassword(input: ResetPasswordBody) {
     if (!/^\d{6}$/.test(input.otp)) {
       throw new BadRequestError('OTP must be a 6-digit code.');
@@ -661,7 +775,10 @@ export class AuthService {
     }
 
     const passwordHash = await hashPassword(input.newPassword);
-    await authRepository.updateUser(user.id, { encryptedPassword: passwordHash });
+    await authRepository.updateUser(user.id, {
+      encryptedPassword: passwordHash,
+      mustChangePassword: false,
+    });
     await authRepository.markOtpUsed(otpRecord.id);
     await authRepository.invalidateOtps(input.mobile, OtpPurpose.FORGOT_PASSWORD);
     await authRepository.deleteUserRefreshTokens(user.id);
@@ -670,6 +787,60 @@ export class AuthService {
       reset: true,
       message: 'Password reset successful. Please log in with your new password.',
     };
+  }
+
+  /**
+   * Resolve a staff portal user from Employee ID or registered mobile.
+   * Customers / non-staff matches return null (caller uses generic messaging).
+   */
+  private async resolveStaffUserForPasswordReset(
+    identifier: string,
+  ): Promise<{ user: any; mobile: string } | null> {
+    const raw = String(identifier ?? '').trim();
+    if (!raw) return null;
+
+    const mobileCandidate = raw.replace(/\D/g, '');
+    if (/^[6-9]\d{9}$/.test(mobileCandidate)) {
+      const user = await authRepository.findByMobile(mobileCandidate);
+      if (!user || !isStaffAccount(user)) return null;
+      const mobile = String(user.phone ?? mobileCandidate).trim();
+      return mobile ? { user, mobile } : null;
+    }
+
+    // Employee ID path — Employee Master → linked user / mobile.
+    await jsonDb.ensureCollection('employees');
+    const codeKey = raw.toLowerCase();
+    const employees = jsonDb.findMany('employees', {}) as any[];
+    const employee = employees.find(
+      (row) => String(row.employeeId ?? '').trim().toLowerCase() === codeKey,
+    );
+    if (!employee) return null;
+
+    let user: any = null;
+    const linkedUserId = String(employee.userId ?? '').trim();
+    if (linkedUserId) {
+      user = await authRepository.findById(linkedUserId);
+    }
+    const empMobile = String(employee.mobile ?? '')
+      .replace(/\D/g, '')
+      .trim();
+    if (!user && /^[6-9]\d{9}$/.test(empMobile)) {
+      user = await authRepository.findByMobile(empMobile);
+    }
+    const empEmail = String(employee.email ?? '')
+      .trim()
+      .toLowerCase();
+    if (!user && empEmail) {
+      user = await authRepository.findByEmail(empEmail);
+    }
+    if (!user || !isStaffAccount(user)) return null;
+
+    const mobile =
+      String(user.phone ?? '')
+        .replace(/\D/g, '')
+        .trim() || empMobile;
+    if (!/^[6-9]\d{9}$/.test(mobile)) return null;
+    return { user, mobile };
   }
 
   async changePassword(userId: string, input: ChangePasswordBody) {
@@ -701,11 +872,15 @@ export class AuthService {
     }
 
     const newPasswordHash = await hashPassword(input.newPassword);
-    await authRepository.updateUser(user.id, { encryptedPassword: newPasswordHash });
+    await authRepository.updateUser(user.id, {
+      encryptedPassword: newPasswordHash,
+      mustChangePassword: false,
+    });
     await authRepository.deleteUserRefreshTokens(user.id);
 
     return {
       changed: true,
+      mustChangePassword: false,
       message: 'Password changed successfully. Please log in again with your new password.',
     };
   }

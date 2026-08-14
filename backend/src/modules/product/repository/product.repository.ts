@@ -38,34 +38,77 @@ export class ProductRepository {
     };
   }
 
-  async list(reqQuery: ListProductsQuery) {
-    const cacheKey = JSON.stringify(reqQuery ?? {});
+  async list(
+    reqQuery: ListProductsQuery,
+    options?: {
+      forceCustomerVisible?: boolean;
+      /** When set, restrict to these creatorIds before search/pagination. */
+      allowedCreatorIds?: Set<string>;
+    },
+  ) {
+    const effectiveQuery: ListProductsQuery = options?.forceCustomerVisible
+      ? { ...reqQuery, status: undefined }
+      : reqQuery;
+    const creatorKey =
+      options?.allowedCreatorIds != null
+        ? [...options.allowedCreatorIds].sort().join(',')
+        : '';
+    const cacheKey = JSON.stringify({
+      ...effectiveQuery,
+      forceCustomerVisible: !!options?.forceCustomerVisible,
+      allowedCreatorIds: creatorKey,
+    });
     await jsonDb.refreshCatalogThrottled();
     const cached = listCache.get(cacheKey);
     if (cached && cached.expires > Date.now()) {
       return cached.value;
     }
 
-    const page = Number(reqQuery.page) || 1;
-    const limit = Math.min(Number(reqQuery.limit) || 12, 500);
+    const page = Number(effectiveQuery.page) || 1;
+    const limit = Math.min(Number(effectiveQuery.limit) || 12, 500);
     const offset = (page - 1) * limit;
 
     let rows = jsonDb.getCollection('products').slice();
-    if (reqQuery.status && reqQuery.status !== 'all') {
-      rows = rows.filter((p: any) => p.status === reqQuery.status);
-    } else if (!reqQuery.status) {
+
+    // Employee hierarchy scope: apply BEFORE search / filters / pagination.
+    // Customer catalog (forceCustomerVisible) never receives this option.
+    if (options?.allowedCreatorIds) {
+      const allowed = options.allowedCreatorIds;
+      rows = rows.filter((p: any) => {
+        const owner = String(p.creatorId ?? '').trim();
+        return !!owner && allowed.has(owner);
+      });
+    }
+
+    if (options?.forceCustomerVisible) {
+      rows = rows.filter((p: any) => p.status === 'active');
+    } else if (effectiveQuery.status && effectiveQuery.status !== 'all') {
+      rows = rows.filter((p: any) => p.status === effectiveQuery.status);
+    } else if (!effectiveQuery.status) {
       rows = rows.filter((p: any) => p.status === 'active');
     }
 
-    // Hide incomplete wizard placeholders from the customer catalog.
-    rows = applyCustomerCatalogVisibility(rows, reqQuery);
+    // Hide incomplete wizard placeholders / non-published from the customer catalog.
+    rows = applyCustomerCatalogVisibility(rows, effectiveQuery, {
+      forceCustomerVisible: options?.forceCustomerVisible,
+    });
 
     if (reqQuery.search) {
       const s = reqQuery.search.toLowerCase();
-      rows = rows.filter(
-        (p: any) =>
-          p.name?.toLowerCase().includes(s) || p.brand?.toLowerCase().includes(s),
-      );
+      rows = rows.filter((p: any) => {
+        const name = String(p.name ?? '').toLowerCase();
+        const brand = String(p.brand ?? '').toLowerCase();
+        const sku = String(p.sku ?? '').toLowerCase();
+        const barcode = String(p.barcode ?? '').toLowerCase();
+        const productType = String(p.productType ?? '').toLowerCase();
+        return (
+          name.includes(s) ||
+          brand.includes(s) ||
+          sku.includes(s) ||
+          barcode.includes(s) ||
+          productType.includes(s)
+        );
+      });
     }
 
     if (reqQuery.brand) {

@@ -12,6 +12,31 @@
     (click)="back()"
   ></button>
   <div actions>
+    @if (isPendingApproval() && canApproveProducts()) {
+      <button
+        *appCan="'products.edit'"
+        pButton
+        type="button"
+        icon="pi pi-check"
+        label="Approve"
+        severity="success"
+        [disabled]="!product() || deciding() !== null"
+        [loading]="deciding() === 'approve'"
+        (click)="confirmApprove()"
+      ></button>
+      <button
+        *appCan="'products.edit'"
+        pButton
+        type="button"
+        icon="pi pi-times"
+        label="Reject"
+        severity="danger"
+        [outlined]="true"
+        [disabled]="!product() || deciding() !== null"
+        [loading]="deciding() === 'reject'"
+        (click)="confirmReject()"
+      ></button>
+    }
     <button
       *appCan="'products.edit'"
       pButton

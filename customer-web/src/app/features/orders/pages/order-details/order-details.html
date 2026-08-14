@@ -585,6 +585,82 @@
 
       </div>
 
+      @if (showAutoEmiCard()) {
+        <section class="lx-od__section lx-od__auto-emi" aria-labelledby="lx-od-auto-emi-title">
+          <h2 id="lx-od-auto-emi-title">Auto EMI</h2>
+
+          @if (isAutoEmiActiveView()) {
+            <p class="lx-od__auto-emi-status is-active" role="status">Auto EMI Active</p>
+            @if (autopayStatus(); as ap) {
+              <dl class="lx-od__emi">
+                <div>
+                  <dt>Monthly EMI</dt>
+                  <dd>{{ formatMoney(ap.loan.emiAmount) }}</dd>
+                </div>
+                <div>
+                  <dt>Next EMI Date</dt>
+                  <dd>{{ formatDeliveryDate(ap.loan.nextEmiDueDate) }}</dd>
+                </div>
+              </dl>
+            }
+            <a routerLink="/my-emi/autopay" class="lx-btn lx-btn--outline">Manage Auto EMI</a>
+          } @else if (autoEmiPhase() === 'confirming' || autoEmiPhase() === 'pending_timeout') {
+            <p class="lx-od__auto-emi-status is-pending" role="status">
+              {{
+                autoEmiPhase() === 'pending_timeout'
+                  ? 'Auto EMI setup is still being confirmed.'
+                  : 'Auto EMI setup is being confirmed.'
+              }}
+            </p>
+            <div class="lx-od__auto-emi-actions">
+              @if (approvalUrl() || autopayStatus()?.mandate?.approvalUrl) {
+                <button type="button" class="lx-btn lx-btn--primary" (click)="openPendingApproval()">
+                  Continue Bank Authorization
+                </button>
+              }
+              <button type="button" class="lx-btn lx-btn--outline" (click)="refreshAutoEmiStatus()">
+                Refresh Status
+              </button>
+              <button
+                type="button"
+                class="lx-btn lx-btn--outline"
+                [disabled]="autopaySubmitting()"
+                (click)="retryAutoEmi()"
+              >
+                Retry Auto EMI Setup
+              </button>
+            </div>
+          } @else if (autoEmiPhase() === 'incomplete') {
+            <p class="lx-od__auto-emi-status is-fail" role="status">
+              Auto EMI setup was not completed.
+            </p>
+            <button
+              type="button"
+              class="lx-btn lx-btn--primary"
+              [class.is-loading]="autopaySubmitting()"
+              [disabled]="autopaySubmitting()"
+              (click)="retryAutoEmi()"
+            >
+              Retry Auto EMI Setup
+            </button>
+          } @else {
+            <p class="lx-od__dialog-copy">
+              Your down payment was successful. Complete bank authorization to enable automatic
+              monthly EMI payments.
+            </p>
+            <button
+              type="button"
+              class="lx-btn lx-btn--primary"
+              [class.is-loading]="autopaySubmitting()"
+              [disabled]="autopaySubmitting()"
+              (click)="setupAutoEmi()"
+            >
+              Set Up Auto EMI
+            </button>
+          }
+        </section>
+      }
+
     }
 
   </section>
@@ -595,7 +671,7 @@
 
 <p-dialog
   styleClass="lx-dialog"
-  header="Enable AutoPay?"
+  [header]="dialogHeader()"
   [modal]="true"
   [draggable]="false"
   [resizable]="false"
@@ -604,28 +680,93 @@
   [visible]="showAutopayDialog()"
   (visibleChange)="showAutopayDialog.set($event)"
 >
-  <p class="lx-od__dialog-copy">
-    Enable AutoPay to automatically pay your monthly EMIs on the due date.
-  </p>
-
-  <div class="lx-od__dialog-actions">
-    <button
-      type="button"
-      class="lx-btn lx-btn--outline"
-      [disabled]="autopaySubmitting()"
-      (click)="dismissAutopay()"
-    >
-      Maybe Later
-    </button>
-    <button
-      type="button"
-      class="lx-btn lx-btn--primary"
-      [class.is-loading]="autopaySubmitting()"
-      [disabled]="autopaySubmitting()"
-      (click)="enableAutopay()"
-    >
-      Enable AutoPay
-    </button>
-  </div>
+  @if (autoEmiPhase() === 'active') {
+    <p class="lx-od__dialog-copy" role="status">Auto EMI Active</p>
+    <div class="lx-od__dialog-actions">
+      <a routerLink="/my-emi/autopay" class="lx-btn lx-btn--primary" (click)="dismissAutopay()">
+        View Auto EMI
+      </a>
+      <button type="button" class="lx-btn lx-btn--outline" (click)="dismissAutopay()">Close</button>
+    </div>
+  } @else if (autoEmiPhase() === 'confirming' || autoEmiPhase() === 'opening') {
+    <p class="lx-od__dialog-copy" role="status">Auto EMI setup is being confirmed.</p>
+    @if (popupBlocked()) {
+      <p class="lx-od__dialog-copy">
+        Your browser blocked the authorization window. Use the button below to continue.
+      </p>
+    }
+    <div class="lx-od__dialog-actions">
+      @if (approvalUrl()) {
+        <button type="button" class="lx-btn lx-btn--primary" (click)="openPendingApproval()">
+          Continue Bank Authorization
+        </button>
+      }
+      <button type="button" class="lx-btn lx-btn--outline" (click)="refreshAutoEmiStatus()">
+        Refresh Status
+      </button>
+      <button type="button" class="lx-btn lx-btn--outline" (click)="dismissAutopay()">Close</button>
+    </div>
+  } @else if (autoEmiPhase() === 'pending_timeout') {
+    <p class="lx-od__dialog-copy" role="status">
+      Auto EMI setup is still being confirmed. You can refresh status, continue authorization, or
+      retry setup.
+    </p>
+    <div class="lx-od__dialog-actions">
+      @if (approvalUrl() || autopayStatus()?.mandate?.approvalUrl) {
+        <button type="button" class="lx-btn lx-btn--primary" (click)="openPendingApproval()">
+          Continue Bank Authorization
+        </button>
+      }
+      <button type="button" class="lx-btn lx-btn--outline" (click)="refreshAutoEmiStatus()">
+        Refresh Status
+      </button>
+      <button
+        type="button"
+        class="lx-btn lx-btn--outline"
+        [disabled]="autopaySubmitting()"
+        (click)="retryAutoEmi()"
+      >
+        Retry Auto EMI Setup
+      </button>
+    </div>
+  } @else if (autoEmiPhase() === 'incomplete') {
+    <p class="lx-od__dialog-copy" role="status">Auto EMI setup was not completed.</p>
+    <div class="lx-od__dialog-actions">
+      <button
+        type="button"
+        class="lx-btn lx-btn--primary"
+        [class.is-loading]="autopaySubmitting()"
+        [disabled]="autopaySubmitting()"
+        (click)="retryAutoEmi()"
+      >
+        Retry Auto EMI Setup
+      </button>
+      <button type="button" class="lx-btn lx-btn--outline" (click)="dismissAutopay()">Close</button>
+    </div>
+  } @else {
+    <p class="lx-od__dialog-copy">
+      Your down payment was successful. Complete bank authorization to enable automatic monthly EMI
+      payments.
+    </p>
+    <div class="lx-od__dialog-actions">
+      <button
+        type="button"
+        class="lx-btn lx-btn--outline"
+        [disabled]="autopaySubmitting()"
+        (click)="dismissAutopay()"
+      >
+        Maybe Later
+      </button>
+      <button
+        type="button"
+        class="lx-btn lx-btn--primary"
+        [class.is-loading]="autopaySubmitting()"
+        [disabled]="autopaySubmitting()"
+        (click)="setupAutoEmi()"
+      >
+        Set Up Auto EMI
+      </button>
+    </div>
+  }
 </p-dialog>
 

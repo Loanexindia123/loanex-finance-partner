@@ -1,14 +1,16 @@
 import { api } from '../lib/apiClient';
 import { WishlistItem, Product } from '../types';
+import { withResolvedProductImages } from '../utils/mediaUrl';
 
 function mapProduct(p: any): Product {
+  const resolved = withResolvedProductImages({ ...(p || {}) });
   return {
-    ...p,
-    image: p.image || p.imageUrl || '',
-    originalPrice: p.originalPrice || p.mrp || p.price,
-    price: p.discountPrice || p.price,
-    reviews: p.reviewCount || p.totalReviews || p.reviews || 0,
-    rating: p.averageRating || p.rating || 0,
+    ...resolved,
+    image: resolved.image || resolved.imageUrl || '',
+    originalPrice: resolved.originalPrice || resolved.mrp || resolved.price,
+    price: resolved.discountPrice || resolved.price,
+    reviews: resolved.reviewCount || resolved.totalReviews || resolved.reviews || 0,
+    rating: resolved.averageRating || resolved.rating || 0,
   } as Product;
 }
 

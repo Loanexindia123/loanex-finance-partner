@@ -3,11 +3,13 @@ import { CurrencyPipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ButtonModule } from 'primeng/button';
+import { ConfirmationService, MessageService } from 'primeng/api';
 import { PageHeader } from '../../../../shared/components/page-header/page-header';
 import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
 import { ErrorState } from '../../../../shared/components/error-state/error-state';
 import { StatusBadge } from '../../../../shared/components/status-badge/status-badge';
 import { CanDirective } from '../../../../shared/directives/can.directive';
+import { AuthService } from '../../../../core/services/auth.service';
 import { ProductService } from '../../services/product.service';
 import {
   Category,
@@ -48,8 +50,11 @@ interface DetailSection {
 })
 export class ProductDetail {
   private readonly products = inject(ProductService);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly messages = inject(MessageService);
+  private readonly confirmation = inject(ConfirmationService);
 
   readonly productId = this.route.snapshot.paramMap.get('id')!;
   readonly loading = signal(true);
@@ -57,6 +62,18 @@ export class ProductDetail {
   readonly product = signal<Product | null>(null);
   readonly categories = signal<Category[]>([]);
   readonly activeImage = signal(0);
+  readonly deciding = signal<'approve' | 'reject' | null>(null);
+
+  readonly isPendingApproval = computed(
+    () => String(this.product()?.status ?? '').toLowerCase() === 'pending_approval',
+  );
+
+  readonly canApproveProducts = computed(() => {
+    const role = String(this.auth.user()?.roleName ?? '')
+      .trim()
+      .toLowerCase();
+    return role !== 'employee';
+  });
 
   readonly gallery = computed(() => {
     const product = this.product();
@@ -300,6 +317,76 @@ export class ProductDetail {
 
   edit(): void {
     this.router.navigate(['/products', this.productId]);
+  }
+
+  confirmApprove(): void {
+    if (!this.isPendingApproval() || this.deciding()) return;
+    this.confirmation.confirm({
+      header: 'Approve Product?',
+      message: 'Approve this product and make it visible to customers?',
+      acceptLabel: 'Approve',
+      rejectLabel: 'Cancel',
+      acceptButtonStyleClass: 'p-button-success',
+      accept: () => this.approve(),
+    });
+  }
+
+  confirmReject(): void {
+    if (!this.isPendingApproval() || this.deciding()) return;
+    this.confirmation.confirm({
+      header: 'Reject Product?',
+      message: 'Reject this product? It will remain hidden from customers.',
+      acceptLabel: 'Reject',
+      rejectLabel: 'Cancel',
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => this.reject(),
+    });
+  }
+
+  private approve(): void {
+    this.deciding.set('approve');
+    this.products.approve(this.productId).subscribe({
+      next: (updated) => {
+        this.product.set(updated);
+        this.deciding.set(null);
+        this.messages.add({
+          severity: 'success',
+          summary: 'Product approved',
+          detail: 'Product is now visible to customers.',
+        });
+      },
+      error: (err: unknown) => {
+        this.deciding.set(null);
+        this.messages.add({
+          severity: 'error',
+          summary: 'Approval failed',
+          detail: this.extractMessage(err),
+        });
+      },
+    });
+  }
+
+  private reject(): void {
+    this.deciding.set('reject');
+    this.products.reject(this.productId).subscribe({
+      next: (updated) => {
+        this.product.set(updated);
+        this.deciding.set(null);
+        this.messages.add({
+          severity: 'success',
+          summary: 'Product rejected',
+          detail: 'Product remains hidden from customers.',
+        });
+      },
+      error: (err: unknown) => {
+        this.deciding.set(null);
+        this.messages.add({
+          severity: 'error',
+          summary: 'Rejection failed',
+          detail: this.extractMessage(err),
+        });
+      },
+    });
   }
 
   private extractMessage(err: unknown): string {

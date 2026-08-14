@@ -2,7 +2,6 @@ import {
   EmiPlanEntry,
   ProductVariant,
   ProductWizardData,
-  SupplierEntry,
   formatDealerPaymentSchedule,
 } from '../models/product.models';
 
@@ -140,11 +139,6 @@ export function computeCompleteness(form: ProductWizardData): CompletenessSectio
     form.shortDescription || form.description,
   ];
   const pricingFields = [form.mrp, form.sellingPrice, form.purchasePrice, form.gst];
-  const inventoryFields = [form.warehouse, form.availableStock || form.openingStock];
-  const supplierFields = form.suppliers.flatMap((s: SupplierEntry) => [
-    s.dealer || s.supplier,
-    s.paymentTerms,
-  ]);
   const deliveryFields = [form.weight, form.deliveryDays, form.dispatchSla];
   const seoFields = [form.slug, form.metaTitle, form.metaDescription];
 
@@ -170,14 +164,6 @@ export function computeCompleteness(form: ProductWizardData): CompletenessSectio
     { key: 'pricing', label: 'Pricing', percent: score(pricingFields.filter(Boolean).length, pricingFields.length) },
     { key: 'variants', label: 'Variants', percent: variantsPercent },
     { key: 'images', label: 'Images', percent: imageCount > 0 ? 100 : 0 },
-    { key: 'inventory', label: 'Inventory', percent: score(inventoryFields.filter(Boolean).length, inventoryFields.length) },
-    {
-      key: 'supplier',
-      label: 'Dealer',
-      percent: supplierFields.filter(Boolean).length
-        ? score(supplierFields.filter(Boolean).length, Math.max(supplierFields.length, 2))
-        : 0,
-    },
     { key: 'delivery', label: 'Delivery', percent: score(deliveryFields.filter(Boolean).length, deliveryFields.length) },
     { key: 'emi', label: 'EMI', percent: emiPercent },
     { key: 'seo', label: 'SEO', percent: score(seoFields.filter(Boolean).length, seoFields.length) },

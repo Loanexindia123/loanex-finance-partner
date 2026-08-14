@@ -19,21 +19,54 @@
       type="button"
       severity="secondary"
       [outlined]="true"
-      icon="pi pi-save"
-      label="Save Draft"
+      icon="pi pi-eye"
+      label="Preview"
       [disabled]="submitting()"
-      [loading]="submittingKind() === 'draft'"
-      (click)="save('draft')"
+      (click)="openPreview()"
     ></button>
-    <button
-      pButton
-      type="button"
-      icon="pi pi-check"
-      label="Publish Product"
-      [disabled]="submitting()"
-      [loading]="submittingKind() === 'active'"
-      (click)="save('active')"
-    ></button>
+    @if (isEdit) {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        icon="pi pi-save"
+        label="Save Draft"
+        [disabled]="submitting()"
+        [loading]="submittingKind() === 'draft'"
+        (click)="save('draft')"
+      ></button>
+      <button
+        pButton
+        type="button"
+        icon="pi pi-check"
+        label="Publish Product"
+        [disabled]="submitting()"
+        [loading]="submittingKind() === 'active'"
+        (click)="save('active')"
+      ></button>
+    } @else {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        icon="pi pi-save"
+        label="Save Draft"
+        [disabled]="submitting()"
+        [loading]="submittingKind() === 'draft'"
+        (click)="save('draft')"
+      ></button>
+      <button
+        pButton
+        type="button"
+        icon="pi pi-send"
+        label="Save for Approval"
+        [disabled]="submitting()"
+        [loading]="submittingKind() === 'pending_approval'"
+        (click)="save('pending_approval')"
+      ></button>
+    }
   </div>
 </header>
 
@@ -93,23 +126,47 @@
               </div>
               <div class="field">
                 <label>Product Type</label>
-                <p-select
-                  [options]="productTypeOptions"
-                  formControlName="productType"
-                  optionLabel="label"
-                  optionValue="value"
-                  placeholder="Select type"
-                  [showClear]="true"
-                  appendTo="body"
-                  panelStyleClass="catalog-filter-panel"
-                  [checkmark]="false"
-                  scrollHeight="240px"
-                />
+                <div class="sku-row">
+                  <p-select
+                    [options]="selectOptions(form.get('productType')?.value, productTypeSelectOptions())"
+                    formControlName="productType"
+                    optionLabel="label"
+                    optionValue="value"
+                    [placeholder]="options.productTypesLoading() ? 'Loading types...' : (options.productTypes().length ? 'Select type' : 'No active types')"
+                    [showClear]="true"
+                    [filter]="true"
+                    filterBy="label"
+                    appendTo="body"
+                    panelStyleClass="catalog-filter-panel"
+                    [checkmark]="false"
+                    scrollHeight="240px"
+                    [disabled]="options.productTypesLoading()"
+                  />
+                  <button
+                    pButton
+                    type="button"
+                    [rounded]="true"
+                    severity="secondary"
+                    icon="pi pi-plus"
+                    label="Add"
+                    (click)="openAddProductType()"
+                  ></button>
+                </div>
+                @if (options.productTypesLoading()) {
+                  <small class="field-hint">Loading product types…</small>
+                } @else if (options.productTypesError()) {
+                  <small class="field-error">
+                    {{ options.productTypesError() }}
+                    <button type="button" class="linkish" (click)="options.reloadProductTypes()">Retry</button>
+                  </small>
+                } @else if (!options.productTypes().length) {
+                  <small class="field-hint">No active product types yet. Click Add to create one.</small>
+                }
               </div>
               <div class="field">
                 <label for="modelNumber">Model Number</label>
                 <input id="modelNumber" pInputText formControlName="modelNumber" placeholder="e.g. TN-X1-256" />
-                <small class="field-hint">Used to auto-generate SKU suffix (001, 002…)</small>
+                <small class="field-hint">Preferred for auto-generate SKU; Auto Generate also works without it.</small>
               </div>
               <div class="field">
                 <label for="sku">SKU <span class="req">*</span></label>
@@ -140,21 +197,35 @@
                 <input id="manufacturer" pInputText formControlName="manufacturer" placeholder="Manufacturer name" />
               </div>
               <div class="field">
-                <label>Country of Origin</label>
+                <label>Dealer</label>
                 <p-select
-                  [options]="selectOptions(form.get('countryOfOrigin')?.value, countryOptions)"
-                  formControlName="countryOfOrigin"
+                  [options]="basicDealerSelectOptions()"
+                  [ngModel]="primaryDealerId()"
+                  [ngModelOptions]="{standalone: true}"
+                  (ngModelChange)="onPrimaryDealerSelected($event)"
                   optionLabel="label"
                   optionValue="value"
-                  placeholder="Select country"
+                  [placeholder]="dealersLoading() ? 'Loading dealers...' : (dealerCatalog().length ? 'Select Dealer' : 'No dealers')"
+                  [showClear]="true"
                   [filter]="true"
                   filterBy="label"
-                  [showClear]="true"
                   appendTo="body"
-                  panelStyleClass="catalog-filter-panel"
+                  panelStyleClass="catalog-filter-panel dealer-select-panel"
                   [checkmark]="false"
                   scrollHeight="240px"
+                  [loading]="dealersLoading()"
+                  [disabled]="dealersLoading()"
                 />
+                @if (dealersLoading()) {
+                  <small class="field-hint">Loading dealers…</small>
+                } @else if (dealersError()) {
+                  <small class="field-error">
+                    {{ dealersError() }}
+                    <button type="button" class="linkish" (click)="reloadDealers()">Retry</button>
+                  </small>
+                } @else if (!dealerCatalog().length) {
+                  <small class="field-hint">No dealers available. Add dealers from Masters.</small>
+                }
               </div>
               <div class="field">
                 <label>Warranty</label>
@@ -214,6 +285,41 @@
               <p-toggleswitch formControlName="serialImeiTracking" inputId="serialImeiTracking" />
             </div>
 
+            <section class="section-card amazon-paste" aria-labelledby="amazon-paste-heading">
+              <div class="section-card__head">
+                <div>
+                  <h3 id="amazon-paste-heading">Product Details</h3>
+                  <p>Paste Amazon product information here. Auto Fill populates the existing fields below so you can review them before saving.</p>
+                </div>
+              </div>
+              <textarea
+                id="amazonPaste"
+                pTextarea
+                rows="10"
+                [ngModel]="amazonPaste()"
+                [ngModelOptions]="{standalone: true}"
+                (ngModelChange)="amazonPaste.set($event)"
+                placeholder="Paste Amazon product information here..."
+                [disabled]="amazonAnalyzing()"
+              ></textarea>
+              <div class="amazon-paste__actions">
+                <button
+                  pButton
+                  type="button"
+                  icon="pi pi-sparkles"
+                  label="Auto Fill Product Details"
+                  [loading]="amazonAnalyzing()"
+                  [disabled]="amazonAnalyzing() || !amazonPaste().trim()"
+                  (click)="autoFillFromAmazon()"
+                ></button>
+                @if (amazonFeedback(); as feedback) {
+                  <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
+                    {{ feedback.message }}
+                  </small>
+                }
+              </div>
+            </section>
+
             <div class="list-field">
               <label>Specifications</label>
               @for (spec of specificationsArr.controls; track $index; let i = $index) {
@@ -226,6 +332,52 @@
               <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add specification" (click)="addSpecification()"></button>
             </div>
 
+            <section class="section-card amazon-paste" aria-labelledby="about-this-item-heading">
+              <div class="section-card__head">
+                <div>
+                  <h3 id="about-this-item-heading">About this item</h3>
+                  <p>Paste Amazon's About this item section. Auto Fill creates editable entries below. This stays separate from Specifications and Features.</p>
+                </div>
+              </div>
+              <textarea
+                id="aboutThisItemPaste"
+                pTextarea
+                rows="8"
+                [ngModel]="aboutThisItemPaste()"
+                [ngModelOptions]="{standalone: true}"
+                (ngModelChange)="aboutThisItemPaste.set($event)"
+                placeholder="Paste About this item content here..."
+                [disabled]="aboutThisItemAnalyzing()"
+              ></textarea>
+              <div class="amazon-paste__actions">
+                <button
+                  pButton
+                  type="button"
+                  icon="pi pi-sparkles"
+                  label="Auto Fill About This Item"
+                  [loading]="aboutThisItemAnalyzing()"
+                  [disabled]="aboutThisItemAnalyzing() || !aboutThisItemPaste().trim()"
+                  (click)="autoFillAboutThisItem()"
+                ></button>
+                @if (aboutThisItemFeedback(); as feedback) {
+                  <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
+                    {{ feedback.message }}
+                  </small>
+                }
+              </div>
+            </section>
+
+            <div class="list-field">
+              <label>About this item</label>
+              @for (ctrl of aboutThisItemArr.controls; track $index; let i = $index) {
+                <div class="list-field__row list-field__row--about">
+                  <textarea pTextarea [formControl]="ctrl" rows="2" placeholder="About this item entry"></textarea>
+                  <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger" (click)="removeAt(aboutThisItemArr, i)"></button>
+                </div>
+              }
+              <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add item" (click)="addAboutThisItem()"></button>
+            </div>
+
             <div class="list-field">
               <label>Features</label>
               @for (ctrl of featuresArr.controls; track $index; let i = $index) {
@@ -236,6 +388,49 @@
               }
               <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add Feature" (click)="addFeature()"></button>
             </div>
+
+            <section class="section-card amazon-paste" aria-labelledby="box-contents-paste-heading">
+              <div class="section-card__head">
+                <div>
+                  <h3 id="box-contents-paste-heading">Amazon Box Contents</h3>
+                  <p>Paste the 'What's in the box' / 'Box Contents' section copied from Amazon.</p>
+                </div>
+              </div>
+              <textarea
+                id="boxContentsPaste"
+                pTextarea
+                rows="8"
+                [ngModel]="boxContentsPaste()"
+                [ngModelOptions]="{standalone: true}"
+                (ngModelChange)="boxContentsPaste.set($event)"
+                placeholder="What's in the box
+
+1 x Office Chair
+1 x Headrest
+1 x Armrest Set
+1 x Base
+1 x Caster Wheels
+1 x Installation Manual
+1 x Hardware Kit"
+                [disabled]="boxContentsAnalyzing()"
+              ></textarea>
+              <div class="amazon-paste__actions">
+                <button
+                  pButton
+                  type="button"
+                  icon="pi pi-sparkles"
+                  label="Auto Fill Box Contents"
+                  [loading]="boxContentsAnalyzing()"
+                  [disabled]="boxContentsAnalyzing() || !boxContentsPaste().trim()"
+                  (click)="autoFillBoxContents()"
+                ></button>
+                @if (boxContentsFeedback(); as feedback) {
+                  <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
+                    {{ feedback.message }}
+                  </small>
+                }
+              </div>
+            </section>
 
             <div class="list-field">
               <label>Box Contents</label>
@@ -438,6 +633,40 @@
                             </div>
                           </div>
 
+                          <section class="section-card amazon-paste" [attr.aria-labelledby]="'variant-amazon-' + variantId(ctrl)">
+                            <div class="section-card__head">
+                              <div>
+                                <h3 [id]="'variant-amazon-' + variantId(ctrl)">Product Details</h3>
+                                <p>Paste Amazon product information here. Auto Fill populates this variant’s fields below so you can review them before saving.</p>
+                              </div>
+                            </div>
+                            <textarea
+                              pTextarea
+                              rows="8"
+                              [ngModel]="variantAmazonPaste()[variantId(ctrl)] || ''"
+                              [ngModelOptions]="{standalone: true}"
+                              (ngModelChange)="setVariantPaste('amazon', variantId(ctrl), $event)"
+                              placeholder="Paste Amazon product information here..."
+                              [disabled]="!!variantAmazonAnalyzing()[variantId(ctrl)]"
+                            ></textarea>
+                            <div class="amazon-paste__actions">
+                              <button
+                                pButton
+                                type="button"
+                                icon="pi pi-sparkles"
+                                label="Auto Fill Product Details"
+                                [loading]="!!variantAmazonAnalyzing()[variantId(ctrl)]"
+                                [disabled]="!!variantAmazonAnalyzing()[variantId(ctrl)] || !(variantAmazonPaste()[variantId(ctrl)] || '').trim()"
+                                (click)="autoFillVariantFromAmazon(i)"
+                              ></button>
+                              @if (variantAmazonFeedback()[variantId(ctrl)]; as feedback) {
+                                <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
+                                  {{ feedback.message }}
+                                </small>
+                              }
+                            </div>
+                          </section>
+
                           <div class="field">
                             <label>Description</label>
                             <textarea pTextarea formControlName="description" rows="3"></textarea>
@@ -446,29 +675,19 @@
                           <div class="grid-2">
                             <div class="field">
                               <label>Dealer</label>
-                              <div class="dealer-select-row">
-                                <p-select
-                                  formControlName="supplier"
-                                  [options]="variantDealerSelectOptions()"
-                                  optionLabel="label"
-                                  optionValue="value"
-                                  placeholder="Search dealer..."
-                                  panelStyleClass="catalog-filter-panel dealer-select-panel"
-                                  [filter]="true"
-                                  filterPlaceholder="Search by name or code..."
-                                  [showClear]="true"
-                                  [loading]="dealersLoading()"
-                                  (onChange)="onVariantDealerChange(i)"
-                                />
-                                <button
-                                  pButton
-                                  type="button"
-                                  [outlined]="true"
-                                  icon="pi pi-plus"
-                                  label="Add Dealer"
-                                  (click)="navigateToAddDealerFromVariant()"
-                                ></button>
-                              </div>
+                              <p-select
+                                formControlName="supplier"
+                                [options]="variantDealerSelectOptions()"
+                                optionLabel="label"
+                                optionValue="value"
+                                placeholder="Search dealer..."
+                                panelStyleClass="catalog-filter-panel dealer-select-panel"
+                                [filter]="true"
+                                filterPlaceholder="Search by name or code..."
+                                [showClear]="true"
+                                [loading]="dealersLoading()"
+                                (onChange)="onVariantDealerChange(i)"
+                              />
                             </div>
                             <div class="field">
                               <app-manageable-select
@@ -512,6 +731,40 @@
                             <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add specification" (click)="addVariantSpec(i)"></button>
                           </div>
 
+                          <section class="section-card amazon-paste" [attr.aria-labelledby]="'variant-about-' + variantId(ctrl)">
+                            <div class="section-card__head">
+                              <div>
+                                <h3 [id]="'variant-about-' + variantId(ctrl)">About this item</h3>
+                                <p>Paste Amazon's About this item section. Auto Fill merges into Features below without creating duplicates.</p>
+                              </div>
+                            </div>
+                            <textarea
+                              pTextarea
+                              rows="6"
+                              [ngModel]="variantAboutPaste()[variantId(ctrl)] || ''"
+                              [ngModelOptions]="{standalone: true}"
+                              (ngModelChange)="setVariantPaste('about', variantId(ctrl), $event)"
+                              placeholder="Paste About this item content here..."
+                              [disabled]="!!variantAboutAnalyzing()[variantId(ctrl)]"
+                            ></textarea>
+                            <div class="amazon-paste__actions">
+                              <button
+                                pButton
+                                type="button"
+                                icon="pi pi-sparkles"
+                                label="Auto Fill About This Item"
+                                [loading]="!!variantAboutAnalyzing()[variantId(ctrl)]"
+                                [disabled]="!!variantAboutAnalyzing()[variantId(ctrl)] || !(variantAboutPaste()[variantId(ctrl)] || '').trim()"
+                                (click)="autoFillVariantAboutThisItem(i)"
+                              ></button>
+                              @if (variantAboutFeedback()[variantId(ctrl)]; as feedback) {
+                                <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
+                                  {{ feedback.message }}
+                                </small>
+                              }
+                            </div>
+                          </section>
+
                           <div class="list-field">
                             <label>Features</label>
                             @for (feat of variantFeaturesArr(i).controls; track $index; let fi = $index) {
@@ -522,6 +775,44 @@
                             }
                             <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add feature" (click)="addVariantFeature(i)"></button>
                           </div>
+
+                          <section class="section-card amazon-paste" [attr.aria-labelledby]="'variant-box-' + variantId(ctrl)">
+                            <div class="section-card__head">
+                              <div>
+                                <h3 [id]="'variant-box-' + variantId(ctrl)">Amazon Box Contents</h3>
+                                <p>Paste the 'What's in the box' / 'Box Contents' section copied from Amazon.</p>
+                              </div>
+                            </div>
+                            <textarea
+                              pTextarea
+                              rows="6"
+                              [ngModel]="variantBoxPaste()[variantId(ctrl)] || ''"
+                              [ngModelOptions]="{standalone: true}"
+                              (ngModelChange)="setVariantPaste('box', variantId(ctrl), $event)"
+                              placeholder="What's in the box
+
+1 x Office Chair
+1 x Headrest
+1 x Hardware Kit"
+                              [disabled]="!!variantBoxAnalyzing()[variantId(ctrl)]"
+                            ></textarea>
+                            <div class="amazon-paste__actions">
+                              <button
+                                pButton
+                                type="button"
+                                icon="pi pi-sparkles"
+                                label="Auto Fill Box Contents"
+                                [loading]="!!variantBoxAnalyzing()[variantId(ctrl)]"
+                                [disabled]="!!variantBoxAnalyzing()[variantId(ctrl)] || !(variantBoxPaste()[variantId(ctrl)] || '').trim()"
+                                (click)="autoFillVariantBoxContents(i)"
+                              ></button>
+                              @if (variantBoxFeedback()[variantId(ctrl)]; as feedback) {
+                                <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
+                                  {{ feedback.message }}
+                                </small>
+                              }
+                            </div>
+                          </section>
 
                           <div class="list-field">
                             <label>Box contents</label>
@@ -939,314 +1230,6 @@
 
           @case (5) {
             <section class="section-card">
-              <div class="section-card__head">
-                <div>
-                  <h3>Inventory</h3>
-                  <p>Stock levels and warehouse allocation.</p>
-                </div>
-              </div>
-              <div class="grid-2">
-                <div class="field">
-                  <app-manageable-select
-                    label="Warehouse"
-                    placeholder="Select warehouse"
-                    entityName="Warehouse"
-                    [options]="options.warehouses()"
-                    [value]="form.get('warehouse')!.value"
-                    (valueChange)="onWarehouseChange($event)"
-                    (add)="options.addWarehouse($event)"
-                    (rename)="renameWarehouseEverywhere($event.from, $event.to)"
-                    (remove)="deleteWarehouseEverywhere($event)"
-                  />
-                </div>
-                <div class="field">
-                  <label>Opening stock</label>
-                  <p-inputNumber formControlName="openingStock" />
-                </div>
-                <div class="field">
-                  <label>Available stock</label>
-                  <p-inputNumber formControlName="availableStock" />
-                </div>
-                <div class="field">
-                  <label>Reserved stock</label>
-                  <p-inputNumber formControlName="reservedStock" />
-                </div>
-                <div class="field">
-                  <label>Minimum quantity</label>
-                  <p-inputNumber formControlName="minimumQuantity" />
-                </div>
-                <div class="field">
-                  <label>Maximum quantity</label>
-                  <p-inputNumber formControlName="maximumQuantity" />
-                </div>
-              </div>
-              <div class="setting-row">
-                <div>
-                  <label for="trackInventory">Track inventory</label>
-                  <p>Enable stock tracking and low-stock alerts</p>
-                </div>
-                <p-toggleswitch formControlName="trackInventory" inputId="trackInventory" />
-              </div>
-            </section>
-
-            <section class="section-card">
-              <div class="section-card__head">
-                <div>
-                  <h3>Customer purchase rules</h3>
-                  <p>Limits and eligibility for customer purchases.</p>
-                </div>
-              </div>
-              <div class="grid-2">
-                <div class="field">
-                  <label>Minimum order quantity</label>
-                  <p-inputNumber formControlName="minOrderQuantity" />
-                </div>
-                <div class="field">
-                  <label>Maximum quantity / customer</label>
-                  <p-inputNumber formControlName="maxQuantityPerCustomer" />
-                </div>
-                <div class="field">
-                  <label>Minimum customer age</label>
-                  <p-inputNumber formControlName="minimumCustomerAge" />
-                </div>
-                <div class="field">
-                  <label for="eligiblePinCodes">Eligible pin codes</label>
-                  <input id="eligiblePinCodes" pInputText formControlName="eligiblePinCodes" placeholder="Comma-separated" />
-                </div>
-                <div class="field">
-                  <label>Invoice setting</label>
-                  <p-select
-                    [options]="invoiceSettingOptions"
-                    formControlName="invoiceSetting"
-                    optionLabel="label"
-                    optionValue="value"
-                    appendTo="body"
-                    panelStyleClass="catalog-filter-panel"
-                    [checkmark]="false"
-                    scrollHeight="240px"
-                  />
-                </div>
-              </div>
-              <div class="setting-row">
-                <div>
-                  <label for="cashPurchase">Cash purchase</label>
-                  <p>Allow customers to buy with full cash payment</p>
-                </div>
-                <p-toggleswitch formControlName="cashPurchase" inputId="cashPurchase" />
-              </div>
-              <div class="setting-row">
-                <div>
-                  <label for="requiresFieldVerification">Field verification</label>
-                  <p>Field agent verification required before approval</p>
-                </div>
-                <p-toggleswitch formControlName="requiresFieldVerification" inputId="requiresFieldVerification" />
-              </div>
-              <div class="setting-row">
-                <div>
-                  <label for="requiresSerialImeiCapture">Serial / IMEI capture</label>
-                  <p>Capture serial or IMEI at purchase</p>
-                </div>
-                <p-toggleswitch formControlName="requiresSerialImeiCapture" inputId="requiresSerialImeiCapture" />
-              </div>
-            </section>
-          }
-
-          @case (6) {
-            <section class="section-card">
-              <div class="section-card__head">
-                <div>
-                  <h3>Dealer</h3>
-                  <p>Link this product to a dealer. Fields auto-fill from dealer master data.</p>
-                </div>
-                <div class="source-actions">
-                  <button pButton type="button" icon="pi pi-plus" label="Add Dealer" (click)="addSupplier()"></button>
-                </div>
-              </div>
-
-              @if (suppliersArr.length === 0) {
-                <div class="empty-hint empty-hint--tall">
-                  <i class="pi pi-shop" aria-hidden="true"></i>
-                  <div>
-                    <strong>No dealer linked yet</strong>
-                    <p>Add a dealer to set commercial terms and payment schedule.</p>
-                  </div>
-                  <button pButton type="button" [outlined]="true" icon="pi pi-plus" label="Add Dealer" (click)="addSupplier()"></button>
-                </div>
-              }
-
-              @for (ctrl of suppliersArr.controls; track $index; let i = $index) {
-                <article class="entity-card" [formGroup]="asGroup(ctrl)">
-                  <header class="entity-card__head">
-                    <h4>Dealer #{{ i + 1 }}</h4>
-                    <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger" label="Delete" (click)="removeSupplier(i)"></button>
-                  </header>
-
-                  <div class="grid-2">
-                    <div class="field">
-                      <label>Dealer</label>
-                      <div class="dealer-select-row">
-                        <p-select
-                          formControlName="dealerId"
-                          [options]="dealerSelectOptions()"
-                          optionLabel="label"
-                          optionValue="value"
-                          placeholder="Search dealer..."
-                          panelStyleClass="catalog-filter-panel dealer-select-panel"
-                          [filter]="true"
-                          filterPlaceholder="Search by name or code..."
-                          [showClear]="true"
-                          [loading]="dealersLoading()"
-                          (onChange)="onDealerSelected(i, $event.value)"
-                        />
-                        <button
-                          pButton
-                          type="button"
-                          [outlined]="true"
-                          icon="pi pi-plus"
-                          label="Add Dealer"
-                          (click)="navigateToAddDealer(i)"
-                        ></button>
-                      </div>
-                    </div>
-                    <div class="field">
-                      <label>Product Source</label>
-                      <p-select
-                        formControlName="sourceCreatedBy"
-                        [options]="staffOptions()"
-                        optionLabel="label"
-                        optionValue="value"
-                        placeholder="Select employee"
-                        panelStyleClass="catalog-filter-panel dealer-select-panel"
-                        [filter]="true"
-                        filterPlaceholder="Search employee..."
-                        filterBy="label,code,email"
-                        scrollHeight="240px"
-                        [showClear]="true"
-                      />
-                    </div>
-                  </div>
-
-                  @if (selectedDealer(i); as dealerInfo) {
-                    <div class="dealer-info-panel">
-                      <div class="dealer-info-panel__head">
-                        <i class="pi pi-lock" aria-hidden="true"></i>
-                        <div>
-                          <strong>Dealer Information</strong>
-                          <p>Automatically populated from the selected dealer — read-only on this form.</p>
-                        </div>
-                      </div>
-                      <dl class="dealer-info-panel__grid">
-                        <dt>Firm Name</dt><dd>{{ dealerInfo.dealerName }}</dd>
-                        <dt>Owner</dt><dd>{{ dealerInfo.ownerName || '—' }}</dd>
-                        <dt>Mobile</dt><dd>{{ dealerInfo.mobile || '—' }}</dd>
-                        <dt>WhatsApp</dt><dd>{{ dealerInfo.whatsapp || '—' }}</dd>
-                        <dt>Email</dt><dd>{{ dealerInfo.email || '—' }}</dd>
-                        <dt>Address</dt><dd>{{ dealerInfo.shopAddress || '—' }}</dd>
-                        <dt>Pincode</dt><dd>{{ dealerInfo.pincode || '—' }}</dd>
-                        <dt>GST</dt><dd>{{ dealerInfo.gstNumber || '—' }}</dd>
-                        <dt>Branch</dt><dd>{{ dealerInfo.branch || '—' }}</dd>
-                        <dt>Warehouse</dt><dd>{{ dealerInfo.warehouseAddress || '—' }}</dd>
-                        <dt>Delivery Area</dt><dd>{{ dealerInfo.deliveryArea || '—' }}</dd>
-                        <dt>Payment Cycle</dt><dd>{{ dealerInfo.paymentCycle || '—' }}</dd>
-                      </dl>
-                    </div>
-                  }
-
-                  <p class="subsection-label">Commercial terms (from dealer)</p>
-                  <div class="grid-2">
-                    <div class="field">
-                      <label>Dealer code</label>
-                      <input pInputText formControlName="supplierCode" [readonly]="isDealerFieldReadOnly(i, 'supplierCode')" />
-                    </div>
-                    <div class="field">
-                      <label>Dealer branch</label>
-                      <input pInputText formControlName="dealerBranch" [readonly]="isDealerFieldReadOnly(i, 'dealerBranch')" />
-                    </div>
-                    <div class="field">
-                      <label>GSTIN</label>
-                      <input pInputText formControlName="supplierGstin" [readonly]="isDealerFieldReadOnly(i, 'supplierGstin')" />
-                    </div>
-                    <div class="field">
-                      <label>Contact</label>
-                      <input pInputText formControlName="supplierContact" [readonly]="isDealerFieldReadOnly(i, 'supplierContact')" />
-                    </div>
-                    <div class="field">
-                      <label>Payment terms</label>
-                      <p-select
-                        [options]="paymentTermsOptions"
-                        formControlName="paymentTerms"
-                        optionLabel="label"
-                        optionValue="value"
-                        placeholder="Select terms"
-                        panelStyleClass="catalog-filter-panel"
-                        [disabled]="isDealerFieldReadOnly(i, 'paymentTerms')"
-                      />
-                    </div>
-                    <div class="field">
-                      <label>Settlement cycle</label>
-                      <p-select
-                        [options]="settlementCycleOptions"
-                        formControlName="settlementCycle"
-                        optionLabel="label"
-                        optionValue="value"
-                        placeholder="Select cycle"
-                        panelStyleClass="catalog-filter-panel"
-                        [disabled]="isDealerFieldReadOnly(i, 'settlementCycle')"
-                      />
-                    </div>
-                    <div class="field">
-                      <label>Dispatch from</label>
-                      <input pInputText formControlName="dispatchFrom" [readonly]="isDealerFieldReadOnly(i, 'dispatchFrom')" />
-                    </div>
-                    <div class="field">
-                      <label>Dealer incentive %</label>
-                      <input pInputText formControlName="dealerIncentivePercent" [readonly]="isDealerFieldReadOnly(i, 'dealerIncentivePercent')" />
-                    </div>
-                  </div>
-
-                  <p class="subsection-label">Dealer payment split</p>
-                  <div class="grid-3">
-                    <div class="field">
-                      <label>First payment %</label>
-                      <input pInputText formControlName="firstPaymentPercent" />
-                    </div>
-                    <div class="field">
-                      <label>Delivery payment %</label>
-                      <input pInputText formControlName="deliveryPaymentPercent" />
-                    </div>
-                    <div class="field">
-                      <label>Hold payment %</label>
-                      <input pInputText formControlName="holdPaymentPercent" [readonly]="isDealerFieldReadOnly(i, 'holdPaymentPercent')" />
-                    </div>
-                  </div>
-
-                  <div class="grid-2 mt-2">
-                    <div class="field">
-                      <label>Lead time (days)</label>
-                      <input pInputText formControlName="leadTime" placeholder="e.g. 7" />
-                    </div>
-                  </div>
-
-                  <div class="schedule-note">
-                    <strong>Dealer Payment Schedule Summary</strong>
-                    <p>{{ supplierSchedule(ctrl) }}</p>
-                  </div>
-
-                  <div class="field">
-                    <label>Notes</label>
-                    <textarea pTextarea formControlName="notes" rows="3"></textarea>
-                  </div>
-                </article>
-              }
-
-              @if (suppliersArr.length > 0) {
-                <button pButton type="button" [outlined]="true" icon="pi pi-plus" label="Add another dealer" class="mt-2" (click)="addSupplier()"></button>
-              }
-            </section>
-          }
-
-          @case (7) {
-            <section class="section-card">
               <p class="subsection-label">Package Dimensions</p>
               <div class="grid-2">
                 <div class="field"><label for="weight">Weight (kg)</label><input id="weight" pInputText formControlName="weight" placeholder="0.0" inputmode="decimal" /></div>
@@ -1338,7 +1321,7 @@
             </section>
           }
 
-          @case (8) {
+          @case (6) {
             @if (effectiveSellingPrice() <= 0) {
               <div class="alert-list">
                 <div class="alert-list__item--warn">
@@ -1562,7 +1545,7 @@
 
           }
 
-          @case (9) {
+          @case (7) {
             <section class="section-card">
               <div class="field">
                 <label for="slug">Slug</label>
@@ -1595,7 +1578,7 @@
             }
           }
 
-          @case (10) {
+          @case (8) {
             <section class="live-panel">
               <button type="button" class="live-panel__head" (click)="liveCollapsed.set(!liveCollapsed())">
                 <div>
@@ -1623,10 +1606,8 @@
                       <div><dt>Total Payable</dt><dd>{{ inr(emi.totalPayable) }}</dd></div>
                     </dl>
                   } @else {
-                    <p class="muted">No EMI plan selected — enable a visible plan in Step 9</p>
+                    <p class="muted">No EMI plan selected — enable a visible plan in the EMI step</p>
                   }
-                  <p class="subsection-label">Dealer Payment Schedule</p>
-                  <p>{{ liveCalc().dealerSchedule }}</p>
                   @if (liveAlerts().length) {
                     <ul class="alert-list">
                       @for (alert of liveAlerts(); track alert.id) {
@@ -1658,10 +1639,12 @@
                 <dl>
                   <div><dt>Product Name</dt><dd>{{ display(form.get('productName')!.value) }}</dd></div>
                   <div><dt>SKU</dt><dd>{{ display(form.get('sku')!.value) }}</dd></div>
+                  <div><dt>Dealer</dt><dd>{{ display(selectedDealer(0)?.dealerName) }}</dd></div>
                   <div><dt>Colour / Size / Variant</dt><dd>{{ display(form.get('colourSizeVariant')!.value) }}</dd></div>
                   <div><dt>Product Video URL</dt><dd>{{ display(form.get('productVideoUrl')!.value) }}</dd></div>
                   <div><dt>Serial/IMEI Tracking</dt><dd>{{ display(form.get('serialImeiTracking')!.value) }}</dd></div>
                   <div><dt>Specifications</dt><dd>{{ specificationsArr.length }} items</dd></div>
+                  <div><dt>About this item</dt><dd>{{ aboutThisItemArr.length }} items</dd></div>
                   <div><dt>Features</dt><dd>{{ featuresArr.length }} items</dd></div>
                   <div><dt>Box Contents</dt><dd>{{ boxContentsArr.length }} items</dd></div>
                 </dl>
@@ -1726,28 +1709,8 @@
 
               <section class="review-card">
                 <header>
-                  <h3>Inventory</h3>
-                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(5)"></button>
-                </header>
-                <dl>
-                  <div><dt>Warehouse</dt><dd>{{ display(form.get('warehouse')!.value) }}</dd></div>
-                  <div><dt>Available stock</dt><dd>{{ display(form.get('availableStock')!.value) }}</dd></div>
-                  <div><dt>Reserved</dt><dd>{{ display(form.get('reservedStock')!.value) }}</dd></div>
-                </dl>
-              </section>
-
-              <section class="review-card">
-                <header>
-                  <h3>Dealer</h3>
-                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(6)"></button>
-                </header>
-                <p class="muted">{{ suppliersArr.length }} dealer{{ suppliersArr.length === 1 ? '' : 's' }} configured.</p>
-              </section>
-
-              <section class="review-card">
-                <header>
                   <h3>Delivery</h3>
-                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(7)"></button>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(5)"></button>
                 </header>
                 <dl>
                   <div><dt>Weight</dt><dd>{{ display(form.get('weight')!.value) }}</dd></div>
@@ -1760,7 +1723,7 @@
               <section class="review-card">
                 <header>
                   <h3>EMI</h3>
-                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(8)"></button>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(6)"></button>
                 </header>
                 <dl>
                   <div><dt>Enabled</dt><dd>{{ display(form.get('emiEnabled')!.value) }}</dd></div>
@@ -1771,7 +1734,7 @@
               <section class="review-card">
                 <header>
                   <h3>SEO</h3>
-                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(9)"></button>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(7)"></button>
                 </header>
                 <dl>
                   <div><dt>Slug</dt><dd>{{ display(form.get('slug')!.value) }}</dd></div>
@@ -1782,12 +1745,32 @@
 
             <section class="ready">
               <div>
-                <h3>Ready to Publish</h3>
-                <p>Save as draft to keep working, or publish to make this product active in the catalogue.</p>
+                @if (isEdit) {
+                  <h3>Ready to Publish</h3>
+                  <p>Save as draft to keep working, or publish to make this product active in the catalogue.</p>
+                } @else {
+                  <h3>Ready for Approval</h3>
+                  <p>Preview your product, then save for approval. It will stay hidden from customers until an admin approves it.</p>
+                }
               </div>
               <div class="form-header__actions">
-                <button pButton type="button" severity="secondary" [outlined]="true" label="Save Draft" [disabled]="submitting()" [loading]="submittingKind() === 'draft'" (click)="save('draft')"></button>
-                <button pButton type="button" label="Publish Product" [disabled]="submitting()" [loading]="submittingKind() === 'active'" (click)="save('active')"></button>
+                <button
+                  pButton
+                  type="button"
+                  severity="secondary"
+                  [outlined]="true"
+                  icon="pi pi-eye"
+                  label="Preview"
+                  [disabled]="submitting()"
+                  (click)="openPreview()"
+                ></button>
+                @if (isEdit) {
+                  <button pButton type="button" severity="secondary" [outlined]="true" label="Save Draft" [disabled]="submitting()" [loading]="submittingKind() === 'draft'" (click)="save('draft')"></button>
+                  <button pButton type="button" label="Publish Product" [disabled]="submitting()" [loading]="submittingKind() === 'active'" (click)="save('active')"></button>
+                } @else {
+                  <button pButton type="button" severity="secondary" [outlined]="true" label="Save Draft" [disabled]="submitting()" [loading]="submittingKind() === 'draft'" (click)="save('draft')"></button>
+                  <button pButton type="button" icon="pi pi-send" label="Save for Approval" [disabled]="submitting()" [loading]="submittingKind() === 'pending_approval'" (click)="save('pending_approval')"></button>
+                }
               </div>
             </section>
           }
@@ -1812,21 +1795,54 @@
               type="button"
               severity="secondary"
               [outlined]="true"
-              icon="pi pi-save"
-              label="Save Draft"
+              icon="pi pi-eye"
+              label="Preview"
               [disabled]="submitting()"
-              [loading]="submittingKind() === 'draft'"
-              (click)="save('draft')"
+              (click)="openPreview()"
             ></button>
-            <button
-              pButton
-              type="button"
-              icon="pi pi-check"
-              label="Publish Product"
-              [disabled]="submitting()"
-              [loading]="submittingKind() === 'active'"
-              (click)="save('active')"
-            ></button>
+            @if (isEdit) {
+              <button
+                pButton
+                type="button"
+                severity="secondary"
+                [outlined]="true"
+                icon="pi pi-save"
+                label="Save Draft"
+                [disabled]="submitting()"
+                [loading]="submittingKind() === 'draft'"
+                (click)="save('draft')"
+              ></button>
+              <button
+                pButton
+                type="button"
+                icon="pi pi-check"
+                label="Publish Product"
+                [disabled]="submitting()"
+                [loading]="submittingKind() === 'active'"
+                (click)="save('active')"
+              ></button>
+            } @else {
+              <button
+                pButton
+                type="button"
+                severity="secondary"
+                [outlined]="true"
+                icon="pi pi-save"
+                label="Save Draft"
+                [disabled]="submitting()"
+                [loading]="submittingKind() === 'draft'"
+                (click)="save('draft')"
+              ></button>
+              <button
+                pButton
+                type="button"
+                icon="pi pi-send"
+                label="Save for Approval"
+                [disabled]="submitting()"
+                [loading]="submittingKind() === 'pending_approval'"
+                (click)="save('pending_approval')"
+              ></button>
+            }
           </div>
         } @else {
           <button pButton type="button" icon="pi pi-arrow-right" iconPos="right" label="Next" (click)="next()"></button>
@@ -1834,4 +1850,195 @@
       </div>
     </div>
   </div>
+
+  <p-dialog
+    header="Add Product Type"
+    [visible]="productTypeAddOpen()"
+    (visibleChange)="productTypeAddOpen.set($event)"
+    [modal]="true"
+    [draggable]="false"
+    appendTo="body"
+    styleClass="admin-dialog"
+    [style]="{ width: 'min(440px, calc(100vw - 2rem))' }"
+  >
+    <div class="field">
+      <label for="productTypeName">Product Type Name</label>
+      <input
+        id="productTypeName"
+        pInputText
+        [ngModel]="productTypeDraft()"
+        (ngModelChange)="productTypeDraft.set($event)"
+        [ngModelOptions]="{ standalone: true }"
+        placeholder="e.g. Gaming Chair"
+        (keydown.enter)="$event.preventDefault(); submitAddProductType()"
+      />
+    </div>
+    <ng-template pTemplate="footer">
+      <button
+        pButton
+        type="button"
+        [rounded]="true"
+        severity="secondary"
+        [outlined]="true"
+        label="Cancel"
+        [disabled]="productTypeSaving()"
+        (click)="productTypeAddOpen.set(false)"
+      ></button>
+      <button
+        pButton
+        type="button"
+        [rounded]="true"
+        icon="pi pi-plus"
+        label="Add Product Type"
+        [loading]="productTypeSaving()"
+        [disabled]="productTypeSaving()"
+        (click)="submitAddProductType()"
+      ></button>
+    </ng-template>
+  </p-dialog>
+
+  <p-dialog
+    header="Product Preview"
+    [visible]="previewOpen()"
+    (visibleChange)="previewOpen.set($event)"
+    [modal]="true"
+    [draggable]="false"
+    [dismissableMask]="true"
+    appendTo="body"
+    styleClass="admin-dialog product-preview-dialog"
+    [style]="{ width: 'min(920px, calc(100vw - 2rem))' }"
+    [contentStyle]="{ 'max-height': '75vh', overflow: 'auto' }"
+  >
+    <p class="preview-banner">Preview only — this does not save, submit, or publish the product.</p>
+
+    <div class="preview-hero">
+      <div class="preview-gallery">
+        @if (previewUrls()[0]; as src) {
+          <img [src]="mediaSrc(src)" [alt]="display(form.get('productName')!.value)" />
+        } @else {
+          <div class="preview-gallery__empty"><i class="pi pi-image"></i><span>No image</span></div>
+        }
+      </div>
+      <div class="preview-summary">
+        <h2>{{ display(form.get('productName')!.value) }}</h2>
+        <dl>
+          <div><dt>Short name</dt><dd>{{ display(form.get('shortName')!.value) }}</dd></div>
+          <div><dt>Product type</dt><dd>{{ display(form.get('productType')!.value) }}</dd></div>
+          <div><dt>Brand</dt><dd>{{ display(form.get('brand')!.value) }}</dd></div>
+          <div><dt>Model number</dt><dd>{{ display(form.get('modelNumber')!.value) }}</dd></div>
+          <div><dt>SKU</dt><dd>{{ display(form.get('sku')!.value) }}</dd></div>
+          <div><dt>Barcode</dt><dd>{{ display(form.get('barcode')!.value) }}</dd></div>
+          <div><dt>HSN</dt><dd>{{ display(form.get('hsnCode')!.value) }}</dd></div>
+          <div><dt>Manufacturer</dt><dd>{{ display(form.get('manufacturer')!.value) }}</dd></div>
+          <div><dt>Warranty</dt><dd>{{ display(form.get('warranty')!.value) }}</dd></div>
+          <div><dt>Condition</dt><dd>{{ display(form.get('productCondition')!.value) }}</dd></div>
+          <div><dt>Colour / Size / Variant</dt><dd>{{ display(form.get('colourSizeVariant')!.value) }}</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="review-grid">
+      <section class="review-card">
+        <header><h3>Descriptions</h3></header>
+        <dl>
+          <div><dt>Short description</dt><dd>{{ display(form.get('shortDescription')!.value) }}</dd></div>
+          <div><dt>Description</dt><dd>{{ display(form.get('description')!.value) }}</dd></div>
+          <div><dt>Product video</dt><dd>{{ display(form.get('productVideoUrl')!.value) }}</dd></div>
+        </dl>
+      </section>
+
+      <section class="review-card">
+        <header><h3>Catalogue lists</h3></header>
+        <dl>
+          <div><dt>Specifications</dt><dd>{{ specificationsArr.length }} items</dd></div>
+          <div><dt>Features</dt><dd>{{ featuresArr.length }} items</dd></div>
+          <div><dt>About this item</dt><dd>{{ aboutThisItemArr.length }} items</dd></div>
+          <div><dt>Box Contents</dt><dd>{{ boxContentsArr.length }} items</dd></div>
+          <div><dt>Variants</dt><dd>{{ variantsArr.length }}</dd></div>
+          <div><dt>Gallery images</dt><dd>{{ galleryImagesArr.length }}</dd></div>
+        </dl>
+        @if (featuresArr.length) {
+          <ul class="preview-list">
+            @for (ctrl of featuresArr.controls; track $index) {
+              @if (display(ctrl.value) !== '—') {
+                <li>{{ display(ctrl.value) }}</li>
+              }
+            }
+          </ul>
+        }
+        @if (boxContentsArr.length) {
+          <p class="subsection-label">Box Contents</p>
+          <ul class="preview-list">
+            @for (ctrl of boxContentsArr.controls; track $index) {
+              @if (display(ctrl.value) !== '—') {
+                <li>{{ display(ctrl.value) }}</li>
+              }
+            }
+          </ul>
+        }
+        @if (aboutThisItemArr.length) {
+          <p class="subsection-label">About this item</p>
+          <ul class="preview-list">
+            @for (ctrl of aboutThisItemArr.controls; track $index) {
+              @if (display(ctrl.value) !== '—') {
+                <li>{{ display(ctrl.value) }}</li>
+              }
+            }
+          </ul>
+        }
+        @if (specificationsArr.length) {
+          <p class="subsection-label">Specifications</p>
+          <ul class="preview-list">
+            @for (spec of specificationsArr.controls; track $index) {
+              <li>{{ display(asGroup(spec).get('key')!.value) }}: {{ display(asGroup(spec).get('value')!.value) }}</li>
+            }
+          </ul>
+        }
+      </section>
+
+      <section class="review-card">
+        <header><h3>Pricing &amp; inventory</h3></header>
+        <dl>
+          <div><dt>MRP</dt><dd>{{ display(form.get('mrp')!.value) }}</dd></div>
+          <div><dt>Selling price</dt><dd>{{ display(form.get('sellingPrice')!.value) }}</dd></div>
+          <div><dt>Purchase price</dt><dd>{{ display(form.get('purchasePrice')!.value) }}</dd></div>
+          <div><dt>Available stock</dt><dd>{{ display(form.get('availableStock')!.value) }}</dd></div>
+          <div><dt>Warehouse</dt><dd>{{ display(form.get('warehouse')!.value) }}</dd></div>
+          <div><dt>Dealer</dt><dd>{{ display(selectedDealer(0)?.dealerName) }}</dd></div>
+        </dl>
+      </section>
+
+      <section class="review-card">
+        <header><h3>Delivery &amp; EMI</h3></header>
+        <dl>
+          <div><dt>Delivery days</dt><dd>{{ display(form.get('deliveryDays')!.value) }}</dd></div>
+          <div><dt>Delivery charges</dt><dd>{{ display(form.get('deliveryCharges')!.value) }}</dd></div>
+          <div><dt>Express</dt><dd>{{ display(form.get('expressDelivery')!.value) }}</dd></div>
+          <div><dt>EMI enabled</dt><dd>{{ display(form.get('emiEnabled')!.value) }}</dd></div>
+          <div><dt>EMI plans</dt><dd>{{ emiPlansArr.length }}</dd></div>
+        </dl>
+      </section>
+
+      <section class="review-card">
+        <header><h3>SEO</h3></header>
+        <dl>
+          <div><dt>Slug</dt><dd>{{ display(form.get('slug')!.value) }}</dd></div>
+          <div><dt>Meta title</dt><dd>{{ display(form.get('metaTitle')!.value) }}</dd></div>
+          <div><dt>Meta description</dt><dd>{{ display(form.get('metaDescription')!.value) }}</dd></div>
+        </dl>
+      </section>
+    </div>
+
+    <ng-template pTemplate="footer">
+      <button
+        pButton
+        type="button"
+        [rounded]="true"
+        severity="secondary"
+        [outlined]="true"
+        label="Close"
+        (click)="closePreview()"
+      ></button>
+    </ng-template>
+  </p-dialog>
 }

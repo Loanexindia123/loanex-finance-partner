@@ -8,28 +8,31 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { useKYC } from '../hooks/useKYC';
-import * as ImagePicker from 'expo-image-picker';
 import { fetchExperianReport } from '../services/kycService';
-import { matchFace } from '../services/faceService';
 import { createNotification } from '../services/notificationService';
 import { generateDigiLockerToken } from '../services/digilockerService';
+import {
+  getBankStatus,
+  verifyBankAccount,
+  type BankAccountType,
+} from '../services/bankService';
 import DigiLockerAuth, { VerifiedKYCData } from '../components/feature/DigiLockerAuth';
+import FaceVerificationModal from '../components/feature/FaceVerificationModal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Colors, Fonts, Spacing, Radius, Shadow } from '../constants/theme';
 
-const STEPS = ['Aadhaar', 'Basic Details', 'Summary'];
+const STEPS = ['Aadhaar', 'Basic Details', 'Bank', 'Summary'];
 const W = Dimensions.get('window').width;
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 
 /**
- * KYC flow — mirrors the website: DigiLocker Aadhaar verification FIRST,
- * then basic details (PAN) which fetches the CIBIL credit score, then a
- * summary showing the verified details. Face verification is included as the
- * final confirmation (app-only), and also re-triggers on every EMI
- * application via FaceVerificationModal.
+ * KYC flow — DigiLocker Aadhaar → PAN/Experian → Bank (IDSPay pennyless) →
+ * Face → Complete. Face also re-triggers on every EMI via FaceVerificationModal.
+ * Server kycCompleted gate is unchanged (still mobile + Aadhaar + PAN).
  */
 export default function KYCVerificationScreen() {
   const { user } = useAuth();
-  const { kyc, kycLoading, isKYCComplete, refresh } = useKYC();
+  const { kyc, kycLoading, isKYCComplete, aadhaarVerified, panVerified, bankVerified: kycBankVerified, faceVerified: kycFaceVerified, refresh } = useKYC();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
@@ -66,13 +69,51 @@ export default function KYCVerificationScreen() {
   const [experianData, setExperianData] = useState<any>(null);
   const [cibilScore, setCibilScore] = useState<number>(0);
 
+  // Step 3: Bank Account
+  const [bankVerified, setBankVerified] = useState(false);
+  const [bankLoading, setBankLoading] = useState(false);
+  const [bankStatusLoading, setBankStatusLoading] = useState(false);
+  const [accountHolderName, setAccountHolderName] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [confirmAccountNumber, setConfirmAccountNumber] = useState('');
+  const [ifscCode, setIfscCode] = useState('');
+  const [accountType, setAccountType] = useState<BankAccountType>('SAVINGS');
+  const [maskedBankAccount, setMaskedBankAccount] = useState('');
+  const [verifiedBankName, setVerifiedBankName] = useState('');
+
   // Face
   const [faceVerified, setFaceVerified] = useState(false);
-  const [faceLoading, setFaceLoading] = useState(false);
+  const [showFaceVerify, setShowFaceVerify] = useState(false);
 
   // DatePicker state
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateObj, setDateObj] = useState(new Date(2000, 0, 1));
+
+  // Returning users who already verified bank (e.g. via web) skip the form.
+  React.useEffect(() => {
+    if (step !== 2 || bankVerified) return;
+    let cancelled = false;
+    (async () => {
+      setBankStatusLoading(true);
+      try {
+        const status = await getBankStatus();
+        if (cancelled) return;
+        if (status.bankVerified) {
+          setBankVerified(true);
+          setMaskedBankAccount(status.accountNumberMasked || '');
+          setVerifiedBankName(status.bankName || '');
+        }
+      } catch {
+        // Keep the form available if status cannot be loaded.
+      } finally {
+        if (!cancelled) setBankStatusLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [step, bankVerified]);
 
   // If KYC already completed, show read-only summary
   if (!kycLoading && isKYCComplete && kyc) {
@@ -104,12 +145,31 @@ export default function KYCVerificationScreen() {
             </View>
             <View style={styles.readonlyRow}>
               <Text style={styles.roLabel}>PAN</Text>
-              <Text style={styles.roValue}>{kyc.panNumber || 'Verified'}</Text>
+              <Text style={styles.roValue}>{kyc.panNumber || '—'}</Text>
             </View>
             <View style={styles.readonlyRow}>
               <Text style={styles.roLabel}>CIBIL Score</Text>
               <Text style={[styles.roValue, { fontWeight: Fonts.bold, color: Colors.primary }]}>{kyc.cibilScore}</Text>
             </View>
+          </View>
+
+          <View style={[styles.readonlyCard, { marginTop: Spacing.md }]}>
+            <Text style={[styles.roLabel, { marginBottom: Spacing.sm, fontWeight: Fonts.semiBold, color: Colors.textPrimary }]}>
+              Verification Status
+            </Text>
+            {[
+              { label: 'Aadhaar Verification', verified: aadhaarVerified },
+              { label: 'PAN Verification', verified: panVerified },
+              { label: 'Bank Account Verification', verified: kycBankVerified },
+              { label: 'Face Verification', verified: kycFaceVerified },
+            ].map((row) => (
+              <View key={row.label} style={styles.readonlyRow}>
+                <Text style={styles.roLabel}>{row.label}</Text>
+                <Text style={[styles.roValue, { color: row.verified ? Colors.success : Colors.warning }]}>
+                  {row.verified ? '✓ Verified' : 'Pending'}
+                </Text>
+              </View>
+            ))}
           </View>
 
           <Text style={styles.readonlyNote}>KYC details cannot be edited after verification. Contact support if you need changes.</Text>
@@ -170,6 +230,7 @@ export default function KYCVerificationScreen() {
       const parts = data.name.trim().split(/\s+/);
       setFirstName(parts[0] || '');
       setLastName(parts.slice(1).join(' ') || '');
+      setAccountHolderName(data.name.trim());
     }
     if (data.dob) setDob(data.dob);
     setAadharVerified(true);
@@ -210,6 +271,9 @@ export default function KYCVerificationScreen() {
       setExperianData(res.data);
       setCibilScore(res.data.bureau_score || 0);
       setBasicDetailsVerified(true);
+      if (!accountHolderName.trim()) {
+        setAccountHolderName(`${firstName} ${lastName}`.trim());
+      }
     } else {
       Alert.alert(
         'Verification Failed',
@@ -218,49 +282,96 @@ export default function KYCVerificationScreen() {
     }
   };
 
-  // ─── Step 3: Face verification (app-only) + Complete ───────────────────
-  const handleFaceVerify = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Camera permission is required to verify your face.');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        cameraType: ImagePicker.CameraType.front,
-        base64: true,
-        quality: 0.5,
-      });
-
-      if (result.canceled || !result.assets?.[0]?.base64) {
-        return; // user cancelled
-      }
-
-      setFaceLoading(true);
-      const matchResult = await matchFace(result.assets[0].base64);
-      if (
-        matchResult?.data?.match_status === true ||
-        matchResult?.verified === true ||
-        matchResult?.status?.code === 200
-      ) {
-        setFaceVerified(true);
-      } else {
-        Alert.alert('Match Failed', 'Face match could not be confirmed. Please try again in better lighting.');
-        setFaceVerified(false);
-      }
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Face verification failed');
-      setFaceVerified(false);
-    } finally {
-      setFaceLoading(false);
+  // ─── Step 3: Bank Account Verification (existing backend pennyless) ────
+  const handleVerifyBank = async () => {
+    if (!basicDetailsVerified) {
+      Alert.alert('Incomplete', 'Please verify your PAN and credit profile first.');
+      return;
     }
+
+    const holder = accountHolderName.trim();
+    const bank = bankName.trim();
+    const acct = accountNumber.replace(/\D/g, '');
+    const confirm = confirmAccountNumber.replace(/\D/g, '');
+    const ifsc = ifscCode.trim().toUpperCase();
+
+    if (!holder) {
+      Alert.alert('Incomplete', 'Account holder name is required.');
+      return;
+    }
+    if (holder.length < 3 || holder.length > 100) {
+      Alert.alert('Invalid Name', 'Account holder name must be 3–100 characters.');
+      return;
+    }
+    if (!bank || bank.length < 2 || bank.length > 100) {
+      Alert.alert('Invalid Bank', 'Please enter a valid bank name.');
+      return;
+    }
+    if (!acct) {
+      Alert.alert('Incomplete', 'Account number is required.');
+      return;
+    }
+    if (!/^\d{8,18}$/.test(acct)) {
+      Alert.alert('Invalid Account', 'Account number must be 8–18 digits.');
+      return;
+    }
+    if (!confirm) {
+      Alert.alert('Incomplete', 'Please confirm your account number.');
+      return;
+    }
+    if (acct !== confirm) {
+      Alert.alert('Mismatch', 'Account number and confirm account number must match.');
+      return;
+    }
+    if (!ifsc) {
+      Alert.alert('Incomplete', 'IFSC code is required.');
+      return;
+    }
+    if (!IFSC_REGEX.test(ifsc)) {
+      Alert.alert('Invalid IFSC', 'Enter a valid IFSC code (e.g. SBIN0001234).');
+      return;
+    }
+    if (!accountType) {
+      Alert.alert('Incomplete', 'Please select account type (Savings or Current).');
+      return;
+    }
+    if (bankLoading) return;
+
+    setBankLoading(true);
+    const res = await verifyBankAccount({
+      accountHolderName: holder,
+      bankName: bank,
+      accountNumber: acct,
+      confirmAccountNumber: confirm,
+      ifscCode: ifsc,
+      accountType,
+    });
+    setBankLoading(false);
+
+    if (res.success && res.bankVerified) {
+      setBankVerified(true);
+      setMaskedBankAccount(res.accountNumberMasked || '');
+      setVerifiedBankName(res.bankName || bank);
+      Alert.alert('Bank Account Verified Successfully', res.message || 'Your bank account is verified.');
+    } else {
+      setBankVerified(false);
+      Alert.alert(
+        'Verification Failed',
+        res.error || res.message || 'Unable to verify your bank account. Please try again.',
+      );
+    }
+  };
+
+  // ─── Step 4: Face verification (live camera via FaceVerificationModal) ─
+  const handleFaceVerified = () => {
+    setShowFaceVerify(false);
+    setFaceVerified(true);
   };
 
   const handleComplete = async () => {
     if (!user) return;
-    if (!aadharVerified || !basicDetailsVerified) {
-      Alert.alert('Incomplete', 'Please complete Aadhaar and basic details verification first.');
+    if (!aadharVerified || !basicDetailsVerified || !bankVerified) {
+      Alert.alert('Incomplete', 'Please complete Aadhaar, PAN, and bank verification first.');
       return;
     }
     setSaving(true);
@@ -277,7 +388,7 @@ export default function KYCVerificationScreen() {
       });
       Alert.alert(
         'KYC Completed!',
-        `Welcome, ${firstName}! Your account is fully verified.\n\n• Aadhaar: ✅ Verified\n• PAN & Credit: ✅ Verified\n• Score: ${cibilScore}\n• Face: ✅ Verified\n\nYou can now shop and use EMI options.`,
+        `Welcome, ${firstName}! Your account is fully verified.\n\n• Aadhaar: ✅ Verified\n• PAN & Credit: ✅ Verified\n• Bank: ✅ Verified\n• Score: ${cibilScore}\n• Face: ✅ Verified\n\nYou can now shop and use EMI options.`,
         [{ text: 'Start Shopping', onPress: () => router.replace('/(tabs)') }],
       );
     } catch (e: any) {
@@ -427,14 +538,132 @@ export default function KYCVerificationScreen() {
 
             {basicDetailsVerified && (
               <Pressable style={styles.nextBtn} onPress={() => goToStep(2)}>
-                <Text style={styles.nextBtnTxt}>Continue to Summary</Text>
+                <Text style={styles.nextBtnTxt}>Continue to Bank Verification</Text>
               </Pressable>
             )}
             <View style={{ height: 100 }} />
           </ScrollView>
         </View>
 
-        {/* Step 3: Summary + Face Verification */}
+        {/* Step 3: Bank Account Verification */}
+        <View style={styles.step}>
+          <View style={styles.stepIcon}>
+            <MaterialIcons name="account-balance" size={36} color={Colors.primary} />
+          </View>
+          <Text style={styles.stepTitle}>Bank Account Verification</Text>
+          <Text style={styles.stepSub}>Verify your bank account to continue KYC.</Text>
+
+          {bankStatusLoading ? (
+            <ActivityIndicator color={Colors.primary} />
+          ) : bankVerified ? (
+            <View style={{ width: '100%' }}>
+              <View style={[styles.verifiedBox, { width: '100%' }]}>
+                <MaterialIcons name="check-circle" size={24} color={Colors.success} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.verifiedTxt, { fontSize: Fonts.md }]}>Bank Account Verified Successfully</Text>
+                  {maskedBankAccount ? (
+                    <Text style={styles.verifiedSub}>{maskedBankAccount}</Text>
+                  ) : null}
+                  {verifiedBankName ? (
+                    <Text style={styles.verifiedSub}>{verifiedBankName}</Text>
+                  ) : null}
+                </View>
+              </View>
+              <Pressable style={styles.nextBtn} onPress={() => goToStep(3)}>
+                <Text style={styles.nextBtnTxt}>Continue to Face Verification</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={styles.stepFieldLabel}>Account Holder Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={accountHolderName}
+                onChangeText={setAccountHolderName}
+                placeholder="Name as per bank account"
+                autoCapitalize="words"
+                maxLength={100}
+                editable={!bankLoading}
+              />
+
+              <Text style={styles.stepFieldLabel}>Bank Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={bankName}
+                onChangeText={setBankName}
+                placeholder="State Bank of India"
+                autoCapitalize="words"
+                maxLength={100}
+                editable={!bankLoading}
+              />
+
+              <Text style={styles.stepFieldLabel}>Account Number *</Text>
+              <TextInput
+                style={styles.input}
+                value={accountNumber}
+                onChangeText={t => setAccountNumber(t.replace(/\D/g, '').slice(0, 18))}
+                placeholder="8–18 digit account number"
+                keyboardType="number-pad"
+                maxLength={18}
+                editable={!bankLoading}
+              />
+
+              <Text style={styles.stepFieldLabel}>Confirm Account Number *</Text>
+              <TextInput
+                style={styles.input}
+                value={confirmAccountNumber}
+                onChangeText={t => setConfirmAccountNumber(t.replace(/\D/g, '').slice(0, 18))}
+                placeholder="Re-enter account number"
+                keyboardType="number-pad"
+                maxLength={18}
+                editable={!bankLoading}
+              />
+
+              <Text style={styles.stepFieldLabel}>IFSC Code *</Text>
+              <TextInput
+                style={styles.input}
+                value={ifscCode}
+                onChangeText={t => setIfscCode(t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11))}
+                placeholder="SBIN0001234"
+                autoCapitalize="characters"
+                maxLength={11}
+                editable={!bankLoading}
+              />
+
+              <Text style={styles.stepFieldLabel}>Account Type *</Text>
+              <View style={styles.typeRow}>
+                <Pressable
+                  style={[styles.typeChip, accountType === 'SAVINGS' && styles.typeChipActive]}
+                  onPress={() => setAccountType('SAVINGS')}
+                  disabled={bankLoading}
+                >
+                  <Text style={[styles.typeChipTxt, accountType === 'SAVINGS' && styles.typeChipTxtActive]}>Savings</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.typeChip, accountType === 'CURRENT' && styles.typeChipActive]}
+                  onPress={() => setAccountType('CURRENT')}
+                  disabled={bankLoading}
+                >
+                  <Text style={[styles.typeChipTxt, accountType === 'CURRENT' && styles.typeChipTxtActive]}>Current</Text>
+                </Pressable>
+              </View>
+
+              <Pressable
+                style={[styles.verifyBtn, bankLoading && styles.btnDisabled]}
+                onPress={handleVerifyBank}
+                disabled={bankLoading}
+              >
+                {bankLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.verifyBtnTxt}>Verify Bank Account</Text>}
+              </Pressable>
+              <Text style={styles.stepNote}>
+                We verify your account with the details you enter. You can retry if verification fails.
+              </Text>
+              <View style={{ height: 100 }} />
+            </ScrollView>
+          )}
+        </View>
+
+        {/* Step 4: Summary + Face Verification */}
         <View style={styles.step}>
           <View style={styles.stepIcon}>
             <MaterialIcons name="verified" size={36} color={Colors.primary} />
@@ -448,6 +677,7 @@ export default function KYCVerificationScreen() {
             <View style={styles.experianRow}><Text style={styles.experianLabel}>Aadhaar</Text><Text style={styles.experianValue}>{verifiedAadharNumber}</Text></View>
             <View style={styles.experianRow}><Text style={styles.experianLabel}>PAN</Text><Text style={styles.experianValue}>{pan.toUpperCase()}</Text></View>
             <View style={styles.experianRow}><Text style={styles.experianLabel}>CIBIL Score</Text><Text style={[styles.experianValue, { color: Colors.success, fontWeight: '700' }]}>{cibilScore || 'N/A'}</Text></View>
+            <View style={styles.experianRow}><Text style={styles.experianLabel}>Bank</Text><Text style={styles.experianValue}>{maskedBankAccount || verifiedBankName || (bankVerified ? 'Verified' : 'Pending')}</Text></View>
           </View>
 
           {faceVerified ? (
@@ -456,22 +686,19 @@ export default function KYCVerificationScreen() {
               <Text style={styles.verifiedTxt}>Face verified successfully</Text>
             </View>
           ) : (
-            <Pressable style={styles.faceBtn} onPress={handleFaceVerify} disabled={faceLoading}>
-              {faceLoading ? (
-                <ActivityIndicator color={Colors.primary} size="large" />
-              ) : (
-                <>
-                  <MaterialIcons name="camera-alt" size={48} color={Colors.primary} />
-                  <Text style={styles.faceBtnTxt}>Tap to scan your face</Text>
-                </>
-              )}
+            <Pressable style={styles.faceBtn} onPress={() => setShowFaceVerify(true)}>
+              <MaterialIcons name="photo-camera" size={48} color="#fff" />
+              <Text style={styles.faceBtnTxt}>Start Face Verification</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: Fonts.sm, marginTop: 4 }}>
+                Opens front camera for a live selfie
+              </Text>
             </Pressable>
           )}
 
           <Pressable
-            style={[styles.nextBtn, (!faceVerified || saving) && styles.btnDisabled]}
+            style={[styles.nextBtn, (!faceVerified || !bankVerified || saving) && styles.btnDisabled]}
             onPress={handleComplete}
-            disabled={!faceVerified || saving}
+            disabled={!faceVerified || !bankVerified || saving}
           >
             {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.nextBtnTxt}>Complete KYC & Start Shopping</Text>}
           </Pressable>
@@ -487,6 +714,13 @@ export default function KYCVerificationScreen() {
         onCancel={handleDigiLockerCancel}
         onError={handleDigiLockerError}
         onClose={() => setDigilockerVisible(false)}
+      />
+
+      {/* Live front-camera face verification (no gallery upload) */}
+      <FaceVerificationModal
+        visible={showFaceVerify}
+        onClose={() => setShowFaceVerify(false)}
+        onSuccess={handleFaceVerified}
       />
     </KeyboardAvoidingView>
   );
@@ -533,4 +767,9 @@ const styles = StyleSheet.create({
   experianRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
   experianLabel: { fontSize: Fonts.sm, color: Colors.textSecondary, width: 80 },
   experianValue: { fontSize: Fonts.sm, color: Colors.textPrimary, fontFamily: 'Inter-SemiBold', flex: 1, textAlign: 'right' },
+  typeRow: { width: '100%', flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
+  typeChip: { flex: 1, borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md, paddingVertical: Spacing.md, alignItems: 'center', backgroundColor: Colors.surfaceAlt },
+  typeChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  typeChipTxt: { fontSize: Fonts.md, color: Colors.textSecondary, fontWeight: Fonts.semiBold },
+  typeChipTxtActive: { color: Colors.primary },
 });

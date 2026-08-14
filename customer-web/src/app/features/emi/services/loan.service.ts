@@ -42,7 +42,8 @@ export interface EmiScheduleItem {
 }
 
 export interface LoanDashboard {
-  loan: LoanSummary;
+  hasLoan?: boolean;
+  loan: LoanSummary | null;
   summary: {
     outstandingBalance: number;
     totalLoanAmount: number;
@@ -55,7 +56,7 @@ export interface LoanDashboard {
     principalPaid: number;
     interestPaid: number;
     loanCompletionPercent: number;
-  };
+  } | null;
   nextEmi: {
     id: string;
     emiNumber: number;
@@ -74,7 +75,7 @@ export interface LoanDashboard {
     receiptAvailable: boolean;
   }>;
   schedule: EmiScheduleItem[];
-  canPayEmi: boolean;
+  canPayEmi?: boolean;
 }
 
 export interface LoanPaymentHistory {
@@ -97,8 +98,8 @@ export class LoanService {
     return this.wrap(this.http.get<ApiSuccess<LoanSummary>>(`${this.baseUrl}/current`));
   }
 
-  getDashboard(): Observable<LoanDashboard> {
-    return this.wrap(this.http.get<ApiSuccess<LoanDashboard>>(`${this.baseUrl}/dashboard`));
+  getDashboard(): Observable<LoanDashboard | null> {
+    return this.wrap(this.http.get<ApiSuccess<LoanDashboard | null>>(`${this.baseUrl}/dashboard`));
   }
 
   getPaymentHistory(): Observable<LoanPaymentHistory> {

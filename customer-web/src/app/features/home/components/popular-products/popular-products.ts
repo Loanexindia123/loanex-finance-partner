@@ -19,6 +19,7 @@ import {
   ProductsApiService,
 } from '../../../products/services/products-api.service';
 import { formatInr } from '../../../../shared/utils/currency';
+import { resolveMediaUrl } from '../../../../shared/utils/media-url';
 import { PopularProduct } from '../../models/catalog.models';
 import { HomeDataCacheService } from '../../services/home-data-cache.service';
 
@@ -181,7 +182,7 @@ export class PopularProducts {
         product.deliveryCharge > 0
           ? `Delivery ${formatInr(product.deliveryCharge)}`
           : 'Free Delivery',
-      imageSrc: product.imageUrl || product.thumbnail,
+      imageSrc: resolveMediaUrl(product.imageUrl || product.thumbnail),
       imageAlt: product.name,
       path: `/products/${product.slug || product.id}`,
       wishlist: false,

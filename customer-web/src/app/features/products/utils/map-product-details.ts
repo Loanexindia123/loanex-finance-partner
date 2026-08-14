@@ -5,6 +5,7 @@ import {
   ProductVariantSku,
 } from '../models/product-details.models';
 import { ProductDetail } from '../services/products-api.service';
+import { resolveMediaUrl } from '../../../shared/utils/media-url';
 
 function toMoneyNumber(value: unknown): number {
   if (value === null || value === undefined || value === '') return 0;
@@ -183,7 +184,7 @@ function deriveStockStatus(stock: number): ProductStockStatus {
 function galleryFromUrls(urls: string[], name: string, prefix = 'img') {
   return urls.map((src, index) => ({
     id: `${prefix}-${index + 1}`,
-    src,
+    src: resolveMediaUrl(src),
     alt: `${name} image ${index + 1}`,
   }));
 }
@@ -360,12 +361,17 @@ export function mapProductDetails(detail: ProductDetail): ProductDetails {
     selected?.imagesGallery?.length
       ? selected.imagesGallery.map((img, index) => ({
           ...img,
+          src: resolveMediaUrl(img.src),
           alt: `${displayName} image ${index + 1}`,
         }))
       : selected?.images?.length
         ? galleryFromUrls(selected.images, displayName, selected.id)
         : detail.imagesGallery.length > 0
-          ? detail.imagesGallery
+          ? detail.imagesGallery.map((img, index) => ({
+              ...img,
+              src: resolveMediaUrl(img.src),
+              alt: img.alt || `${displayName} image ${index + 1}`,
+            }))
           : galleryFromUrls(detail.images, displayName);
 
   const isActive =
@@ -447,6 +453,7 @@ export function applyVariantToDetails(
     variant.imagesGallery?.length > 0
       ? variant.imagesGallery.map((img, index) => ({
           ...img,
+          src: resolveMediaUrl(img.src),
           alt: `${presentation.name} image ${index + 1}`,
         }))
       : galleryFromUrls(variant.images ?? [], presentation.name, variant.id);

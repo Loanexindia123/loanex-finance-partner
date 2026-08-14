@@ -12,6 +12,8 @@ export interface AdminUser {
   roleId: string | null;
   roleName: string | null;
   permissions: string[];
+  /** When true, user must change the initial password before using the portal. */
+  mustChangePassword: boolean;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -28,6 +30,7 @@ export interface AdminLoginRawResponse {
     roleId: string | null;
     roleName: string | null;
     permissions: string[];
+    mustChangePassword?: boolean;
     created_at: string;
     updated_at: string;
   };
@@ -48,6 +51,7 @@ export interface MeRawResponse {
     roleId: string | null;
     roleName: string | null;
     permissions: string[];
+    mustChangePassword?: boolean;
     createdAt: string;
     updatedAt: string;
   };

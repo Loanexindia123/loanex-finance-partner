@@ -29,6 +29,8 @@ if (process.env.NODE_ENV !== 'production') {
   process.env.SUPABASE_SYNC_MODE ??= 'source';
   process.env.DATA_PRIMARY ??= 'mongodb';
   process.env.PAYMENT_DEV_BYPASS ??= 'true';
+  // TODO(TEMP): Remove once IDSPay production bank verification is fixed.
+  process.env.BANK_VERIFICATION_TEMP_BYPASS ??= 'true';
 }
 
 const envSchema = z.object({
@@ -136,6 +138,17 @@ const envSchema = z.object({
    * (no silent self-attestation success).
    */
   BANK_VERIFICATION_PROVIDER: z.string().optional().default(''),
+  /**
+   * TODO(TEMP): Remove once IDSPay production bank verification is fixed
+   * ("Invalid Payment mode" / BANK_PROVIDER_ERROR).
+   * When true (non-production only), bank verify skips IDSPay and allows
+   * onboarding to continue with a clearly marked TEMP_BYPASS record.
+   * Forced OFF when NODE_ENV=production.
+   */
+  BANK_VERIFICATION_TEMP_BYPASS: z
+    .string()
+    .optional()
+    .transform((value) => value === 'true'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -165,6 +178,14 @@ if (env.NODE_ENV === 'production') {
   if (env.PAYMENT_DEV_BYPASS) {
     console.error('[SECURITY] PAYMENT_DEV_BYPASS must be false in production — forcing off');
     (env as { PAYMENT_DEV_BYPASS: boolean }).PAYMENT_DEV_BYPASS = false;
+  }
+  // TODO(TEMP): Remove BANK_VERIFICATION_TEMP_BYPASS once IDSPay is fixed.
+  // Intentionally allowed in production while IDSPay returns "Invalid Payment mode"
+  // so onboarding can be tested. Turn OFF / remove as soon as IDSPay works.
+  if (env.BANK_VERIFICATION_TEMP_BYPASS) {
+    console.warn(
+      '[TEMP] BANK_VERIFICATION_TEMP_BYPASS is ON in production — IDSPay bank verify skipped',
+    );
   }
   if (!env.AUTHKEY_API_KEY?.trim()) {
     console.error('[SECURITY] AUTHKEY_API_KEY is missing — OTP send will fail closed');

@@ -390,16 +390,15 @@ export class VerificationService {
         actionLabel: status.panVerified ? 'View' : 'Start Verification',
         actionPath: '/verification',
       },
-      // Bank Account Verification — temporarily disabled; KYC via Aadhaar for now
-      // {
-      //   key: 'bank',
-      //   icon: 'pi pi-building',
-      //   title: 'Bank Account Verification',
-      //   description: 'Verify your bank account to complete EMI eligibility checks.',
-      //   completed: status.bankVerified,
-      //   actionLabel: status.bankVerified ? 'View' : 'Start Verification',
-      //   actionPath: '/verification',
-      // },
+      {
+        key: 'bank',
+        icon: 'pi pi-building',
+        title: 'Bank Account Verification',
+        description: 'Verify your bank account to complete EMI eligibility checks.',
+        completed: status.bankVerified,
+        actionLabel: status.bankVerified ? 'View' : 'Start Verification',
+        actionPath: '/verification',
+      },
     ];
   }
 

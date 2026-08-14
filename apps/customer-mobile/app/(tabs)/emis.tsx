@@ -213,6 +213,13 @@ export default function EMIsScreen() {
               </Text>
             </Pressable>
           )}
+          <Pressable
+            style={styles.autopayBtn}
+            onPress={() => router.push('/autopay' as any)}
+          >
+            <MaterialIcons name="autorenew" size={18} color={Colors.primary} />
+            <Text style={styles.autopayBtnTxt}>Auto EMI / Autopay</Text>
+          </Pressable>
         </View>
       ),
     },
@@ -340,6 +347,19 @@ const styles = StyleSheet.create({
   statusTxt: { fontSize: 10, fontWeight: Fonts.bold },
   payBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary, paddingVertical: Spacing.md, borderRadius: Radius.lg, gap: Spacing.sm },
   payBtnTxt: { color: '#fff', fontWeight: Fonts.bold, fontSize: Fonts.md },
+  autopayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.lg,
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  autopayBtnTxt: { color: Colors.primary, fontWeight: Fonts.bold, fontSize: Fonts.md },
   emiRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.borderLight },
   emiNum: { width: 34, height: 34, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md },
   emiNumTxt: { fontSize: Fonts.sm, fontWeight: Fonts.bold },

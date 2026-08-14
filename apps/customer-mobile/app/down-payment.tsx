@@ -15,7 +15,9 @@ import {
   createDownPaymentDevBypassSignature,
   verifyDownPayment,
   DownPaymentContext,
+  VerifyDownPaymentResponse,
 } from '../services/downPaymentService';
+import AutoEmiCard from '../components/feature/AutoEmiCard';
 
 const showAlert = (title: string, msg: string, onOk?: () => void) => {
   if (Platform.OS === 'web') { window.alert(`${title}\n${msg}`); onOk?.(); }
@@ -41,7 +43,9 @@ export default function DownPaymentScreen() {
     currency: string;
     prefill: { name: string; email: string; contact: string };
   } | null>(null);
-  const [success, setSuccess] = useState<any>(null);
+  const [success, setSuccess] = useState<
+    (Partial<VerifyDownPaymentResponse> & { message?: string }) | null
+  >(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -50,7 +54,11 @@ export default function DownPaymentScreen() {
       .then((ctx) => {
         setContext(ctx);
         if (ctx.orderId && ctx.status === 'DOWN_PAYMENT_COMPLETED') {
-          setSuccess({ message: 'Down payment already completed.', orderId: ctx.orderId, orderNumber: ctx.orderNumber });
+          setSuccess({
+            message: 'Down payment already completed.',
+            orderId: ctx.orderId,
+            orderNumber: ctx.orderNumber ?? undefined,
+          });
         }
       })
       .catch((e: any) => setError(e.message || 'Unable to load down-payment details.'))
@@ -168,22 +176,34 @@ export default function DownPaymentScreen() {
             </Pressable>
           </View>
         ) : success ? (
-          <View style={styles.card}>
-            <MaterialIcons name="check-circle" size={56} color={Colors.success} style={{ alignSelf: 'center', marginBottom: Spacing.md }} />
-            <Text style={styles.successTitle}>{success.message || 'Down payment successful!'}</Text>
-            {success.orderNumber && (
-              <Text style={styles.successSub}>Order: {success.orderNumber}</Text>
-            )}
-            {success.loanAccountNumber && (
-              <Text style={styles.successSub}>Loan Account: {success.loanAccountNumber}</Text>
-            )}
-            <Pressable
-              style={styles.primaryBtn}
-              onPress={() => success.orderId ? router.replace(`/order/${success.orderId}` as any) : router.replace('/(tabs)/emis' as any)}
-            >
-              <Text style={styles.primaryBtnTxt}>View Order</Text>
-            </Pressable>
-          </View>
+          <>
+            <View style={styles.card}>
+              <MaterialIcons name="check-circle" size={56} color={Colors.success} style={{ alignSelf: 'center', marginBottom: Spacing.md }} />
+              <Text style={styles.successTitle}>{success.message || 'Down payment successful!'}</Text>
+              {success.orderNumber && (
+                <Text style={styles.successSub}>Order: {success.orderNumber}</Text>
+              )}
+              {success.loanAccountNumber && (
+                <Text style={styles.successSub}>Loan Account: {success.loanAccountNumber}</Text>
+              )}
+              <Pressable
+                style={styles.primaryBtn}
+                onPress={() =>
+                  success.orderId
+                    ? router.replace(`/order/${success.orderId}` as any)
+                    : router.replace('/(tabs)/emis' as any)
+                }
+              >
+                <Text style={styles.primaryBtnTxt}>View Order</Text>
+              </Pressable>
+            </View>
+            {/* Down-payment screen is EMI-only; Full Payment never reaches here. */}
+            <AutoEmiCard
+              enabled
+              variant="setup"
+              onManagePress={() => router.push('/autopay' as any)}
+            />
+          </>
         ) : context ? (
           <>
             <View style={styles.card}>

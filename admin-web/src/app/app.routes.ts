@@ -9,6 +9,18 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/login/login').then((m) => m.Login),
   },
   {
+    path: 'auth/forgot-password',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./features/auth/forgot-password/forgot-password').then((m) => m.ForgotPassword),
+  },
+  {
+    path: 'auth/change-password',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/auth/change-password/change-password').then((m) => m.ChangePassword),
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () => import('./layout/admin-shell/admin-shell').then((m) => m.AdminShell),
@@ -55,6 +67,12 @@ export const routes: Routes = [
         path: 'users',
         canActivate: [permissionGuard('users.view')],
         loadChildren: () => import('./features/users/users.routes').then((m) => m.USERS_ROUTES),
+      },
+      {
+        path: 'employees',
+        canActivate: [permissionGuard('users.view')],
+        loadChildren: () =>
+          import('./features/employees/employees.routes').then((m) => m.EMPLOYEES_ROUTES),
       },
       {
         path: 'roles',

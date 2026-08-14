@@ -78,6 +78,7 @@ export class MyProfileComponent implements OnInit {
   readonly kycLoading = signal(false);
   readonly aadhaarVerified = signal(false);
   readonly panVerified = signal(false);
+  readonly bankVerified = signal(false);
 
   readonly personalForm = this.fb.nonNullable.group({
     fullName: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
@@ -110,6 +111,7 @@ export class MyProfileComponent implements OnInit {
         this.kycLoading.set(false);
         this.aadhaarVerified.set(status.aadhaarVerified);
         this.panVerified.set(status.panVerified);
+        this.bankVerified.set(status.bankVerified);
       },
       error: () => this.kycLoading.set(false),
     });

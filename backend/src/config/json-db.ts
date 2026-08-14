@@ -52,6 +52,8 @@ export interface LocalDatabaseSchema {
   wholesalers: any[];
   delivery_partners: any[];
   delivery_zones: any[];
+  product_types: any[];
+  employees: any[];
 }
 
 const DEFAULT_INITIAL_DATA: LocalDatabaseSchema = {
@@ -144,6 +146,25 @@ const DEFAULT_INITIAL_DATA: LocalDatabaseSchema = {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
+    {
+      id: '00000000-0000-4000-8000-000000000006',
+      name: 'Employee',
+      description: 'Employee portal: products, product masters and own dealers',
+      permissions: [
+        'products.view',
+        'products.create',
+        'products.edit',
+        'masters.view',
+        'masters.create',
+        'masters.edit',
+      ],
+      is_system: false,
+      isSystem: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
   ],
   profiles: [],
   categories: [
@@ -221,6 +242,15 @@ const DEFAULT_INITIAL_DATA: LocalDatabaseSchema = {
     { id: 'brand-samsung', name: 'Samsung', logo: '', status: 'active' },
     { id: 'brand-sony', name: 'Sony', logo: '', status: 'active' },
   ],
+  product_types: [
+    { id: 'ptype-smartphone', name: 'Smartphone', status: 'active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: 'ptype-tablet', name: 'Tablet', status: 'active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: 'ptype-laptop', name: 'Laptop', status: 'active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: 'ptype-accessories', name: 'Accessories', status: 'active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: 'ptype-smartwatch', name: 'Smartwatch', status: 'active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: 'ptype-audio', name: 'Audio', status: 'active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  ],
+  employees: [],
   products: [],
   product_emi_plans: [],
   cart_items: [],
@@ -667,6 +697,8 @@ export const ADMIN_LAZY_COLLECTIONS = [
   'wholesalers',
   'delivery_partners',
   'delivery_zones',
+  'product_types',
+  'employees',
 ] as const;
 
 const ADMIN_LAZY_SET = new Set<string>(ADMIN_LAZY_COLLECTIONS);

@@ -15,6 +15,12 @@ export const MASTER_NAV_CARDS: MasterNavCard[] = [
     route: '/masters/brands',
   },
   {
+    title: 'Product Types',
+    description: 'Product type options for create and edit product forms',
+    icon: 'pi pi-box',
+    route: '/masters/product-types',
+  },
+  {
     title: 'Categories & Subcategories',
     description: 'Catalogue hierarchy for products and dealers',
     icon: 'pi pi-sitemap',
@@ -60,6 +66,13 @@ export const NAMED_MASTER_ROUTES: Record<string, NamedMasterRouteConfig> = {
     subtitle: 'Manage product brands for catalogue and filters',
     entityLabel: 'Brand',
     apiPath: '/admin/brands',
+    addPermission: 'masters.create',
+  },
+  'product-types': {
+    title: 'Product Types',
+    subtitle: 'Manage product types for catalogue and product forms',
+    entityLabel: 'Product Type',
+    apiPath: '/admin/product_types',
     addPermission: 'masters.create',
   },
   warehouses: {

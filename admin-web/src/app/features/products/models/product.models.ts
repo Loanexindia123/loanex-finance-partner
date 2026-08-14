@@ -21,7 +21,6 @@ export interface VariantAttribute {
   values: string[];
 }
 
-export const PRODUCT_TYPES = ['Smartphone', 'Tablet', 'Laptop', 'Accessories', 'Smartwatch', 'Audio'];
 export const COUNTRIES = ['India', 'China', 'Vietnam', 'USA', 'South Korea'];
 export const WARRANTIES = ['None', '6 Months', '1 Year', '2 Years', '3 Years'];
 export const PRODUCT_CONDITIONS = ['New', 'Refurbished - Like New', 'Refurbished - Good', 'Open Box'];
@@ -430,6 +429,7 @@ export interface ProductWizardData {
   description: string;
   features: string[];
   boxContents: string[];
+  aboutThisItem: string[];
   productVideoUrl: string;
   colourSizeVariant: string;
   serialImeiTracking: boolean;
@@ -547,6 +547,7 @@ export function initialWizardData(): ProductWizardData {
     description: '',
     features: [],
     boxContents: [],
+    aboutThisItem: [],
     productVideoUrl: '',
     colourSizeVariant: '',
     serialImeiTracking: false,
@@ -635,8 +636,6 @@ export const WIZARD_STEPS = [
   'Variants',
   'Images',
   'Pricing',
-  'Inventory',
-  'Dealer',
   'Delivery',
   'EMI',
   'SEO',
@@ -653,8 +652,6 @@ export const WIZARD_STEP_META: ReadonlyArray<{
   { title: 'Variants', description: 'Optional named SKUs — colour, size, storage, and more.', icon: 'pi-clone' },
   { title: 'Images', description: 'Primary and gallery image URLs used on the storefront.', icon: 'pi-images' },
   { title: 'Pricing', description: 'MRP, selling price and marketplace comparison.', icon: 'pi-wallet' },
-  { title: 'Inventory', description: 'Stock, warehouse and order quantity rules.', icon: 'pi-box' },
-  { title: 'Dealer', description: 'Link dealer master data and commercial terms.', icon: 'pi-shop' },
   { title: 'Delivery', description: 'Dispatch SLA, charges and fulfilment options.', icon: 'pi-send' },
   { title: 'EMI', description: 'LoanEx EMI availability and plan configuration.', icon: 'pi-credit-card' },
   { title: 'SEO', description: 'Slug, meta tags and search keywords.', icon: 'pi-search' },
@@ -719,7 +716,7 @@ export interface Product {
   stock?: number;
   availableStock?: number;
   stockStatus?: string;
-  status: 'active' | 'inactive' | 'draft' | string;
+  status: 'active' | 'inactive' | 'draft' | 'pending_approval' | 'rejected' | string;
   emiAvailable?: boolean;
   featured?: boolean;
   trending?: boolean;
@@ -743,7 +740,7 @@ export interface ProductQueryParams {
   trending?: boolean;
   recommended?: boolean;
   search?: string;
-  status?: 'all' | 'active' | 'inactive' | 'draft';
+  status?: 'all' | 'active' | 'inactive' | 'draft' | 'pending_approval' | 'rejected';
   availability?: 'IN_STOCK' | 'OUT_OF_STOCK' | 'ALL';
 }
 
@@ -768,7 +765,7 @@ export interface ProductPayload {
   price: number;
   mrp?: number;
   stock?: number;
-  status: 'active' | 'draft' | 'inactive';
+  status: 'active' | 'draft' | 'pending_approval' | 'rejected' | 'inactive';
   emiAvailable?: boolean;
   warranty?: string;
   hsnCode?: string;

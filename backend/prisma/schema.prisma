@@ -690,6 +690,8 @@ model products {
   hsnCode                       String?
   manufacturer                  String?
   createdAt                     DateTime?           @default(now()) @db.Timestamptz(6)
+  /** Auth user id of the employee who created the product (admin ownership). */
+  creatorId                     String?
   wizardData                    Json?
   amazonPrice                   Decimal?            @db.Decimal(10, 2)
   availableStock                Int?                @default(0)

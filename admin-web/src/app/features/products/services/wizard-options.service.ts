@@ -1,6 +1,6 @@
 import { Injectable, WritableSignal, computed, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { catchError, of } from 'rxjs';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Observable, catchError, map, of, tap } from 'rxjs';
 import { apiUrl } from '../../../core/config/api.config';
 import { ApiEnvelope } from '../../../core/models/api.models';
 import { unwrapApi } from '../../../core/rxjs/unwrap-api';
@@ -31,6 +31,8 @@ const SEED = {
   delivery_zones: ['Zone 1', 'Zone 2'],
 } as const;
 
+const PRODUCT_TYPES_API = '/admin/product_types';
+
 function unwrapList(raw: unknown): NamedMaster[] {
   if (Array.isArray(raw)) return raw as NamedMaster[];
   if (raw && typeof raw === 'object') {
@@ -48,6 +50,14 @@ function normalizeName(name: string): string {
   return name.trim();
 }
 
+function extractHttpMessage(err: unknown): string {
+  if (err instanceof HttpErrorResponse) {
+    const body = err.error as { message?: string; error?: string } | null;
+    return body?.message || body?.error || err.message || 'Request failed';
+  }
+  return err instanceof Error ? err.message : 'Request failed';
+}
+
 @Injectable({ providedIn: 'root' })
 export class WizardOptionsService {
   private readonly http = inject(HttpClient);
@@ -60,6 +70,7 @@ export class WizardOptionsService {
   private readonly partnersSig = signal<NamedMaster[]>([]);
   private readonly zonesSig = signal<NamedMaster[]>([]);
   private readonly categoriesSig = signal<NamedMaster[]>([]);
+  private readonly productTypesSig = signal<NamedMaster[]>([]);
 
   readonly brands = computed(() => activeNames(this.brandsSig()));
   readonly warehouses = computed(() => activeNames(this.warehousesSig()));
@@ -68,7 +79,11 @@ export class WizardOptionsService {
   readonly wholesalers = computed(() => activeNames(this.wholesalersSig()));
   readonly deliveryPartners = computed(() => activeNames(this.partnersSig()));
   readonly deliveryZones = computed(() => activeNames(this.zonesSig()));
+  readonly productTypes = computed(() => activeNames(this.productTypesSig()));
   readonly categoryTree = computed(() => buildCategoryTree(this.categoriesSig()));
+
+  readonly productTypesLoading = signal(false);
+  readonly productTypesError = signal('');
 
   constructor() {
     this.seedDefaults();
@@ -90,6 +105,50 @@ export class WizardOptionsService {
 
   findDealerByName(name: string): NamedMaster | undefined {
     return this.dealersSig().find((s) => s.name === name);
+  }
+
+  reloadProductTypes(): void {
+    this.loadProductTypes();
+  }
+
+  /**
+   * Create a Product Type via API, refresh local options, and return the saved name.
+   * Does not optimistically mutate before the server responds.
+   */
+  createProductType(name: string): Observable<string> {
+    const trimmed = normalizeName(name);
+    if (!trimmed) {
+      return new Observable((subscriber) => {
+        subscriber.error(new Error('Product Type name is required'));
+      });
+    }
+    if (this.productTypesSig().some((item) => eq(item.name, trimmed))) {
+      return new Observable((subscriber) => {
+        subscriber.error(new Error('A product type with this name already exists.'));
+      });
+    }
+
+    return this.http
+      .post<ApiEnvelope<NamedMaster>>(apiUrl(PRODUCT_TYPES_API), {
+        name: trimmed,
+        status: 'active',
+      })
+      .pipe(
+        unwrapApi(),
+        tap((created) => {
+          const savedName = String(created?.name ?? trimmed).trim() || trimmed;
+          const item: NamedMaster = {
+            id: String(created?.id ?? nextId('ptype')),
+            name: savedName,
+            status: created?.status || 'active',
+          };
+          this.productTypesSig.update((list) => {
+            if (list.some((row) => eq(row.name, item.name))) return list;
+            return [...list, item];
+          });
+        }),
+        map((created) => String(created?.name ?? trimmed).trim() || trimmed),
+      );
   }
 
   addBrand(name: string): boolean {
@@ -274,6 +333,8 @@ export class WizardOptionsService {
         status: 'active',
       })),
     );
+    // Product types come from API only — no hardcoded frontend seed.
+    this.productTypesSig.set([]);
   }
 
   private loadRemote(): void {
@@ -302,6 +363,36 @@ export class WizardOptionsService {
     this.loadMaster('/admin/wholesalers', this.wholesalersSig);
     this.loadMaster('/admin/delivery_partners', this.partnersSig);
     this.loadMaster('/admin/delivery_zones', this.zonesSig);
+    this.loadProductTypes();
+  }
+
+  private loadProductTypes(): void {
+    this.productTypesLoading.set(true);
+    this.productTypesError.set('');
+    this.http
+      .get<ApiEnvelope<unknown>>(apiUrl(PRODUCT_TYPES_API))
+      .pipe(
+        unwrapApi(),
+        catchError((err) => {
+          this.productTypesLoading.set(false);
+          this.productTypesError.set(extractHttpMessage(err));
+          return of(null);
+        }),
+      )
+      .subscribe((raw) => {
+        if (raw == null) return;
+        const list = unwrapList(raw)
+          .map((item) => ({
+            ...item,
+            id: String(item.id ?? nextId('ptype')),
+            name: String(item.name ?? '').trim(),
+            status: item.status || 'active',
+          }))
+          .filter((item) => item.name);
+        this.productTypesSig.set(list);
+        this.productTypesLoading.set(false);
+        this.productTypesError.set('');
+      });
   }
 
   private loadMaster(path: string, dest: WritableSignal<NamedMaster[]>): void {

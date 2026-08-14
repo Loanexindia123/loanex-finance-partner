@@ -1,0 +1,193 @@
+<app-page-header
+  title="Product Types"
+  subtitle="Manage product types used in the create/edit product form"
+  backLink="/masters"
+  backLabel="Back to Masters"
+/>
+
+@if (!loading() && !error()) {
+  <div class="toolbar">
+    <label class="search">
+      <i class="pi pi-search" aria-hidden="true"></i>
+      <input
+        type="search"
+        placeholder="Search product types..."
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event); resetPage()"
+      />
+    </label>
+
+    <button *appCan="'masters.create'" class="toolbar__add" type="button" (click)="openAdd()">
+      <i class="pi pi-plus" aria-hidden="true"></i>
+      Add Product Type
+    </button>
+
+    <p-select
+      [options]="statusOptions"
+      [ngModel]="statusFilter()"
+      (ngModelChange)="statusFilter.set($event); resetPage()"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Status"
+      styleClass="catalog-filter"
+      panelStyleClass="catalog-filter-panel"
+      appendTo="body"
+      [checkmark]="false"
+      scrollHeight="240px"
+    />
+
+    @if (hasActiveFilters()) {
+      <button class="toolbar__clear" type="button" (click)="clearFilters()">
+        <i class="pi pi-filter-slash" aria-hidden="true"></i>
+        Clear
+      </button>
+    }
+  </div>
+}
+
+@if (loading()) {
+  <app-branded-loader message="Loading product types..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" actionLabel="Retry" (action)="load()" />
+} @else if (filtered().length === 0) {
+  <app-empty-state
+    icon="pi-tags"
+    title="No product types found"
+    description="Add your first product type or adjust your search and filters."
+  />
+} @else {
+  <div class="table-shell">
+    <p-table [value]="paged()" dataKey="id" [rowHover]="true" styleClass="catalog-table">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Product Type</th>
+          <th>Status</th>
+          <th class="actions-col">Actions</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-item>
+        <tr>
+          <td><span class="name-cell">{{ item.name }}</span></td>
+          <td>
+            <div class="status-cell">
+              <app-status-badge [status]="item.status === 'active' ? 'active' : 'inactive'" />
+              <p-toggleswitch
+                *appCan="'masters.edit'"
+                [ngModel]="item.status === 'active'"
+                [disabled]="togglingId() === item.id"
+                (ngModelChange)="toggleStatus(item, $event)"
+                [inputId]="'product-type-status-' + item.id"
+              />
+            </div>
+          </td>
+          <td>
+            <div class="row-actions">
+              <button
+                *appCan="'masters.edit'"
+                type="button"
+                class="act act--edit"
+                pTooltip="Edit product type"
+                [tooltipOptions]="actionTooltip"
+                (click)="openEdit(item)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <footer class="pager">
+    <p class="pager__meta">
+      Showing <strong>{{ pageFrom() }}–{{ pageTo() }}</strong> of
+      <strong>{{ filtered().length }}</strong> product types
+    </p>
+
+    <div class="pager__nav" role="navigation" aria-label="Pagination">
+      <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(1)" aria-label="First page">
+        <i class="pi pi-angle-double-left"></i>
+      </button>
+      <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" aria-label="Previous page">
+        <i class="pi pi-angle-left"></i>
+      </button>
+      @for (page of pageNumbers(); track page) {
+        <button
+          type="button"
+          class="pager__btn"
+          [class.pager__btn--active]="page === currentPage()"
+          (click)="goToPage(page)"
+        >
+          {{ page }}
+        </button>
+      }
+      <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" aria-label="Next page">
+        <i class="pi pi-angle-right"></i>
+      </button>
+      <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" aria-label="Last page">
+        <i class="pi pi-angle-double-right"></i>
+      </button>
+    </div>
+
+    <div class="pager__size">
+      <span>Rows</span>
+      <p-select
+        [options]="pageSizeOptions"
+        [ngModel]="pageSize()"
+        (ngModelChange)="changePageSize($event)"
+        optionLabel="label"
+        optionValue="value"
+        styleClass="catalog-filter pager-filter"
+        panelStyleClass="catalog-filter-panel"
+        appendTo="body"
+      />
+    </div>
+  </footer>
+}
+
+<p-dialog
+  [header]="dialogTitle()"
+  [visible]="dialogOpen()"
+  (visibleChange)="!$event ? closeDialog() : dialogOpen.set(true)"
+  [modal]="true"
+  [style]="{ width: '26rem' }"
+  [draggable]="false"
+  styleClass="warehouse-dialog"
+>
+  <div class="warehouse-form">
+    <label class="field">
+      <span>Product Type Name *</span>
+      <input
+        pInputText
+        [ngModel]="draftName()"
+        (ngModelChange)="draftName.set($event)"
+        placeholder="Enter product type name"
+      />
+    </label>
+
+    <div class="enable-row">
+      <div>
+        <strong>Status</strong>
+        <p>Visible in product create/edit dropdown when active</p>
+      </div>
+      <p-toggleswitch
+        [ngModel]="draftActive()"
+        (ngModelChange)="draftActive.set($event)"
+        inputId="productTypeActive"
+      />
+    </div>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <button pButton type="button" severity="secondary" [outlined]="true" label="Cancel" (click)="closeDialog()"></button>
+    <button
+      pButton
+      type="button"
+      [label]="editing() ? 'Update' : 'Add Product Type'"
+      [loading]="saving()"
+      [disabled]="saving()"
+      (click)="submit()"
+    ></button>
+  </ng-template>
+</p-dialog>

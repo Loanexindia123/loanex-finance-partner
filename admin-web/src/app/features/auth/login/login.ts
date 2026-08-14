@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
 
@@ -9,7 +9,7 @@ const REMEMBERED_EMAIL_KEY = 'loanexAdmin.rememberedEmail';
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, RouterLink],
   templateUrl: './login.html',
   styleUrl: './login.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -42,8 +42,12 @@ export class Login {
     const { email, password, rememberMe } = this.form.getRawValue();
 
     this.auth.login({ email: email.trim(), password }).subscribe({
-      next: () => {
+      next: (user) => {
         this.persistRememberedEmail(rememberMe, email);
+        if (user.mustChangePassword) {
+          this.router.navigateByUrl('/auth/change-password');
+          return;
+        }
         const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') || '/dashboard';
         this.router.navigateByUrl(returnUrl);
       },

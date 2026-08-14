@@ -18,6 +18,7 @@ import { EmptyState } from '../../../../shared/components/empty-state/empty-stat
 import { StatusBadge } from '../../../../shared/components/status-badge/status-badge';
 import { StatCard } from '../../../../shared/components/stat-card/stat-card';
 import { CanDirective } from '../../../../shared/directives/can.directive';
+import { AuthService } from '../../../../core/services/auth.service';
 import { ProductService } from '../../services/product.service';
 import {
   Category,
@@ -56,6 +57,7 @@ import {
 })
 export class ProductList {
   private readonly products = inject(ProductService);
+  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly messages = inject(MessageService);
 
@@ -86,6 +88,7 @@ export class ProductList {
 
   readonly deleteTarget = signal<Product | null>(null);
   readonly deleting = signal(false);
+  readonly approvingId = signal<string | null>(null);
 
   readonly categoryOptions = computed(() => [
     { label: 'All categories', value: null },
@@ -95,8 +98,10 @@ export class ProductList {
   readonly statusOptions = [
     { label: 'All statuses', value: 'all' },
     { label: 'Active', value: 'active' },
-    { label: 'Inactive', value: 'inactive' },
+    { label: 'Pending Approval', value: 'pending_approval' },
     { label: 'Draft', value: 'draft' },
+    { label: 'Rejected', value: 'rejected' },
+    { label: 'Inactive', value: 'inactive' },
   ];
 
   readonly stockOptions = [
@@ -119,6 +124,7 @@ export class ProductList {
     return {
       total: items.length,
       active: items.filter((p) => String(p.status).toLowerCase() === 'active').length,
+      pending: items.filter((p) => String(p.status).toLowerCase() === 'pending_approval').length,
       low: items.filter((p) => productStockState(p) === 'low').length,
       out: items.filter((p) => productStockState(p) === 'out').length,
     };
@@ -252,6 +258,44 @@ export class ProductList {
 
   edit(product: Product): void {
     this.router.navigate(['/products', product.id]);
+  }
+
+  isPendingApproval(product: Product): boolean {
+    return String(product.status).toLowerCase() === 'pending_approval';
+  }
+
+  /** Employees can submit for approval but cannot publish. */
+  canApproveProducts(): boolean {
+    const role = String(this.auth.user()?.roleName ?? '')
+      .trim()
+      .toLowerCase();
+    return role !== 'employee';
+  }
+
+  approve(product: Product): void {
+    if (this.approvingId() || !this.isPendingApproval(product)) return;
+    this.approvingId.set(product.id);
+    this.products.approve(product.id).subscribe({
+      next: (updated) => {
+        this.items.update((items) =>
+          items.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+        );
+        this.approvingId.set(null);
+        this.messages.add({
+          severity: 'success',
+          summary: 'Product approved',
+          detail: `${updated.name} is now visible to customers.`,
+        });
+      },
+      error: (err: unknown) => {
+        this.approvingId.set(null);
+        this.messages.add({
+          severity: 'error',
+          summary: 'Approval failed',
+          detail: this.extractMessage(err),
+        });
+      },
+    });
   }
 
   askDelete(product: Product): void {

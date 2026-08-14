@@ -27,7 +27,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { SelectModule } from 'primeng/select';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { ButtonModule } from 'primeng/button';
-import { MessageService } from 'primeng/api';
+import { ConfirmationService, MessageService } from 'primeng/api';
 import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
 import { isStoredImageRef, resolveMediaUrl } from '../../../../core/config/api.config';
@@ -36,14 +36,12 @@ import { ManageableSelect } from '../../components/manageable-select/manageable-
 import { ProductService } from '../../services/product.service';
 import { WizardOptionsService } from '../../services/wizard-options.service';
 import {
-  COUNTRIES,
   DELIVERY_CHARGE_METHODS,
   GALLERY_IMAGE_LIMIT,
   PRODUCT_CONDITIONS,
   PRODUCT_IMAGE_ACCEPT,
   PRODUCT_IMAGE_MAX_BYTES,
   PRODUCT_IMAGE_TYPES,
-  PRODUCT_TYPES,
   EmiPlanEntry,
   INVOICE_SETTINGS,
   PAYMENT_TERMS,
@@ -69,7 +67,15 @@ import {
   normalizeTextListItems,
   normalizeVariant,
 } from '../../models/product.models';
-import { generateSkuFromModelNumber, getMockExistingSkus } from '../../utils/sku-generation';
+import { generateProductSku, getMockExistingSkus } from '../../utils/sku-generation';
+import { parseAboutThisItemText } from '../../utils/parse-about-this-item';
+import { parseBoxContentsText } from '../../utils/parse-box-contents';
+import {
+  amazonParseHasContent,
+  mergeAmazonParseIntoProduct,
+  mergeAmazonParseIntoVariant,
+  parseAmazonProductText,
+} from '../../utils/parse-amazon-product-text';
 import {
   CompletenessSection,
   PricingCalculations,
@@ -125,6 +131,7 @@ export class ProductForm {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly messages = inject(MessageService);
+  private readonly confirmation = inject(ConfirmationService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly cdr = inject(ChangeDetectorRef);
 
@@ -138,7 +145,7 @@ export class ProductForm {
 
   readonly loading = signal(this.isEdit);
   readonly submitting = signal(false);
-  readonly submittingKind = signal<'draft' | 'active' | null>(null);
+  readonly submittingKind = signal<'draft' | 'active' | 'pending_approval' | null>(null);
   readonly newVariantName = signal('');
   readonly expandedVariantIds = signal<string[]>([]);
   readonly emiModalOpen = signal(false);
@@ -167,9 +174,55 @@ export class ProductForm {
   readonly dealerCatalog = signal<Dealer[]>([]);
   readonly staffOptions = signal<{ label: string; value: string; code: string; email: string }[]>([]);
   readonly dealersLoading = signal(true);
+  readonly dealersError = signal('');
 
-  readonly productTypeOptions = PRODUCT_TYPES.map((v) => ({ label: v, value: v }));
-  readonly countryOptions = COUNTRIES.map((v) => ({ label: v, value: v }));
+  readonly productTypeAddOpen = signal(false);
+  readonly productTypeDraft = signal('');
+  readonly productTypeSaving = signal(false);
+
+  readonly amazonPaste = signal('');
+  readonly amazonAnalyzing = signal(false);
+  readonly amazonFeedback = signal<{
+    severity: 'success' | 'warn' | 'error' | 'info';
+    message: string;
+  } | null>(null);
+
+  readonly aboutThisItemPaste = signal('');
+  readonly aboutThisItemAnalyzing = signal(false);
+  readonly aboutThisItemFeedback = signal<{
+    severity: 'success' | 'warn' | 'error' | 'info';
+    message: string;
+  } | null>(null);
+
+  readonly boxContentsPaste = signal('');
+  readonly boxContentsAnalyzing = signal(false);
+  readonly boxContentsFeedback = signal<{
+    severity: 'success' | 'warn' | 'error' | 'info';
+    message: string;
+  } | null>(null);
+
+  readonly previewOpen = signal(false);
+
+  /** Per-variant Amazon / About / Box Contents paste state keyed by variant id. */
+  readonly variantAmazonPaste = signal<Record<string, string>>({});
+  readonly variantAmazonAnalyzing = signal<Record<string, boolean>>({});
+  readonly variantAmazonFeedback = signal<
+    Record<string, { severity: 'success' | 'warn' | 'error' | 'info'; message: string } | null>
+  >({});
+  readonly variantAboutPaste = signal<Record<string, string>>({});
+  readonly variantAboutAnalyzing = signal<Record<string, boolean>>({});
+  readonly variantAboutFeedback = signal<
+    Record<string, { severity: 'success' | 'warn' | 'error' | 'info'; message: string } | null>
+  >({});
+  readonly variantBoxPaste = signal<Record<string, string>>({});
+  readonly variantBoxAnalyzing = signal<Record<string, boolean>>({});
+  readonly variantBoxFeedback = signal<
+    Record<string, { severity: 'success' | 'warn' | 'error' | 'info'; message: string } | null>
+  >({});
+
+  readonly productTypeSelectOptions = computed(() =>
+    this.options.productTypes().map((v) => ({ label: v, value: v })),
+  );
   readonly warrantyOptions = WARRANTIES.map((v) => ({ label: v, value: v }));
   readonly conditionOptions = PRODUCT_CONDITIONS.map((v) => ({ label: v, value: v }));
 
@@ -203,6 +256,41 @@ export class ProductForm {
         value: d.id,
       })),
   );
+
+  reloadDealers(): void {
+    this.dealersLoading.set(true);
+    this.dealersError.set('');
+    this.dealerService.list().subscribe({
+      next: (dealers) => {
+        this.dealerCatalog.set(dealers);
+        this.dealersLoading.set(false);
+        this.suppliersArr.controls.forEach((_, index) => this.syncDealerReadOnlyState(index));
+        this.applyReturnDealerSelection();
+        this.cdr.markForCheck();
+      },
+      error: (err: unknown) => {
+        this.dealersLoading.set(false);
+        this.dealersError.set(this.extractMessage(err) || 'Failed to load dealers.');
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  primaryDealerId(): string {
+    if (!this.suppliersArr.length) return '';
+    return String(this.asGroup(this.suppliersArr.at(0)).get('dealerId')?.value ?? '');
+  }
+
+  basicDealerSelectOptions(): Array<{ label: string; value: string }> {
+    const current = this.primaryDealerId();
+    const base = this.dealerSelectOptions();
+    if (current && !base.some((opt) => opt.value === current)) {
+      const dealer = this.dealerCatalog().find((d) => d.id === current);
+      const label = dealer ? `${dealer.dealerName} (${dealer.dealerCode})` : current;
+      return [{ label, value: current }, ...base];
+    }
+    return base;
+  }
   readonly variantDealerSelectOptions = computed(() =>
     this.dealerCatalog().map((d) => ({
       label: `${d.dealerName} (${d.dealerCode})`,
@@ -229,13 +317,13 @@ export class ProductForm {
     barcode: [''],
     hsnCode: [''],
     manufacturer: [''],
-    countryOfOrigin: [''],
     warranty: [''],
     productCondition: ['New'],
     shortDescription: [''],
     description: [''],
     features: this.fb.array<string>([]),
     boxContents: this.fb.array<string>([]),
+    aboutThisItem: this.fb.array<string>([]),
     productVideoUrl: [''],
     colourSizeVariant: [''],
     serialImeiTracking: [false],
@@ -344,6 +432,9 @@ export class ProductForm {
   get boxContentsArr(): FormArray<FormControl<string | null>> {
     return this.form.get('boxContents') as FormArray<FormControl<string | null>>;
   }
+  get aboutThisItemArr(): FormArray<FormControl<string | null>> {
+    return this.form.get('aboutThisItem') as FormArray<FormControl<string | null>>;
+  }
   get specificationsArr(): FormArray {
     return this.form.get('specifications') as FormArray;
   }
@@ -405,15 +496,7 @@ export class ProductForm {
       });
     this.destroyRef.onDestroy(() => this.releaseAllLocalImages());
 
-    this.dealerService.list().subscribe({
-      next: (dealers) => {
-        this.dealerCatalog.set(dealers);
-        this.dealersLoading.set(false);
-        this.suppliersArr.controls.forEach((_, index) => this.syncDealerReadOnlyState(index));
-        this.applyReturnDealerSelection();
-      },
-      error: () => this.dealersLoading.set(false),
-    });
+    this.reloadDealers();
     this.staffUsers.listStaff().subscribe({
       next: (users) => {
         this.staffOptions.set(
@@ -475,7 +558,6 @@ export class ProductForm {
       barcode: wizard.barcode,
       hsnCode: product.hsnCode ?? wizard.hsnCode,
       manufacturer: product.manufacturer ?? wizard.manufacturer,
-      countryOfOrigin: matchOption(wizard.countryOfOrigin, COUNTRIES),
       warranty: matchOption(product.warranty ?? wizard.warranty, WARRANTIES),
       productCondition: mapProductCondition(wizard.productCondition),
       colourSizeVariant: wizard.colourSizeVariant || '',
@@ -564,6 +646,10 @@ export class ProductForm {
       this.boxContentsArr,
       normalizeTextListItems(wizard.boxContents).map((item) => item.value),
     );
+    this.setStringArray(
+      this.aboutThisItemArr,
+      normalizeTextListItems(wizard.aboutThisItem).map((item) => item.value),
+    );
     this.setStringArray(this.galleryImagesArr, galleryImages);
     this.specificationsArr.clear();
     normalizeKeyValueItems(wizard.specifications).forEach((item) =>
@@ -606,6 +692,9 @@ export class ProductForm {
   addBoxContent(): void {
     this.boxContentsArr.push(this.fb.control(''));
   }
+  addAboutThisItem(): void {
+    this.aboutThisItemArr.push(this.fb.control(''));
+  }
   addSpecification(): void {
     this.specificationsArr.push(
       this.fb.group({
@@ -616,23 +705,312 @@ export class ProductForm {
     );
   }
 
+  autoFillFromAmazon(): void {
+    const text = this.amazonPaste().trim();
+    if (!text || this.amazonAnalyzing()) return;
+
+    this.amazonAnalyzing.set(true);
+    this.amazonFeedback.set({
+      severity: 'info',
+      message: 'Analyzing product details...',
+    });
+    this.cdr.markForCheck();
+
+    setTimeout(() => {
+      try {
+        const parsed = parseAmazonProductText(text);
+        if (!amazonParseHasContent(parsed)) {
+          this.amazonFeedback.set({
+            severity: 'warn',
+            message: 'No product details could be extracted from the provided text.',
+          });
+          this.messages.add({
+            severity: 'warn',
+            summary: 'Nothing to fill',
+            detail: 'No product details could be extracted from the provided text.',
+          });
+          return;
+        }
+        this.applyAmazonParse(parsed);
+        this.amazonFeedback.set({
+          severity: 'success',
+          message: 'Product details extracted successfully.',
+        });
+        this.messages.add({
+          severity: 'success',
+          summary: 'Auto Fill complete',
+          detail: 'Product details extracted successfully. Review the fields before saving.',
+        });
+      } catch {
+        this.amazonFeedback.set({
+          severity: 'error',
+          message: 'Unable to analyze the provided content. You can still enter the details manually.',
+        });
+        this.messages.add({
+          severity: 'error',
+          summary: 'Auto Fill failed',
+          detail: 'Unable to analyze the provided content. You can still enter the details manually.',
+        });
+      } finally {
+        this.amazonAnalyzing.set(false);
+        this.cdr.markForCheck();
+      }
+    }, 220);
+  }
+
+  autoFillAboutThisItem(): void {
+    const text = this.aboutThisItemPaste().trim();
+    if (!text || this.aboutThisItemAnalyzing()) return;
+
+    this.aboutThisItemAnalyzing.set(true);
+    this.aboutThisItemFeedback.set({
+      severity: 'info',
+      message: 'Analyzing About this item...',
+    });
+    this.cdr.markForCheck();
+
+    setTimeout(() => {
+      try {
+        const items = parseAboutThisItemText(text);
+        if (!items.length) {
+          this.aboutThisItemFeedback.set({
+            severity: 'warn',
+            message: 'No About this item entries could be extracted from the provided text.',
+          });
+          this.messages.add({
+            severity: 'warn',
+            summary: 'Nothing to fill',
+            detail: 'No About this item entries could be extracted from the provided text.',
+          });
+          return;
+        }
+        this.setStringArray(this.aboutThisItemArr, items);
+        this.aboutThisItemFeedback.set({
+          severity: 'success',
+          message: 'About this item extracted successfully.',
+        });
+        this.messages.add({
+          severity: 'success',
+          summary: 'About this item',
+          detail: 'About this item extracted successfully.',
+        });
+      } catch {
+        this.aboutThisItemFeedback.set({
+          severity: 'error',
+          message: 'Unable to analyze the provided content. You can still enter the details manually.',
+        });
+        this.messages.add({
+          severity: 'error',
+          summary: 'Auto Fill failed',
+          detail: 'Unable to analyze the provided content. You can still enter the details manually.',
+        });
+      } finally {
+        this.aboutThisItemAnalyzing.set(false);
+        this.cdr.markForCheck();
+      }
+    }, 180);
+  }
+
+  autoFillBoxContents(): void {
+    const text = this.boxContentsPaste().trim();
+    if (!text || this.boxContentsAnalyzing()) return;
+
+    const hasExisting = this.boxContentsArr.controls.some((ctrl) => String(ctrl.value ?? '').trim());
+    if (hasExisting) {
+      this.confirmation.confirm({
+        header: 'Replace Box Contents?',
+        message:
+          'Existing Box Contents items will be replaced with the newly parsed list. Continue?',
+        acceptLabel: 'Replace Box Contents',
+        rejectLabel: 'Cancel',
+        acceptButtonStyleClass: 'p-button-warning',
+        accept: () => this.runBoxContentsAutoFill(text),
+      });
+      return;
+    }
+
+    this.runBoxContentsAutoFill(text);
+  }
+
+  private runBoxContentsAutoFill(text: string): void {
+    this.boxContentsAnalyzing.set(true);
+    this.boxContentsFeedback.set({
+      severity: 'info',
+      message: 'Analyzing Box Contents...',
+    });
+    this.cdr.markForCheck();
+
+    setTimeout(() => {
+      try {
+        const items = parseBoxContentsText(text);
+        if (!items.length) {
+          this.boxContentsFeedback.set({
+            severity: 'warn',
+            message: 'No Box Contents items could be extracted from the provided text.',
+          });
+          this.messages.add({
+            severity: 'warn',
+            summary: 'Nothing to fill',
+            detail: 'No Box Contents items could be extracted from the provided text.',
+          });
+          return;
+        }
+        this.setStringArray(this.boxContentsArr, items);
+        this.boxContentsFeedback.set({
+          severity: 'success',
+          message: `Box Contents extracted successfully (${items.length} items).`,
+        });
+        this.messages.add({
+          severity: 'success',
+          summary: 'Box Contents',
+          detail: `Box Contents extracted successfully (${items.length} items).`,
+        });
+      } catch {
+        this.boxContentsFeedback.set({
+          severity: 'error',
+          message: 'Unable to analyze the provided content. You can still enter the details manually.',
+        });
+        this.messages.add({
+          severity: 'error',
+          summary: 'Auto Fill failed',
+          detail: 'Unable to analyze the provided content. You can still enter the details manually.',
+        });
+      } finally {
+        this.boxContentsAnalyzing.set(false);
+        this.cdr.markForCheck();
+      }
+    }, 180);
+  }
+
+  private applyAmazonParse(parsed: ReturnType<typeof parseAmazonProductText>): void {
+    const currentSpecs = this.specificationsArr.controls.map((ctrl) => {
+      const raw = (ctrl as FormGroup).getRawValue() as { id?: string; key?: string; value?: string };
+      return {
+        id: String(raw.id ?? ''),
+        key: String(raw.key ?? ''),
+        value: String(raw.value ?? ''),
+      };
+    });
+    const merged = mergeAmazonParseIntoProduct(
+      {
+        brand: String(this.form.get('brand')?.value ?? ''),
+        manufacturer: String(this.form.get('manufacturer')?.value ?? ''),
+        modelNumber: String(this.form.get('modelNumber')?.value ?? ''),
+        warranty: String(this.form.get('warranty')?.value ?? ''),
+        colourSizeVariant: String(this.form.get('colourSizeVariant')?.value ?? ''),
+        shortDescription: String(this.form.get('shortDescription')?.value ?? ''),
+        description: String(this.form.get('description')?.value ?? ''),
+        specifications: currentSpecs,
+        features: this.featuresArr.controls.map((ctrl) => String(ctrl.value ?? '')),
+        boxContents: this.boxContentsArr.controls.map((ctrl) => String(ctrl.value ?? '')),
+      },
+      parsed,
+    );
+
+    this.form.patchValue({
+      brand: merged.brand,
+      manufacturer: merged.manufacturer,
+      modelNumber: merged.modelNumber,
+      warranty: merged.warranty,
+      colourSizeVariant: merged.colourSizeVariant,
+      shortDescription: merged.shortDescription,
+      description: merged.description,
+    });
+
+    if (merged.brand) this.options.ensureName('brands', merged.brand);
+
+    this.specificationsArr.clear();
+    merged.specifications.forEach((item, index) => {
+      this.specificationsArr.push(
+        this.fb.group({
+          id: [item.id || `spec-${Date.now()}-${index}`],
+          key: [item.key],
+          value: [item.value],
+        }),
+      );
+    });
+    this.setStringArray(this.featuresArr, merged.features);
+    this.setStringArray(this.boxContentsArr, merged.boxContents);
+  }
+
   canAutoGenerateSku(): boolean {
-    return !!String(this.form.get('modelNumber')?.value ?? '').trim();
+    // Always available — SKU can be built from model number or other product fields.
+    return true;
+  }
+
+  openAddProductType(): void {
+    this.productTypeDraft.set('');
+    this.productTypeAddOpen.set(true);
+  }
+
+  submitAddProductType(): void {
+    const name = this.productTypeDraft().trim();
+    if (!name) {
+      this.messages.add({
+        severity: 'warn',
+        summary: 'Product Type name required',
+        detail: 'Enter a product type name.',
+      });
+      return;
+    }
+
+    this.productTypeSaving.set(true);
+    this.options.createProductType(name).subscribe({
+      next: (savedName) => {
+        this.productTypeSaving.set(false);
+        this.productTypeAddOpen.set(false);
+        this.productTypeDraft.set('');
+        this.form.patchValue({ productType: savedName });
+        this.messages.add({
+          severity: 'success',
+          summary: 'Product Type added',
+          detail: `"${savedName}" is now available and selected.`,
+        });
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        this.productTypeSaving.set(false);
+        const detail =
+          err instanceof HttpErrorResponse
+            ? ((err.error as { message?: string; error?: string } | null)?.message ||
+                (err.error as { message?: string; error?: string } | null)?.error ||
+                err.message)
+            : err instanceof Error
+              ? err.message
+              : 'Could not create product type.';
+        this.messages.add({
+          severity: 'error',
+          summary: 'Could not add Product Type',
+          detail,
+        });
+      },
+    });
   }
 
   autoGenerateSku(): void {
-    const modelNumber = String(this.form.get('modelNumber')?.value ?? '');
     const variantSkus = this.variantsArr.controls.map((ctrl) => String(ctrl.get('sku')?.value ?? ''));
     const existing = getMockExistingSkus([
       String(this.form.get('sku')?.value ?? ''),
       ...variantSkus,
     ]);
-    const generated = generateSkuFromModelNumber(modelNumber, existing);
-    if (!generated) {
+    const generated = generateProductSku(
+      {
+        modelNumber: this.form.get('modelNumber')?.value,
+        productName: this.form.get('productName')?.value,
+        shortName: this.form.get('shortName')?.value,
+        productType: this.form.get('productType')?.value,
+        brand: this.form.get('brand')?.value,
+        category: this.form.get('category')?.value,
+        subCategory: this.form.get('subCategory')?.value,
+      },
+      existing,
+    );
+    if (!generated?.trim()) {
       this.messages.add({
-        severity: 'warn',
-        summary: 'Model number required',
-        detail: 'Enter a Model Number before auto-generating SKU.',
+        severity: 'error',
+        summary: 'SKU generation failed',
+        detail:
+          'Could not generate a SKU from the available product information. Enter a SKU manually or fill in product details and try again.',
       });
       return;
     }
@@ -773,6 +1151,341 @@ export class ProductForm {
       }),
     );
     this.markVariantUnsaved(index);
+  }
+
+  setVariantPaste(
+    which: 'amazon' | 'about' | 'box',
+    variantId: string,
+    value: string,
+  ): void {
+    if (which === 'amazon') {
+      this.variantAmazonPaste.update((m) => ({ ...m, [variantId]: value }));
+      return;
+    }
+    if (which === 'about') {
+      this.variantAboutPaste.update((m) => ({ ...m, [variantId]: value }));
+      return;
+    }
+    this.variantBoxPaste.update((m) => ({ ...m, [variantId]: value }));
+  }
+
+  autoFillVariantFromAmazon(index: number): void {
+    const group = this.asGroup(this.variantsArr.at(index));
+    const id = this.variantId(group);
+    const text = (this.variantAmazonPaste()[id] ?? '').trim();
+    if (!text || this.variantAmazonAnalyzing()[id]) return;
+
+    this.variantAmazonAnalyzing.update((m) => ({ ...m, [id]: true }));
+    this.variantAmazonFeedback.update((m) => ({
+      ...m,
+      [id]: { severity: 'info', message: 'Analyzing product details...' },
+    }));
+    this.cdr.markForCheck();
+
+    setTimeout(() => {
+      try {
+        const parsed = parseAmazonProductText(text);
+        if (!amazonParseHasContent(parsed)) {
+          this.variantAmazonFeedback.update((m) => ({
+            ...m,
+            [id]: {
+              severity: 'warn',
+              message: 'No product details could be extracted from the provided text.',
+            },
+          }));
+          this.messages.add({
+            severity: 'warn',
+            summary: 'Nothing to fill',
+            detail: 'No product details could be extracted for this variant.',
+          });
+          return;
+        }
+        this.applyVariantAmazonParse(index, parsed);
+        this.variantAmazonFeedback.update((m) => ({
+          ...m,
+          [id]: { severity: 'success', message: 'Variant details extracted successfully.' },
+        }));
+        this.messages.add({
+          severity: 'success',
+          summary: 'Auto Fill complete',
+          detail: 'Variant details extracted successfully. Review before saving the variant.',
+        });
+      } catch {
+        this.variantAmazonFeedback.update((m) => ({
+          ...m,
+          [id]: {
+            severity: 'error',
+            message: 'Unable to analyze the provided content.',
+          },
+        }));
+        this.messages.add({
+          severity: 'error',
+          summary: 'Auto Fill failed',
+          detail: 'Unable to analyze the provided content for this variant.',
+        });
+      } finally {
+        this.variantAmazonAnalyzing.update((m) => ({ ...m, [id]: false }));
+        this.cdr.markForCheck();
+      }
+    }, 180);
+  }
+
+  autoFillVariantAboutThisItem(index: number): void {
+    const group = this.asGroup(this.variantsArr.at(index));
+    const id = this.variantId(group);
+    const text = (this.variantAboutPaste()[id] ?? '').trim();
+    if (!text || this.variantAboutAnalyzing()[id]) return;
+
+    this.variantAboutAnalyzing.update((m) => ({ ...m, [id]: true }));
+    this.variantAboutFeedback.update((m) => ({
+      ...m,
+      [id]: { severity: 'info', message: 'Analyzing About this item...' },
+    }));
+    this.cdr.markForCheck();
+
+    setTimeout(() => {
+      try {
+        const items = parseAboutThisItemText(text);
+        if (!items.length) {
+          this.variantAboutFeedback.update((m) => ({
+            ...m,
+            [id]: {
+              severity: 'warn',
+              message: 'No About this item entries could be extracted.',
+            },
+          }));
+          this.messages.add({
+            severity: 'warn',
+            summary: 'Nothing to fill',
+            detail: 'No About this item entries could be extracted for this variant.',
+          });
+          return;
+        }
+        this.mergeVariantTextList(this.variantFeaturesArr(index), items, 'feature');
+        this.markVariantUnsaved(index);
+        this.variantAboutFeedback.update((m) => ({
+          ...m,
+          [id]: {
+            severity: 'success',
+            message: `Features updated from About this item (${items.length} items).`,
+          },
+        }));
+        this.messages.add({
+          severity: 'success',
+          summary: 'About this item',
+          detail: 'Variant features updated from About this item.',
+        });
+      } catch {
+        this.variantAboutFeedback.update((m) => ({
+          ...m,
+          [id]: {
+            severity: 'error',
+            message: 'Unable to analyze the provided content.',
+          },
+        }));
+        this.messages.add({
+          severity: 'error',
+          summary: 'Auto Fill failed',
+          detail: 'Unable to analyze About this item for this variant.',
+        });
+      } finally {
+        this.variantAboutAnalyzing.update((m) => ({ ...m, [id]: false }));
+        this.cdr.markForCheck();
+      }
+    }, 180);
+  }
+
+  autoFillVariantBoxContents(index: number): void {
+    const group = this.asGroup(this.variantsArr.at(index));
+    const id = this.variantId(group);
+    const text = (this.variantBoxPaste()[id] ?? '').trim();
+    if (!text || this.variantBoxAnalyzing()[id]) return;
+
+    const hasExisting = this.variantBoxArr(index).controls.some((ctrl) =>
+      String(ctrl.get('value')?.value ?? '').trim(),
+    );
+    if (hasExisting) {
+      this.confirmation.confirm({
+        header: 'Replace Box Contents?',
+        message:
+          'Existing variant Box Contents items will be replaced with the newly parsed list. Continue?',
+        acceptLabel: 'Replace Box Contents',
+        rejectLabel: 'Cancel',
+        acceptButtonStyleClass: 'p-button-warning',
+        accept: () => this.runVariantBoxContentsAutoFill(index, id, text),
+      });
+      return;
+    }
+
+    this.runVariantBoxContentsAutoFill(index, id, text);
+  }
+
+  private runVariantBoxContentsAutoFill(index: number, id: string, text: string): void {
+    this.variantBoxAnalyzing.update((m) => ({ ...m, [id]: true }));
+    this.variantBoxFeedback.update((m) => ({
+      ...m,
+      [id]: { severity: 'info', message: 'Analyzing Box Contents...' },
+    }));
+    this.cdr.markForCheck();
+
+    setTimeout(() => {
+      try {
+        const items = parseBoxContentsText(text);
+        if (!items.length) {
+          this.variantBoxFeedback.update((m) => ({
+            ...m,
+            [id]: {
+              severity: 'warn',
+              message: 'No Box Contents items could be extracted.',
+            },
+          }));
+          this.messages.add({
+            severity: 'warn',
+            summary: 'Nothing to fill',
+            detail: 'No Box Contents items could be extracted for this variant.',
+          });
+          return;
+        }
+        this.replaceVariantTextList(this.variantBoxArr(index), items, 'box');
+        this.markVariantUnsaved(index);
+        this.variantBoxFeedback.update((m) => ({
+          ...m,
+          [id]: {
+            severity: 'success',
+            message: `Box Contents extracted successfully (${items.length} items).`,
+          },
+        }));
+        this.messages.add({
+          severity: 'success',
+          summary: 'Box Contents',
+          detail: `Variant Box Contents extracted successfully (${items.length} items).`,
+        });
+      } catch {
+        this.variantBoxFeedback.update((m) => ({
+          ...m,
+          [id]: {
+            severity: 'error',
+            message: 'Unable to analyze the provided content.',
+          },
+        }));
+        this.messages.add({
+          severity: 'error',
+          summary: 'Auto Fill failed',
+          detail: 'Unable to analyze Box Contents for this variant.',
+        });
+      } finally {
+        this.variantBoxAnalyzing.update((m) => ({ ...m, [id]: false }));
+        this.cdr.markForCheck();
+      }
+    }, 180);
+  }
+
+  private applyVariantAmazonParse(
+    index: number,
+    parsed: ReturnType<typeof parseAmazonProductText>,
+  ): void {
+    const group = this.asGroup(this.variantsArr.at(index));
+    const specsArr = this.variantSpecsArr(index);
+    const featuresArr = this.variantFeaturesArr(index);
+    const boxArr = this.variantBoxArr(index);
+
+    const currentSpecs = specsArr.controls.map((ctrl) => {
+      const raw = (ctrl as FormGroup).getRawValue() as { id?: string; key?: string; value?: string };
+      return {
+        id: String(raw.id ?? ''),
+        key: String(raw.key ?? ''),
+        value: String(raw.value ?? ''),
+      };
+    });
+    const currentFeatures = featuresArr.controls.map((ctrl) =>
+      String(ctrl.get('value')?.value ?? ''),
+    );
+    const currentBox = boxArr.controls.map((ctrl) => String(ctrl.get('value')?.value ?? ''));
+
+    const merged = mergeAmazonParseIntoVariant(
+      {
+        description: String(group.get('description')?.value ?? ''),
+        weight: String(group.get('weight')?.value ?? ''),
+        length: String(group.get('length')?.value ?? ''),
+        width: String(group.get('width')?.value ?? ''),
+        height: String(group.get('height')?.value ?? ''),
+        specifications: currentSpecs,
+        features: currentFeatures,
+        boxContents: currentBox,
+      },
+      parsed,
+    );
+
+    group.patchValue(
+      {
+        description: merged.description,
+        weight: merged.weight,
+        length: merged.length,
+        width: merged.width,
+        height: merged.height,
+      },
+      { emitEvent: false },
+    );
+
+    specsArr.clear();
+    merged.specifications.forEach((item, specIndex) => {
+      specsArr.push(
+        this.fb.group({
+          id: [item.id || `spec-${Date.now()}-${specIndex}`],
+          key: [item.key],
+          value: [item.value],
+        }),
+      );
+    });
+    this.replaceVariantTextList(featuresArr, merged.features, 'feature');
+    this.replaceVariantTextList(boxArr, merged.boxContents, 'box');
+    this.markVariantUnsaved(index);
+    this.cdr.markForCheck();
+  }
+
+  private mergeVariantTextList(
+    arr: FormArray,
+    values: string[],
+    kind: 'feature' | 'box',
+  ): void {
+    const existing = arr.controls.map((ctrl) => String(ctrl.get('value')?.value ?? ''));
+    const seen = new Set(existing.map((v) => v.trim().toLowerCase()).filter(Boolean));
+    for (const value of values) {
+      const trimmed = String(value ?? '').trim();
+      if (!trimmed) continue;
+      const token = trimmed.toLowerCase();
+      if (seen.has(token)) continue;
+      seen.add(token);
+      const emptyIndex = arr.controls.findIndex(
+        (ctrl) => !String(ctrl.get('value')?.value ?? '').trim(),
+      );
+      if (emptyIndex >= 0) {
+        arr.at(emptyIndex).patchValue({ value: trimmed });
+      } else {
+        arr.push(
+          this.fb.group({
+            id: [`${kind}-${Date.now()}-${arr.length}`],
+            value: [trimmed],
+          }),
+        );
+      }
+    }
+  }
+
+  private replaceVariantTextList(
+    arr: FormArray,
+    values: string[],
+    kind: 'feature' | 'box',
+  ): void {
+    arr.clear();
+    values.forEach((value, i) => {
+      arr.push(
+        this.fb.group({
+          id: [`${kind}-${Date.now()}-${i}`],
+          value: [value],
+        }),
+      );
+    });
   }
 
   addVariantGalleryImage(index: number): void {
@@ -1414,6 +2127,19 @@ export class ProductForm {
     }
   }
 
+  onPrimaryDealerSelected(dealerId: string | null): void {
+    if (!dealerId) {
+      if (this.suppliersArr.length) {
+        this.onDealerSelected(0, null);
+      }
+      return;
+    }
+    if (!this.suppliersArr.length) {
+      this.addSupplier();
+    }
+    this.onDealerSelected(0, dealerId);
+  }
+
   onDealerSelected(index: number, dealerId: string | null): void {
     this.clearDealerDerivedFields(index);
     const group = this.asGroup(this.suppliersArr.at(index));
@@ -1427,7 +2153,9 @@ export class ProductForm {
   }
 
   selectedDealer(index: number): Dealer | null {
-    const dealerId = String(this.asGroup(this.suppliersArr.at(index)).get('dealerId')?.value ?? '');
+    const ctrl = this.suppliersArr.at(index);
+    if (!ctrl) return null;
+    const dealerId = String(this.asGroup(ctrl).get('dealerId')?.value ?? '');
     if (!dealerId) return null;
     return this.dealerCatalog().find((d) => d.id === dealerId) ?? null;
   }
@@ -1762,6 +2490,7 @@ export class ProductForm {
       }),
       features: (v.features ?? []).map((item: unknown) => String(item ?? '')),
       boxContents: (v.boxContents ?? []).map((item: unknown) => String(item ?? '')),
+      aboutThisItem: (v.aboutThisItem ?? []).map((item: unknown) => String(item ?? '')),
       variants: this.serializeVariants(),
       suppliers: this.serializeSuppliers(),
       emiPlans: this.serializeEmiPlans(),
@@ -1835,7 +2564,15 @@ export class ProductForm {
     return urls;
   }
 
-  save(status: 'draft' | 'active'): void {
+  openPreview(): void {
+    this.previewOpen.set(true);
+  }
+
+  closePreview(): void {
+    this.previewOpen.set(false);
+  }
+
+  save(status: 'draft' | 'active' | 'pending_approval'): void {
     if (this.submitting()) return;
     if (this.form.get('productName')!.invalid || this.form.get('sellingPrice')!.invalid || this.form.get('mrp')!.invalid) {
       this.form.markAllAsTouched();
@@ -1861,10 +2598,22 @@ export class ProductForm {
           next: () => {
             this.submitting.set(false);
             this.submittingKind.set(null);
-            this.messages.add({
-              severity: 'success',
-              summary: this.isEdit ? 'Product updated' : 'Product created',
-            });
+            if (status === 'pending_approval') {
+              this.messages.add({
+                severity: 'success',
+                summary: 'Submitted for approval',
+                detail: 'Product submitted for approval.',
+              });
+            } else {
+              this.messages.add({
+                severity: 'success',
+                summary: this.isEdit ? 'Product updated' : 'Product created',
+                detail:
+                  status === 'draft'
+                    ? 'Saved as draft. Not visible to customers.'
+                    : 'Product is now active in the catalogue.',
+              });
+            }
             this.router.navigate(['/products']);
           },
           error: (err: unknown) => {
@@ -1890,7 +2639,7 @@ export class ProductForm {
     });
   }
 
-  private buildSavePayload(status: 'draft' | 'active'): ProductPayload {
+  private buildSavePayload(status: 'draft' | 'active' | 'pending_approval'): ProductPayload {
     const v = this.form.getRawValue();
     const variants = this.serializeVariants();
     const variantsEnabled = variants.length > 0;
@@ -1910,6 +2659,7 @@ export class ProductForm {
         const raw = (ctrl as FormGroup).getRawValue() as { id: string; key: string; value: string };
         return { id: raw.id, key: raw.key ?? '', value: raw.value ?? '' };
       }),
+      aboutThisItem: (v.aboutThisItem ?? []).map((item: unknown) => String(item ?? '')),
       variants,
       suppliers: this.serializeSuppliers(),
       emiPlans: this.serializeEmiPlans(),

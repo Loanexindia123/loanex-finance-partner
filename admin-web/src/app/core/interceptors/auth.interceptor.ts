@@ -4,8 +4,9 @@ import { catchError, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import { TokenService } from '../services/token.service';
 
-/** admin-login itself must never receive a stale Bearer header. */
-const PUBLIC_AUTH_PATH = /\/api\/v1\/auth\/admin-login(?:\?|$)/i;
+/** Public auth endpoints must never receive a stale Bearer header. */
+const PUBLIC_AUTH_PATH =
+  /\/api\/v1\/auth\/(?:admin-login|admin-forgot-password|admin-verify-reset-otp|admin-reset-password)(?:\?|$)/i;
 
 /**
  * Attaches the admin Bearer token to every request and handles 401s.

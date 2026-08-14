@@ -11,6 +11,7 @@ import { isPlatformBrowser } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { CatalogProduct } from '../../../products/services/products-api.service';
+import { resolveMediaUrl } from '../../../../shared/utils/media-url';
 import { HomeCategory } from '../../models/catalog.models';
 import { HomeDataCacheService } from '../../services/home-data-cache.service';
 
@@ -62,7 +63,7 @@ export class Categories {
 
     const thumbnailByCategory = new Map<string, string>();
     for (const item of items) {
-      const image = item.imageUrl || item.thumbnail;
+      const image = resolveMediaUrl(item.imageUrl || item.thumbnail);
       if (!thumbnailByCategory.has(item.category) && image) {
         thumbnailByCategory.set(item.category, image);
       }

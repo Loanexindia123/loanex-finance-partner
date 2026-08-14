@@ -126,6 +126,74 @@ export class BankVerificationService {
 
     const referenceId = `LXB${Date.now()}${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
     const geo = requireGeo();
+    const accountNumberMasked = maskAccountNumber(input.accountNumber);
+    const verifiedAt = new Date();
+
+    // ---------------------------------------------------------------------------
+    // TODO(TEMP): Remove this bypass once IDSPay production bank verification is
+    // fixed ("Invalid Payment mode" / BANK_PROVIDER_ERROR).
+    //
+    // TEMPORARY TESTING BYPASS — does NOT call IDSPay and must NEVER be treated
+    // as a real provider verification. Gated by BANK_VERIFICATION_TEMP_BYPASS
+    // and forced OFF when NODE_ENV=production (see env.ts).
+    // Original IDSPay path is preserved immediately below this block.
+    // ---------------------------------------------------------------------------
+    if (env.BANK_VERIFICATION_TEMP_BYPASS) {
+      console.warn(
+        '[TEMP] BANK_VERIFICATION_TEMP_BYPASS active — skipping IDSPay; not a real bank verification',
+      );
+
+      const bypassReferenceId = `TEMP_BYPASS_${referenceId}`;
+
+      await bankVerificationRepository.create({
+        userId,
+        accountHolderName: input.accountHolderName,
+        bankName: input.bankName,
+        accountNumberMasked,
+        accountNumberHash,
+        ifscCode,
+        accountType: input.accountType as BankAccountType,
+        // Flow needs a completed gate; provider metadata below marks this as TEMP only.
+        status: BankVerificationStatus.VERIFIED,
+        verifiedAt,
+      });
+
+      const bypassLatest = await bankVerificationRepository.findLatestByUserId(userId);
+      if (bypassLatest?.id) {
+        jsonDb.update(
+          'bankVerification',
+          { id: bypassLatest.id },
+          {
+            provider: 'TEMP_BYPASS_TESTING',
+            providerReferenceId: bypassReferenceId,
+            // Explicitly NOT an IDSPay success payload.
+            providerResponse: {
+              temporaryTestingBypass: true,
+              notIdsPayVerification: true,
+              reason:
+                'IDSPay production bank verification temporarily bypassed for onboarding flow testing',
+            },
+            providerStatus: 'TEMP_BYPASS_NOT_IDSPAY',
+          },
+        );
+      }
+
+      bankVerificationRepository.markUserBankVerified(userId);
+      await bankVerificationRepository.upsertCustomerBankVerified(userId);
+
+      return {
+        status: 'VERIFIED' as const,
+        bankVerified: true as const,
+        accountNumberMasked,
+        bankName: input.bankName,
+        verificationStatus: 'COMPLETED',
+        nextStep: 'VERIFICATION_SUMMARY' as const,
+        verifiedAt: verifiedAt.toISOString(),
+        providerReferenceId: bypassReferenceId,
+        temporaryTestingBypass: true as const,
+      };
+    }
+    // --- End TEMPORARY TESTING BYPASS; restore by deleting the block above ---
 
     const providerResult = await verifyBankAccountWithIdsPay({
       accountNumber: input.accountNumber.replace(/\D/g, ''),
@@ -135,8 +203,6 @@ export class BankVerificationService {
       longitude: geo.longitude,
     });
 
-    const verifiedAt = new Date();
-    const accountNumberMasked = maskAccountNumber(input.accountNumber);
     const resolvedHolderName =
       providerResult.accountHolderName?.trim() || input.accountHolderName;
 

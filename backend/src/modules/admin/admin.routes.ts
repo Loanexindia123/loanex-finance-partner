@@ -26,6 +26,16 @@ import { orderController } from '../order/controller/order.controller';
 import { adminUpdateOrderStatusSchema } from '../order/validator/order.validator';
 import { adminJobsRouter } from '../careers';
 import { settingsController } from '../settings/settings.controller';
+import { productTypeController } from './product-type/product-type.controller';
+import {
+  createProductTypeBodySchema,
+  updateProductTypeBodySchema,
+} from './product-type/product-type.validator';
+import { employeeController } from './employee/employee.controller';
+import {
+  createEmployeeBodySchema,
+  updateEmployeeBodySchema,
+} from './employee/employee.validator';
 
 export const adminRouter = Router();
 
@@ -228,7 +238,75 @@ adminRouter.delete(
   asyncHandler(dealerController.remove),
 );
 
-// —— Master data (other collections; branches + dealers handled above) ——
+// —— Product Types (dedicated: name uniqueness + seed defaults) ——
+adminRouter.get(
+  '/product_types',
+  requirePermission('masters.view'),
+  asyncHandler(productTypeController.list),
+);
+adminRouter.get(
+  '/product_types/active',
+  requirePermission('masters.view'),
+  asyncHandler(productTypeController.listActive),
+);
+adminRouter.post(
+  '/product_types',
+  requirePermission('masters.create'),
+  validateRequest(createProductTypeBodySchema),
+  asyncHandler(productTypeController.create),
+);
+adminRouter.get(
+  '/product_types/:id',
+  requirePermission('masters.view'),
+  asyncHandler(productTypeController.getById),
+);
+adminRouter.put(
+  '/product_types/:id',
+  requirePermission('masters.edit'),
+  validateRequest(updateProductTypeBodySchema),
+  asyncHandler(productTypeController.update),
+);
+adminRouter.delete(
+  '/product_types/:id',
+  requirePermission('masters.delete'),
+  asyncHandler(productTypeController.remove),
+);
+
+// —— Employee onboarding (dedicated collection; does not mutate /admin/users) ——
+adminRouter.get(
+  '/employees',
+  requirePermission('users.view'),
+  asyncHandler(employeeController.list),
+);
+adminRouter.get(
+  '/employees/onboarders',
+  requirePermission('users.create'),
+  asyncHandler(employeeController.listOnboarders),
+);
+adminRouter.post(
+  '/employees',
+  requirePermission('users.create'),
+  validateRequest(createEmployeeBodySchema),
+  asyncHandler(employeeController.create),
+);
+adminRouter.get(
+  '/employees/:id',
+  requirePermission('users.view'),
+  asyncHandler(employeeController.getById),
+);
+adminRouter.put(
+  '/employees/:id',
+  requirePermission('users.edit'),
+  validateRequest(updateEmployeeBodySchema),
+  asyncHandler(employeeController.update),
+);
+adminRouter.delete(
+  '/employees/:id',
+  requirePermission('users.delete'),
+  asyncHandler(employeeController.remove),
+);
+
+// —— Master data (other collections; branches + dealers + product_types handled above) ——
 for (const collection of [
   'suppliers',
   'warehouses',

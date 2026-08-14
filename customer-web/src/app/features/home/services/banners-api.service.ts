@@ -3,6 +3,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Observable, catchError, map, of, shareReplay, tap } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ApiSuccess } from '../../../core/models/auth.models';
+import { resolveMediaUrl } from '../../../shared/utils/media-url';
 
 export type BannerPlacement = 'home' | 'promotional' | 'product' | string;
 
@@ -54,7 +55,7 @@ export class BannersApiService {
     this.list$ = this.http.get<ApiSuccess<StoreBanner[]>>(this.baseUrl).pipe(
       map((res) =>
         (res.data ?? [])
-          .map((banner) => ({ ...banner, imageUrl: resolveBannerImage(banner.imageUrl) }))
+          .map((banner) => ({ ...banner, imageUrl: resolveMediaUrl(banner.imageUrl) }))
           .filter(
             (banner: StoreBanner) =>
               banner.status === 'active' && Boolean(banner.imageUrl?.trim()),
@@ -100,15 +101,5 @@ export class BannersApiService {
       }),
     );
   }
-}
-
-function resolveBannerImage(url: string | null | undefined): string {
-  const trimmed = (url ?? '').trim();
-  if (!trimmed) return '';
-  if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('data:')) return trimmed;
-  if (trimmed.startsWith('/api/')) {
-    return `${environment.apiBaseUrl}${trimmed}`;
-  }
-  return trimmed;
 }
 

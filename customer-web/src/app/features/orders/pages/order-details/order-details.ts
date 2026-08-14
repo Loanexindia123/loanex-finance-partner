@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   OnInit,
   computed,
   inject,
@@ -12,7 +13,7 @@ import { forkJoin, of, catchError } from 'rxjs';
 import { formatInr } from '../../../../shared/utils/currency';
 import { paymentTypeLabel } from '../../../../shared/utils/payment-labels';
 import { LayoutUiService } from '../../../../layout/services/layout-ui.service';
-import { AutopayService } from '../../../emi/services/autopay.service';
+import { AutopayService, AutopayStatus } from '../../../emi/services/autopay.service';
 import {
   CreatePaymentOrderResponse,
   PaymentService,
@@ -23,6 +24,15 @@ import {
   OrderTrackingDetails,
 } from '../../../emi/services/order.service';
 import { openRazorpayCheckout } from '../../../emi/utils/razorpay-checkout';
+import {
+  AUTO_EMI_POLL_INTERVAL_MS,
+  AUTO_EMI_POLL_MAX_ATTEMPTS,
+  AutoEmiUiPhase,
+  isAutoEmiActive,
+  isEmiOrder,
+  isTerminalMandateFailure,
+  openApprovalUrl,
+} from '../../../emi/utils/autopay-ui.helper';
 
 @Component({
   selector: 'app-order-details',
@@ -38,16 +48,25 @@ export class OrderDetailsComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly layoutUi = inject(LayoutUiService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly loading = signal(true);
   readonly downloading = signal(false);
   readonly paying = signal(false);
   readonly showAutopayDialog = signal(false);
   readonly autopaySubmitting = signal(false);
+  readonly autoEmiPhase = signal<AutoEmiUiPhase>('setup');
+  readonly autopayStatus = signal<AutopayStatus | null>(null);
+  readonly approvalUrl = signal<string | null>(null);
+  readonly popupBlocked = signal(false);
   readonly error = signal<string | null>(null);
   readonly info = signal<string | null>(null);
   readonly order = signal<OrderConfirmationDetails | null>(null);
   readonly tracking = signal<OrderTrackingDetails | null>(null);
+
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private pollAttempts = 0;
+  private visibilityHandler: (() => void) | null = null;
 
   readonly payLabel = computed(() => {
     const emi = this.order()?.emi;
@@ -67,6 +86,29 @@ export class OrderDetailsComponent implements OnInit {
     return fee !== null && fee !== undefined && fee > 0;
   });
 
+  readonly showAutoEmiCard = computed(() => {
+    const order = this.order();
+    return Boolean(order && isEmiOrder(order.paymentType) && order.downPaymentPaid);
+  });
+
+  readonly isAutoEmiActiveView = computed(() => isAutoEmiActive(this.autopayStatus()));
+
+  readonly dialogHeader = computed(() => {
+    switch (this.autoEmiPhase()) {
+      case 'active':
+        return 'Auto EMI Active';
+      case 'confirming':
+      case 'pending_timeout':
+        return 'Confirming Auto EMI';
+      case 'incomplete':
+        return 'Auto EMI Setup';
+      case 'opening':
+        return 'Starting Auto EMI';
+      default:
+        return 'Set Up Auto EMI Payment';
+    }
+  });
+
   /**
    * Upcoming (unpaid) installments from the live loan schedule — the mirror
    * of the paid history above, showing due dates and amounts still to pay.
@@ -74,9 +116,7 @@ export class OrderDetailsComponent implements OnInit {
   readonly upcomingInstallments = computed(() => {
     const order = this.order();
     if (!order?.emiSchedule) return [];
-    return order.emiSchedule.filter(
-      (row) => row.paymentStatus !== 'PAID',
-    );
+    return order.emiSchedule.filter((row) => row.paymentStatus !== 'PAID');
   });
 
   /**
@@ -117,6 +157,10 @@ export class OrderDetailsComponent implements OnInit {
   });
 
   private orderRef = '';
+
+  constructor() {
+    this.destroyRef.onDestroy(() => this.teardownAutopayWatch());
+  }
 
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
@@ -193,31 +237,112 @@ export class OrderDetailsComponent implements OnInit {
     });
   }
 
-  enableAutopay(): void {
+  /** Start bank eMandate authorization after successful down payment. */
+  setupAutoEmi(): void {
     if (this.autopaySubmitting()) return;
+    const order = this.order();
+    if (!order || !isEmiOrder(order.paymentType) || !order.downPaymentPaid) return;
+
     this.autopaySubmitting.set(true);
     this.error.set(null);
+    this.info.set(null);
+    this.popupBlocked.set(false);
+    this.autoEmiPhase.set('opening');
 
-    this.autopayApi
-      .createMandate({
-        paymentMethod: 'UPI_AUTOPAY',
-      })
-      .subscribe({
-        next: (result) => {
+    this.autopayApi.createEmandate().subscribe({
+      next: (result) => this.afterMandateCreated(result.approvalUrl ?? null, result.status),
+      error: () => {
+        this.autopaySubmitting.set(false);
+        this.autoEmiPhase.set('incomplete');
+        this.error.set(this.autopayApi.error() ?? 'Unable to start Auto EMI setup.');
+        this.showAutopayDialog.set(true);
+      },
+    });
+  }
+
+  /**
+   * Retry only when backend allows it. Cancels a PENDING mandate first
+   * (never ACTIVE), then creates a new EMANDATE — no duplicate create while PENDING.
+   */
+  retryAutoEmi(): void {
+    if (this.autopaySubmitting()) return;
+    const order = this.order();
+    if (!order || !isEmiOrder(order.paymentType) || !order.downPaymentPaid) return;
+
+    this.autopaySubmitting.set(true);
+    this.error.set(null);
+    this.info.set(null);
+    this.popupBlocked.set(false);
+    this.autoEmiPhase.set('opening');
+
+    this.autopayApi.getStatus().subscribe({
+      next: (status) => {
+        this.autopayStatus.set(status);
+        if (isAutoEmiActive(status)) {
           this.autopaySubmitting.set(false);
-          this.showAutopayDialog.set(false);
-          this.info.set(result.message ?? 'AutoPay enabled successfully.');
-        },
-        error: () => {
-          this.autopaySubmitting.set(false);
-          this.error.set(this.autopayApi.error() ?? 'Unable to enable AutoPay.');
-        },
-      });
+          this.autoEmiPhase.set('active');
+          this.showAutopayDialog.set(true);
+          return;
+        }
+
+        const mandateStatus = status.mandate?.status;
+        if (mandateStatus === 'PENDING') {
+          // Backend blocks recreate while PENDING — cancel first, never cancel ACTIVE.
+          this.autopayApi.cancelMandate().subscribe({
+            next: () => this.createEmandateAndOpen(),
+            error: () => {
+              this.autopaySubmitting.set(false);
+              this.autoEmiPhase.set('pending_timeout');
+              this.error.set(
+                this.autopayApi.error() ??
+                  'A pending Auto EMI authorization already exists. Complete it from the approval link, or try again later.',
+              );
+              this.approvalUrl.set(status.mandate?.approvalUrl ?? this.approvalUrl());
+              this.showAutopayDialog.set(true);
+            },
+          });
+          return;
+        }
+
+        if (status.canEnable || isTerminalMandateFailure(status) || !status.mandate) {
+          this.createEmandateAndOpen();
+          return;
+        }
+
+        this.autopaySubmitting.set(false);
+        this.autoEmiPhase.set('incomplete');
+        this.error.set(
+          'Auto EMI cannot be restarted from the current mandate state. Open Auto EMI settings for details.',
+        );
+        this.showAutopayDialog.set(true);
+      },
+      error: () => {
+        this.autopaySubmitting.set(false);
+        this.autoEmiPhase.set('incomplete');
+        this.error.set(this.autopayApi.error() ?? 'Unable to check Auto EMI status.');
+        this.showAutopayDialog.set(true);
+      },
+    });
   }
 
   dismissAutopay(): void {
     if (this.autopaySubmitting()) return;
     this.showAutopayDialog.set(false);
+  }
+
+  openPendingApproval(): void {
+    const url = this.approvalUrl() || this.autopayStatus()?.mandate?.approvalUrl;
+    if (!url) return;
+    const opened = openApprovalUrl(url);
+    this.popupBlocked.set(!opened);
+    if (opened) {
+      this.autoEmiPhase.set('confirming');
+      this.startStatusPoll();
+    }
+  }
+
+  refreshAutoEmiStatus(): void {
+    this.loadAutopayStatus({ openDialogIfNeeded: false, startPollIfPending: true });
   }
 
   formatMoney(value: number | null | undefined): string {
@@ -281,7 +406,8 @@ export class OrderDetailsComponent implements OnInit {
         const steps =
           tracking.steps?.length
             ? tracking.steps
-            : ((tracking as { trackingSteps?: OrderTrackingDetails['steps'] }).trackingSteps ?? []);
+            : ((tracking as { trackingSteps?: OrderTrackingDetails['steps'] }).trackingSteps ??
+              []);
         this.tracking.set({
           ...order,
           ...tracking,
@@ -304,9 +430,20 @@ export class OrderDetailsComponent implements OnInit {
           });
         }
 
-        const autopay = this.route.snapshot.queryParamMap.get('autopay');
-        if (autopay === '1' && order.downPaymentPaid) {
-          this.showAutopayDialog.set(true);
+        const wantSetupPrompt =
+          this.route.snapshot.queryParamMap.get('autopay') === '1' &&
+          isEmiOrder(order.paymentType) &&
+          Boolean(order.downPaymentPaid);
+
+        if (isEmiOrder(order.paymentType) && order.downPaymentPaid) {
+          this.loadAutopayStatus({
+            openDialogIfNeeded: wantSetupPrompt,
+            startPollIfPending: true,
+          });
+        } else {
+          this.teardownAutopayWatch();
+          this.autopayStatus.set(null);
+          this.showAutopayDialog.set(false);
         }
       },
       error: () => {
@@ -330,14 +467,210 @@ export class OrderDetailsComponent implements OnInit {
       next: (order) => {
         this.order.set(order);
         this.setBreadcrumbs(order);
-        if (order.downPaymentPaid) {
-          this.showAutopayDialog.set(true);
+        if (isEmiOrder(order.paymentType) && order.downPaymentPaid) {
+          this.loadAutopayStatus({ openDialogIfNeeded: true, startPollIfPending: true });
         }
       },
       error: () => {
         this.error.set(this.orderApi.error() ?? 'Unable to refresh order details.');
       },
     });
+  }
+
+  private loadAutopayStatus(options: {
+    openDialogIfNeeded: boolean;
+    startPollIfPending: boolean;
+  }): void {
+    this.autopayApi.getStatus().subscribe({
+      next: (status) => {
+        this.autopayStatus.set(status);
+        this.approvalUrl.set(status.mandate?.approvalUrl ?? this.approvalUrl());
+
+        if (isAutoEmiActive(status)) {
+          this.stopStatusPoll();
+          this.autoEmiPhase.set('active');
+          if (options.openDialogIfNeeded) {
+            this.showAutopayDialog.set(true);
+          }
+          return;
+        }
+
+        if (status.mandate?.status === 'PENDING') {
+          this.autoEmiPhase.set('confirming');
+          if (options.openDialogIfNeeded) {
+            this.showAutopayDialog.set(true);
+          }
+          if (options.startPollIfPending) {
+            this.startStatusPoll();
+          }
+          this.attachVisibilityWatch();
+          return;
+        }
+
+        if (isTerminalMandateFailure(status)) {
+          this.autoEmiPhase.set('incomplete');
+          if (options.openDialogIfNeeded) {
+            this.showAutopayDialog.set(true);
+          }
+          return;
+        }
+
+        if (status.canEnable) {
+          this.autoEmiPhase.set('setup');
+          if (options.openDialogIfNeeded) {
+            this.showAutopayDialog.set(true);
+          }
+          return;
+        }
+
+        this.autoEmiPhase.set('setup');
+      },
+      error: () => {
+        // No active loan yet / Autopay unavailable — still allow setup prompt after DP
+        // if the user landed with ?autopay=1; create-mandate will surface real errors.
+        if (options.openDialogIfNeeded) {
+          this.autoEmiPhase.set('setup');
+          this.showAutopayDialog.set(true);
+        }
+      },
+    });
+  }
+
+  private createEmandateAndOpen(): void {
+    this.autopayApi.createEmandate().subscribe({
+      next: (result) => this.afterMandateCreated(result.approvalUrl ?? null, result.status),
+      error: () => {
+        this.autopaySubmitting.set(false);
+        this.autoEmiPhase.set('incomplete');
+        this.error.set(this.autopayApi.error() ?? 'Unable to start Auto EMI setup.');
+        this.showAutopayDialog.set(true);
+      },
+    });
+  }
+
+  private afterMandateCreated(url: string | null, mandateStatus: string): void {
+    this.autopaySubmitting.set(false);
+    this.approvalUrl.set(url);
+
+    // Never treat create success as Active — backend creates PENDING.
+    if (mandateStatus === 'ACTIVE') {
+      // Defensive: only if backend ever returns ACTIVE immediately (e.g. stub).
+      this.loadAutopayStatus({ openDialogIfNeeded: true, startPollIfPending: false });
+      return;
+    }
+
+    this.autoEmiPhase.set('confirming');
+    this.showAutopayDialog.set(true);
+
+    if (url) {
+      const opened = openApprovalUrl(url);
+      this.popupBlocked.set(!opened);
+    } else {
+      this.popupBlocked.set(true);
+      this.error.set(
+        'Mandate was created, but no authorization link was returned. Please open Auto EMI settings to continue.',
+      );
+    }
+
+    this.startStatusPoll();
+    this.attachVisibilityWatch();
+    // Refresh local status snapshot from backend (source of truth).
+    this.autopayApi.getStatus().subscribe({
+      next: (status) => this.autopayStatus.set(status),
+      error: () => undefined,
+    });
+  }
+
+  private startStatusPoll(): void {
+    this.stopStatusPoll();
+    this.pollAttempts = 0;
+    this.autoEmiPhase.set('confirming');
+
+    const tick = (): void => {
+      this.autopayApi.getStatus().subscribe({
+        next: (status) => {
+          this.autopayStatus.set(status);
+          this.approvalUrl.set(status.mandate?.approvalUrl ?? this.approvalUrl());
+
+          if (isAutoEmiActive(status)) {
+            this.stopStatusPoll();
+            this.autoEmiPhase.set('active');
+            this.info.set('Auto EMI Active');
+            this.showAutopayDialog.set(true);
+            return;
+          }
+
+          if (isTerminalMandateFailure(status)) {
+            this.stopStatusPoll();
+            this.autoEmiPhase.set('incomplete');
+            this.showAutopayDialog.set(true);
+            return;
+          }
+
+          this.pollAttempts += 1;
+          if (this.pollAttempts >= AUTO_EMI_POLL_MAX_ATTEMPTS) {
+            this.stopStatusPoll();
+            this.autoEmiPhase.set(
+              status.mandate?.status === 'PENDING' ? 'pending_timeout' : 'incomplete',
+            );
+            this.showAutopayDialog.set(true);
+            return;
+          }
+
+          this.pollTimer = setTimeout(tick, AUTO_EMI_POLL_INTERVAL_MS);
+        },
+        error: () => {
+          this.pollAttempts += 1;
+          if (this.pollAttempts >= AUTO_EMI_POLL_MAX_ATTEMPTS) {
+            this.stopStatusPoll();
+            this.autoEmiPhase.set('incomplete');
+            return;
+          }
+          this.pollTimer = setTimeout(tick, AUTO_EMI_POLL_INTERVAL_MS);
+        },
+      });
+    };
+
+    this.pollTimer = setTimeout(tick, AUTO_EMI_POLL_INTERVAL_MS);
+  }
+
+  private stopStatusPoll(): void {
+    if (this.pollTimer) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+
+  private attachVisibilityWatch(): void {
+    if (this.visibilityHandler || typeof document === 'undefined') return;
+    this.visibilityHandler = () => {
+      if (document.visibilityState !== 'visible') return;
+      const phase = this.autoEmiPhase();
+      if (phase === 'confirming' || phase === 'pending_timeout' || phase === 'opening') {
+        this.autopayApi.getStatus().subscribe({
+          next: (status) => {
+            this.autopayStatus.set(status);
+            if (isAutoEmiActive(status)) {
+              this.stopStatusPoll();
+              this.autoEmiPhase.set('active');
+            } else if (isTerminalMandateFailure(status)) {
+              this.stopStatusPoll();
+              this.autoEmiPhase.set('incomplete');
+            }
+          },
+          error: () => undefined,
+        });
+      }
+    };
+    document.addEventListener('visibilitychange', this.visibilityHandler);
+  }
+
+  private teardownAutopayWatch(): void {
+    this.stopStatusPoll();
+    if (this.visibilityHandler && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
   }
 
   private completeWithDevBypass(order: CreatePaymentOrderResponse): void {
@@ -402,7 +735,6 @@ export class OrderDetailsComponent implements OnInit {
           }
         }
         this.reloadOrder();
-        this.showAutopayDialog.set(true);
       },
       error: () => {
         this.paying.set(false);

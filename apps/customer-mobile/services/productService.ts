@@ -1,5 +1,6 @@
 import { Product } from '../types';
 import { api } from '../lib/apiClient';
+import { withResolvedProductImages } from '../utils/mediaUrl';
 
 export type SortOption = 'relevance' | 'price_asc' | 'price_desc' | 'rating' | 'newest' | 'discount';
 
@@ -17,6 +18,26 @@ export interface FilterOptions {
 /** Coalesce concurrent getProducts() callers onto one in-flight request. */
 let productsInFlight: Promise<Product[]> | null = null;
 
+function mapProduct(p: Record<string, unknown>): Product {
+  const resolved = withResolvedProductImages(p);
+  return {
+    ...resolved,
+    image:
+      (resolved.image as string) ||
+      (resolved.imageUrl as string) ||
+      (resolved.thumbnail as string) ||
+      '',
+    originalPrice: (resolved.originalPrice as number) || (resolved.mrp as number) || (resolved.price as number),
+    price: (resolved.discountPrice as number) || (resolved.price as number),
+    reviews:
+      (resolved.reviewCount as number) ||
+      (resolved.totalReviews as number) ||
+      (resolved.reviews as number) ||
+      0,
+    rating: (resolved.averageRating as number) || (resolved.rating as number) || 0,
+  } as Product;
+}
+
 export async function getProducts(): Promise<Product[]> {
   if (productsInFlight) return productsInFlight;
 
@@ -24,14 +45,7 @@ export async function getProducts(): Promise<Product[]> {
     try {
       const res = await api.get('/products');
       const items = res.data?.items || res.data || [];
-      return items.map((p: any) => ({
-        ...p,
-        image: p.image || p.imageUrl || p.thumbnail || (p.images && p.images[0]) || '',
-        originalPrice: p.originalPrice || p.mrp || p.price,
-        price: p.discountPrice || p.price,
-        reviews: p.reviewCount || p.totalReviews || p.reviews || 0,
-        rating: p.averageRating || p.rating || 0,
-      }));
+      return (items as Record<string, unknown>[]).map(mapProduct);
     } catch (err: any) {
       console.error('Error fetching products:', err.message);
       return [];
@@ -48,18 +62,11 @@ export async function getProductById(id: string): Promise<Product | null> {
     const res = await api.get(`/products/${id}`);
     const p = res.data;
     if (!p) return null;
-    return {
-      ...p,
-      image: p.image || p.imageUrl || p.thumbnail || (p.images && p.images[0]) || '',
-      originalPrice: p.originalPrice || p.mrp || p.price,
-      price: p.discountPrice || p.price,
-      reviews: p.reviewCount || p.totalReviews || p.reviews || 0,
-      rating: p.averageRating || p.rating || 0,
-    };
+    return mapProduct(p as Record<string, unknown>);
   } catch {
     try {
       const res = await api.get(`/legacy/products/${id}`);
-      return res.data;
+      return res.data ? mapProduct(res.data as Record<string, unknown>) : null;
     } catch {
       return null;
     }

@@ -249,15 +249,19 @@ export interface CustomerKYC {
   userId: string;
   fullName: string;
   aadharNumber: string;
+  /** DigiLocker / Aadhaar step — mirrors backend `aadhaarVerified` / `aadharVerified`. */
   aadharVerified: boolean;
+  aadhaarVerified: boolean;
   dob?: string;
   gender?: string;
   address?: any;
   rawKycData?: any;
   panNumber: string;
   panVerified: boolean;
+  bankVerified: boolean;
   cibilScore: number;
   cibilChecked: boolean;
+  /** Persisted KYC face match (`customer_kyc.face_verified`), not EMI session face. */
   faceVerified: boolean;
   kycCompleted: boolean;
   kycCompletedAt?: string;
@@ -276,4 +280,55 @@ export interface AppNotification {
   read: boolean;
   route: string;
   createdAt: string;
+}
+
+/** Backend AutopayMandateStatus — do not invent values. */
+export type AutopayMandateStatus =
+  | 'PENDING'
+  | 'ACTIVE'
+  | 'PAUSED'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'EXPIRED';
+
+export interface AutopayMandate {
+  id: string;
+  provider: string;
+  mandateId: string;
+  mandateReference: string;
+  paymentMethod: string;
+  bankName: string | null;
+  upiId: string | null;
+  maximumDebitAmount: number;
+  frequency: string;
+  nextDebitDate: string | null;
+  status: AutopayMandateStatus | string;
+  failureReason: string | null;
+  /** Razorpay hosted authorization URL (subscription.short_url). */
+  approvalUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  message?: string;
+}
+
+export interface AutopayStatus {
+  loan: {
+    id: string;
+    loanAccountNumber: string;
+    applicationNumber: string;
+    emiAmount: number;
+    nextEmiDueDate: string | null;
+    loanStatus: string;
+    autopayEnabled: boolean;
+  };
+  autopayStatus: string;
+  mandate: AutopayMandate | null;
+  options: Array<{ code: string; label: string }>;
+  canEnable: boolean;
+  canDisable: boolean;
+}
+
+export interface AutopayHistoryResponse {
+  total: number;
+  items: Array<AutopayMandate & { loanAccountNumber: string; applicationNumber: string | null }>;
 }

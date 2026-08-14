@@ -65,6 +65,16 @@ export const CREATOR_TYPES = ['Employee', 'Self', 'Partner'] as const;
 
 export const PAYMENT_CYCLES = ['Daily', 'Weekly', 'Bi-Weekly', 'Monthly', 'On Delivery'] as const;
 
+/** Payment terms stored on dealer master and mapped to product `paymentTerms`. */
+export const PAYMENT_SETTLEMENT_TERMS = [
+  'Advance',
+  'Net 15',
+  'Net 30',
+  'Net 45',
+  'Net 60',
+  'On Delivery',
+] as const;
+
 export const PRODUCT_DELIVERY_BY = ['Dealer', 'LoanEx', 'Third Party'] as const;
 
 export const FORM_STATUS_OPTIONS: { label: string; value: DealerFormStatus }[] = [

@@ -4,6 +4,7 @@ import { sendSuccess } from '../../../common/utils/api-response';
 import type { AuthenticatedRequest } from '../../../common/middleware/authenticate';
 import { ForbiddenError } from '../../../common/errors/app-error';
 import { rolesService } from '../../rbac/roles.service';
+import { jsonDb } from '../../../config/json-db';
 
 import type {
   ListProductsQuery,
@@ -32,42 +33,92 @@ async function canViewHiddenProducts(req: AuthenticatedRequest): Promise<boolean
   }
 }
 
+function isEmployeeRole(userId: string): boolean {
+  const user = jsonDb.findOne('users', { id: userId }) as any;
+  if (!user) return false;
+  const roleId = user.role_id ?? user.roleId;
+  if (!roleId) return false;
+  const role = jsonDb.findOne('roles', { id: roleId }) as any;
+  return String(role?.name ?? '').trim().toLowerCase() === 'employee';
+}
+
+/** Employees may save for approval but cannot publish/approve products. */
+function assertEmployeeCannotPublish(userId: string | undefined, status: unknown): void {
+  if (!userId) return;
+  const next = String(status ?? '').trim().toLowerCase();
+  if (next !== 'active') return;
+  if (isEmployeeRole(userId)) {
+    throw new ForbiddenError(
+      'Employees cannot publish products. Save for approval and wait for an admin to approve.',
+    );
+  }
+}
+
+function actorId(req: AuthenticatedRequest): string {
+  return String(req.user?.sub ?? '').trim();
+}
+
 export class ProductController {
   list = async (req: AuthenticatedRequest, res: Response) => {
-    const data = await productService.list(req.validatedQuery as ListProductsQuery);
+    const allowHidden = await canViewHiddenProducts(req);
+    const data = await productService.list(req.validatedQuery as ListProductsQuery, {
+      forceCustomerVisible: !allowHidden,
+      // Staff list: hierarchy filter. Customer catalog: no actor scoping.
+      actorUserId: allowHidden ? actorId(req) : undefined,
+    });
     return sendSuccess(res, data, 'Products fetched');
   };
 
   getById = async (req: AuthenticatedRequest, res: Response) => {
     const { productId } = req.validatedParams as ProductIdParam;
     const allowHidden = await canViewHiddenProducts(req);
-    const data = await productService.getById(productId, { allowHidden });
+    const data = await productService.getById(productId, {
+      allowHidden,
+      actorUserId: allowHidden ? actorId(req) : undefined,
+    });
     return sendSuccess(res, data, 'Product fetched');
   };
 
   getBySlug = async (req: AuthenticatedRequest, res: Response) => {
     const { slug } = req.validatedParams as ProductSlugParam;
     const allowHidden = await canViewHiddenProducts(req);
-    const data = await productService.getBySlug(slug, { allowHidden });
+    const data = await productService.getBySlug(slug, {
+      allowHidden,
+      actorUserId: allowHidden ? actorId(req) : undefined,
+    });
     return sendSuccess(res, data, 'Product fetched');
   };
 
   create = async (req: AuthenticatedRequest, res: Response) => {
+    const userId = actorId(req);
+    if (!userId) {
+      throw new ForbiddenError('Not authorized for this action');
+    }
     const body = (req as any).validatedBody || req.body;
-    const data = await productService.create(body);
+    assertEmployeeCannotPublish(userId, body?.status);
+    const data = await productService.create(body, userId);
     return sendSuccess(res, data, 'Product created successfully');
   };
 
   update = async (req: AuthenticatedRequest, res: Response) => {
+    const userId = actorId(req);
+    if (!userId) {
+      throw new ForbiddenError('Not authorized for this action');
+    }
     const { productId } = req.validatedParams as ProductIdParam;
-    const body = req.body; // Since we might not have a specific validator for update yet, we'll use raw body or partial schema
-    const data = await productService.update(productId, body);
+    const body = req.body;
+    assertEmployeeCannotPublish(userId, body?.status);
+    const data = await productService.update(productId, body, userId);
     return sendSuccess(res, data, 'Product updated successfully');
   };
 
   remove = async (req: AuthenticatedRequest, res: Response) => {
+    const userId = actorId(req);
+    if (!userId) {
+      throw new ForbiddenError('Not authorized for this action');
+    }
     const { productId } = req.validatedParams as ProductIdParam;
-    const data = await productService.remove(productId);
+    const data = await productService.remove(productId, userId);
     return sendSuccess(res, data, 'Product deleted successfully');
   };
 

@@ -37,6 +37,14 @@
       ],
       "expo-web-browser",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow LoanEx to use your camera for live face verification selfies.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {

@@ -21,6 +21,7 @@ const SEVERITY_MAP: Record<string, Severity> = {
   in_progress: 'info',
   under_review: 'info',
   pending: 'warn',
+  pending_approval: 'warn',
   overdue: 'danger',
   created: 'warn',
   hold: 'warn',

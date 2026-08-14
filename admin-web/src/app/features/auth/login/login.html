@@ -91,7 +91,9 @@
           </label>
         </div>
 
-        <p class="login__reset-note">Forgot your password? Please contact your Super Admin.</p>
+        <p class="login__reset-note">
+          <a routerLink="/auth/forgot-password" class="login__forgot-link">Forgot Password?</a>
+        </p>
 
         <button type="submit" class="login__submit" [disabled]="submitting()">
           @if (submitting()) {

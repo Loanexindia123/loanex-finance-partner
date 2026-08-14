@@ -63,14 +63,23 @@
     <section class="section-card">
       <header class="section-card__head">
         <div class="section-card__titles">
-          <h3>Dealer Basic Details</h3>
-          <p>Firm identity, contact information, and business classification.</p>
+          <h3>Basic Information</h3>
+          <p>Dealer identity used on Product Dealer selection.</p>
         </div>
       </header>
       <div class="grid-3">
         <div class="field" [class.field--invalid]="isInvalid('dealerName')">
-          <label>Firm / Shop Name *</label>
-          <input pInputText formControlName="dealerName" placeholder="Enter firm name" />
+          <label>Dealer Name *</label>
+          <input pInputText formControlName="dealerName" placeholder="Enter dealer / firm name" />
+        </div>
+        <div class="field">
+          <label>Dealer Code</label>
+          <input pInputText formControlName="dealerCode" placeholder="Auto-generated if left blank" />
+          <span class="field-hint">Used on Product Dealer selection. Leave blank to auto-generate.</span>
+        </div>
+        <div class="field">
+          <label>Dealer Branch</label>
+          <input pInputText formControlName="branch" placeholder="Branch / location" />
         </div>
         <div class="field" [class.field--invalid]="isInvalid('ownerName')">
           <label>Owner Name *</label>
@@ -88,18 +97,6 @@
             panelStyleClass="catalog-filter-panel"
             [showClear]="true"
           />
-        </div>
-        <div class="field" [class.field--invalid]="isInvalid('mobile')">
-          <label>Mobile Number *</label>
-          <input pInputText formControlName="mobile" placeholder="OTP Verified" />
-        </div>
-        <div class="field">
-          <label>WhatsApp Number</label>
-          <input pInputText formControlName="whatsapp" placeholder="Same as mobile" />
-        </div>
-        <div class="field">
-          <label>Email ID</label>
-          <input pInputText formControlName="email" type="email" placeholder="Enter email" />
         </div>
         <div class="field" [class.field--invalid]="isInvalid('dealerType')">
           <label>Dealer Type *</label>
@@ -140,6 +137,52 @@
     <section class="section-card">
       <header class="section-card__head">
         <div class="section-card__titles">
+          <h3>Contact Information</h3>
+          <p>Mobile, WhatsApp, and email used as Product Dealer contact.</p>
+        </div>
+      </header>
+      <div class="grid-3">
+        <div class="field" [class.field--invalid]="isInvalid('mobile')">
+          <label>Mobile Number *</label>
+          <input pInputText formControlName="mobile" placeholder="10-digit mobile" />
+        </div>
+        <div class="field">
+          <label>WhatsApp</label>
+          <input pInputText formControlName="whatsapp" placeholder="Same as mobile" />
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('email')">
+          <label>Email</label>
+          <input pInputText formControlName="email" type="email" placeholder="Enter email" />
+          @if (fieldError('email'); as error) {
+            <span class="field-error">{{ error }}</span>
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <header class="section-card__head">
+        <div class="section-card__titles">
+          <h3>Tax Information</h3>
+          <p>GSTIN used when this dealer is selected on a product.</p>
+        </div>
+      </header>
+      <div class="grid-3">
+        <div class="field" [class.field--invalid]="isInvalid('gstNumber')">
+          <label>GSTIN / GST Number</label>
+          <input pInputText formControlName="gstNumber" placeholder="15-character GSTIN" maxlength="15" />
+          @if (fieldError('gstNumber'); as error) {
+            <span class="field-error">{{ error }}</span>
+          } @else {
+            <span class="field-hint">Optional. 15-character GSTIN when registered.</span>
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <header class="section-card__head">
+        <div class="section-card__titles">
           <h3>Address &amp; Service Area</h3>
           <p>Shop location, pincode, and delivery coverage.</p>
         </div>
@@ -165,9 +208,21 @@
           <label>Delivery Time</label>
           <input pInputText formControlName="deliveryTime" placeholder="e.g. 24–48 hrs" />
         </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <header class="section-card__head">
+        <div class="section-card__titles">
+          <h3>Dispatch Information</h3>
+          <p>Warehouse / dispatch location mapped to Product Dispatch From.</p>
+        </div>
+      </header>
+      <div class="grid-2">
         <div class="field field--full">
-          <label>Warehouse Address</label>
-          <textarea pTextarea formControlName="warehouseAddress" rows="2"></textarea>
+          <label>Dispatch From</label>
+          <textarea pTextarea formControlName="warehouseAddress" rows="2" placeholder="Warehouse or dispatch address"></textarea>
+          <span class="field-hint">Canonical dealer field: warehouse address. Falls back to delivery area on products if empty.</span>
         </div>
       </div>
     </section>
@@ -220,8 +275,8 @@
     <section class="section-card">
       <header class="section-card__head">
         <div class="section-card__titles">
-          <h3>Bank &amp; Commercial Details</h3>
-          <p>Bank account, payment cycle, and delivery terms.</p>
+          <h3>Payment &amp; Settlement</h3>
+          <p>Bank account, payment terms, and settlement cycle used on products.</p>
         </div>
       </header>
       <div class="grid-2">
@@ -237,17 +292,64 @@
           <label>IFSC Code *</label>
           <input pInputText formControlName="ifscCode" />
         </div>
-        <div class="field" [class.field--invalid]="isInvalid('paymentCycle')">
-          <label>Payment Cycle *</label>
-          <p-select formControlName="paymentCycle" [options]="paymentCycleOptions" optionLabel="label" optionValue="value" placeholder="Select payment cycle" styleClass="dealer-select" panelStyleClass="catalog-filter-panel" [showClear]="true" />
+        <div class="field" [class.field--invalid]="isInvalid('paymentSettlementTerms')">
+          <label>Payment Terms</label>
+          <p-select
+            formControlName="paymentSettlementTerms"
+            [options]="mergedSelectOptions(form.get('paymentSettlementTerms')?.value, paymentTermsOptions)"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select payment terms"
+            styleClass="dealer-select"
+            panelStyleClass="catalog-filter-panel"
+            [showClear]="true"
+          />
         </div>
-        <div class="field">
-          <label>Hold Percentage</label>
-          <input pInputText formControlName="holdPercentage" placeholder="e.g. 10" />
+        <div class="field" [class.field--invalid]="isInvalid('paymentCycle')">
+          <label>Settlement Cycle *</label>
+          <p-select
+            formControlName="paymentCycle"
+            [options]="mergedSelectOptions(form.get('paymentCycle')?.value, paymentCycleOptions)"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select settlement cycle"
+            styleClass="dealer-select"
+            panelStyleClass="catalog-filter-panel"
+            [showClear]="true"
+          />
         </div>
         <div class="field" [class.field--invalid]="isInvalid('productDeliveryBy')">
           <label>Product Delivery By *</label>
           <p-select formControlName="productDeliveryBy" [options]="productDeliveryOptions" optionLabel="label" optionValue="value" placeholder="Select delivery by" styleClass="dealer-select" panelStyleClass="catalog-filter-panel" [showClear]="true" />
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <header class="section-card__head">
+        <div class="section-card__titles">
+          <h3>Hold &amp; Incentive</h3>
+          <p>Hold payment and dealer incentive percentages mapped to products.</p>
+        </div>
+      </header>
+      <div class="grid-2">
+        <div class="field" [class.field--invalid]="isInvalid('holdPercentage')">
+          <label>Hold Payment %</label>
+          <input pInputText formControlName="holdPercentage" placeholder="e.g. 10" inputmode="decimal" />
+          @if (fieldError('holdPercentage'); as error) {
+            <span class="field-error">{{ error }}</span>
+          } @else {
+            <span class="field-hint">Non-negative percentage. Leave blank if not applicable.</span>
+          }
+        </div>
+        <div class="field" [class.field--invalid]="isInvalid('commission')">
+          <label>Dealer Incentive %</label>
+          <input pInputText formControlName="commission" placeholder="e.g. 2.5" inputmode="decimal" />
+          @if (fieldError('commission'); as error) {
+            <span class="field-error">{{ error }}</span>
+          } @else {
+            <span class="field-hint">Non-negative percentage. Leave blank if not applicable.</span>
+          }
         </div>
       </div>
     </section>

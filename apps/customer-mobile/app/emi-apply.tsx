@@ -128,6 +128,10 @@ export default function EmiApplyScreen() {
   };
 
   const submitApplication = async () => {
+    // Hard guard — never post the application without a successful face scan.
+    if (!faceVerified) {
+      throw new Error('Face verification is required before submitting an EMI application.');
+    }
     const res = await api.post('/emi/applications', {
       productId: params.productId,
       productName: params.productName,
@@ -140,6 +144,14 @@ export default function EmiApplyScreen() {
     setAppNumber(res.data.applicationNumber ?? res.data.id);
     setSubmitted(true);
   };
+
+  /** Submit is only interactive after face success + both declarations. */
+  const canSubmit =
+    faceVerified &&
+    accepted &&
+    acceptedOneTimePayment &&
+    !submitting &&
+    !kycLoading;
 
   const handleSubmit = async () => {
     if (!user) {
@@ -162,7 +174,14 @@ export default function EmiApplyScreen() {
     // Face verification runs on EVERY EMI application — we don't assume the
     // KYC'd person is still the one using the account.
     if (!faceVerified) {
-      setShowFaceVerify(true);
+      Alert.alert(
+        'Face Verification Required',
+        'Please complete Face Verification before submitting your EMI application.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Verify Now', onPress: () => setShowFaceVerify(true) },
+        ],
+      );
       return;
     }
     if (!accepted || !acceptedOneTimePayment) {
@@ -175,21 +194,28 @@ export default function EmiApplyScreen() {
     await doSubmit();
   };
 
-  const handleFaceVerified = async () => {
+  /** Face success only unlocks submit — does not auto-submit the application. */
+  const handleFaceVerified = () => {
     setShowFaceVerify(false);
     setFaceVerified(true);
-    if (!accepted || !acceptedOneTimePayment) {
-      Alert.alert(
-        'Declaration Required',
-        'Please accept the declaration and the one-time payment consent before submitting.',
-      );
-      return;
-    }
-    await doSubmit();
   };
 
   const doSubmit = async () => {
     if (!user) return;
+    if (!faceVerified) {
+      Alert.alert(
+        'Face Verification Required',
+        'Please complete Face Verification before submitting your EMI application.',
+      );
+      return;
+    }
+    if (!accepted || !acceptedOneTimePayment) {
+      Alert.alert(
+        'Declaration Required',
+        'Please accept the declaration and the one-time payment consent before submitting.',
+      );
+      return;
+    }
     setSubmitting(true);
     try {
       // Lifetime one-time KYC verification fee (₹299) — mirror of the web.
@@ -462,7 +488,11 @@ export default function EmiApplyScreen() {
             <MaterialIcons name={faceVerified ? 'check-circle' : 'face-retouching-natural'} size={22} color={faceVerified ? Colors.success : Colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={s.faceRowTitle}>{faceVerified ? 'Face Verified' : 'Verify your identity with a face scan'}</Text>
-              <Text style={s.faceRowSub}>Required for every EMI application — we match your face against the Aadhaar photo on your account.</Text>
+              <Text style={s.faceRowSub}>
+                {faceVerified
+                  ? 'Face match confirmed. You can submit once declarations are accepted.'
+                  : 'Required for every EMI application — complete this before Submit becomes available. We match your face against the Aadhaar photo on your account.'}
+              </Text>
             </View>
           </Pressable>
         </View>
@@ -499,10 +529,18 @@ export default function EmiApplyScreen() {
         </Text>
       </ScrollView>
 
-      {/* Submit Button */}
+      {/* Submit Button — disabled until face verified + declarations */}
       <View style={[s.footer, { paddingBottom: insets.bottom + Spacing.sm }]}>
-        <Pressable style={[s.submitBtn, submitting && { opacity: 0.7 }]}
-          onPress={handleSubmit} disabled={submitting}>
+        {!faceVerified ? (
+          <Text style={s.submitHint}>Complete Face Verification above to enable submit.</Text>
+        ) : (!accepted || !acceptedOneTimePayment) ? (
+          <Text style={s.submitHint}>Accept both declarations above to enable submit.</Text>
+        ) : null}
+        <Pressable
+          style={[s.submitBtn, !canSubmit && s.submitBtnDisabled]}
+          onPress={handleSubmit}
+          disabled={!canSubmit}
+        >
           {submitting
             ? <ActivityIndicator color="#fff" />
             : <>
@@ -598,6 +636,8 @@ const s = StyleSheet.create({
   payHeaderTitle: { flex: 1, fontSize: Fonts.lg, fontWeight: Fonts.bold, color: Colors.textPrimary },
   payHeaderAmount: { fontSize: Fonts.xl, fontWeight: Fonts.extraBold, color: Colors.primary },
   submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: Colors.primary, borderRadius: 16, padding: 16 },
+  submitBtnDisabled: { opacity: 0.45 },
+  submitHint: { fontSize: Fonts.xs, color: Colors.textTertiary, textAlign: 'center', marginBottom: Spacing.sm, lineHeight: 16 },
   submitTxt: { fontSize: Fonts.lg, fontWeight: Fonts.bold, color: '#fff' },
   // Success state
   successIcon: { width: 96, height: 96, borderRadius: 48, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.xl },

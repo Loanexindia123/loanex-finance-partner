@@ -4,7 +4,7 @@
   <section class="stats" aria-label="Catalogue summary">
     <app-stat-card label="Total Products" [value]="stats().total" icon="pi-box" accent="#4f46e5" />
     <app-stat-card label="Active Products" [value]="stats().active" icon="pi-check-circle" accent="#16a34a" />
-    <app-stat-card label="Low Stock" [value]="stats().low" icon="pi-exclamation-triangle" accent="#d97706" />
+    <app-stat-card label="Pending Approval" [value]="stats().pending" icon="pi-clock" accent="#d97706" />
     <app-stat-card label="Out of Stock" [value]="stats().out" icon="pi-times-circle" accent="#dc2626" />
   </section>
 }
@@ -160,6 +160,20 @@
                 <i class="pi pi-pencil" aria-hidden="true"></i>
                 Edit
               </button>
+              @if (isPendingApproval(product) && canApproveProducts()) {
+                <button
+                  *appCan="'products.edit'"
+                  type="button"
+                  class="act act--approve"
+                  pTooltip="Approve product"
+                  [tooltipOptions]="actionTooltip"
+                  [disabled]="approvingId() === product.id"
+                  (click)="approve(product)"
+                >
+                  <i class="pi pi-check" aria-hidden="true"></i>
+                  Approve
+                </button>
+              }
               <button
                 *appCan="'products.delete'"
                 type="button"
@@ -220,6 +234,17 @@
           <button *appCan="'products.edit'" type="button" class="act act--edit" (click)="edit(product)">
             <i class="pi pi-pencil" aria-hidden="true"></i> Edit
           </button>
+          @if (isPendingApproval(product) && canApproveProducts()) {
+            <button
+              *appCan="'products.edit'"
+              type="button"
+              class="act act--approve"
+              [disabled]="approvingId() === product.id"
+              (click)="approve(product)"
+            >
+              <i class="pi pi-check" aria-hidden="true"></i> Approve
+            </button>
+          }
           <button *appCan="'products.delete'" type="button" class="act act--delete" (click)="askDelete(product)">
             <i class="pi pi-trash" aria-hidden="true"></i> Delete
           </button>

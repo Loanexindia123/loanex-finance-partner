@@ -99,11 +99,15 @@
             <dd>{{ d.branch || d.dealerBranch || 'Not set' }}</dd>
           </div>
           <div>
-            <dt>GST</dt>
+            <dt>GSTIN</dt>
             <dd>{{ d.gstNumber || 'Not set' }}</dd>
           </div>
           <div>
-            <dt>Payment cycle</dt>
+            <dt>Payment terms</dt>
+            <dd>{{ d.paymentSettlementTerms || 'Not set' }}</dd>
+          </div>
+          <div>
+            <dt>Settlement cycle</dt>
             <dd>{{ d.paymentCycle || d.paymentSchedule || 'Not set' }}</dd>
           </div>
           <div>
@@ -175,6 +179,30 @@
         </dl>
       </section>
 
+      <section class="card">
+        <header class="card__head">
+          <div>
+            <h3>Tax Information</h3>
+            <p>GSTIN used on product dealer mapping</p>
+          </div>
+          <span class="card__count">{{ filledCount(d, taxFields) }}/{{ taxFields.length }}</span>
+        </header>
+        <dl class="field-list">
+          @for (field of taxFields; track field.key) {
+            <div class="field-row" [class.field-row--empty]="!hasValue(d[field.key])">
+              <dt>{{ field.label }}</dt>
+              <dd>
+                @if (hasValue(d[field.key])) {
+                  {{ fieldValue(d, field.key) }}
+                } @else {
+                  <span class="muted-pill">Not set</span>
+                }
+              </dd>
+            </div>
+          }
+        </dl>
+      </section>
+
       <section class="card card--wide">
         <header class="card__head">
           <div>
@@ -202,8 +230,32 @@
       <section class="card">
         <header class="card__head">
           <div>
-            <h3>Bank &amp; Commercial</h3>
-            <p>Payment terms and settlement</p>
+            <h3>Dispatch Information</h3>
+            <p>Warehouse / dispatch location mapped to products</p>
+          </div>
+          <span class="card__count">{{ filledCount(d, dispatchFields) }}/{{ dispatchFields.length }}</span>
+        </header>
+        <dl class="field-list">
+          @for (field of dispatchFields; track field.key) {
+            <div class="field-row" [class.field-row--empty]="!hasValue(d[field.key])">
+              <dt>{{ field.label }}</dt>
+              <dd>
+                @if (hasValue(d[field.key])) {
+                  {{ fieldValue(d, field.key) }}
+                } @else {
+                  <span class="muted-pill">Not set</span>
+                }
+              </dd>
+            </div>
+          }
+        </dl>
+      </section>
+
+      <section class="card">
+        <header class="card__head">
+          <div>
+            <h3>Payment &amp; Settlement</h3>
+            <p>Payment terms, settlement, hold, and incentive</p>
           </div>
           <span class="card__count">{{ filledCount(d, commercialFields) }}/{{ commercialFields.length }}</span>
         </header>

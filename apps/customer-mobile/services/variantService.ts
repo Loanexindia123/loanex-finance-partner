@@ -1,5 +1,6 @@
 import { api } from '../lib/apiClient';
 import { ProductVariant } from '../types';
+import { resolveMediaUrlList } from '../utils/mediaUrl';
 
 function mapVariant(data: any): ProductVariant {
   return {
@@ -12,7 +13,7 @@ function mapVariant(data: any): ProductVariant {
     gst: data.gst ?? 0,
     stock: data.stock ?? 0,
     reservedStock: data.reservedStock ?? data.reserved_stock ?? 0,
-    images: data.images || [],
+    images: resolveMediaUrlList(data.images || []),
     weight: data.weight ?? 0,
     length: data.length ?? 0,
     width: data.width ?? 0,

@@ -1,0 +1,702 @@
+<header class="form-header">
+  <div class="form-header__left">
+    <button
+      pButton
+      type="button"
+      icon="pi pi-arrow-left"
+      label="Back to Employees"
+      [text]="true"
+      (click)="backToList()"
+    ></button>
+    <div>
+      <h1>{{ isEdit ? 'Continue Employee Onboarding' : 'Employee Onboarding' }}</h1>
+      <p>Complete HR onboarding in seven steps. Drafts keep all entered information.</p>
+    </div>
+  </div>
+</header>
+
+@if (loading()) {
+  <app-branded-loader message="Loading employee..." />
+} @else {
+  <div class="wizard" [formGroup]="form">
+    <nav class="wizard__steps" aria-label="Employee onboarding steps">
+      @for (step of steps; track step.key; let i = $index) {
+        <button
+          type="button"
+          class="wizard__step"
+          [class.wizard__step--active]="activeStep() === i"
+          [class.wizard__step--done]="isStepComplete(i) && activeStep() !== i"
+          (click)="goToStep(i)"
+        >
+          <span class="wizard__step-index">
+            @if (isStepComplete(i) && activeStep() !== i) {
+              <i class="pi pi-check" aria-hidden="true"></i>
+            } @else {
+              {{ i + 1 }}
+            }
+          </span>
+          <span class="wizard__step-copy">
+            <span class="wizard__step-title">{{ i + 1 }}. {{ step.title }}</span>
+            <span class="wizard__step-desc">{{ step.description }}</span>
+          </span>
+        </button>
+      }
+    </nav>
+
+    <div class="wizard__panel">
+      <header class="panel-head">
+        <span class="panel-head__icon" aria-hidden="true">
+          <i class="pi" [class]="currentStep().icon"></i>
+        </span>
+        <div>
+          <h2>{{ currentStep().title }}</h2>
+          <p>{{ currentStep().description }}</p>
+        </div>
+      </header>
+
+      <div class="panel-body">
+        @switch (activeStep()) {
+          @case (0) {
+            <div class="grid-3">
+              <div class="field">
+                <label for="onboardedBy">Onboarded By</label>
+                <p-select
+                  inputId="onboardedBy"
+                  formControlName="onboardedById"
+                  [options]="mergedSelectOptions(form.get('onboardedById')?.value, onboarderOptions())"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select employee"
+                  [filter]="true"
+                  filterPlaceholder="Search employee..."
+                  filterBy="label,email,name"
+                  [showClear]="false"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                  scrollHeight="240px"
+                />
+              </div>
+              <div class="field">
+                <label for="employeeId">Create Employee ID</label>
+                <input pInputText id="employeeId" formControlName="employeeId" readonly />
+                <span class="field-hint">Auto-generated. Kept when you save a draft.</span>
+              </div>
+              <div class="field">
+                <label for="onboardingDate">Onboarding Date</label>
+                <input pInputText type="date" id="onboardingDate" formControlName="onboardingDate" />
+              </div>
+            </div>
+          }
+
+          @case (1) {
+            <div class="grid-3">
+              <div class="field" [class.field--invalid]="isInvalid('fullName')">
+                <label for="fullName">Full Name <span class="req">*</span></label>
+                <input pInputText id="fullName" formControlName="fullName" placeholder="Employee full name" />
+                @if (isInvalid('fullName')) {
+                  <small class="field-error">{{ fieldError('fullName') }}</small>
+                }
+              </div>
+              <div class="field">
+                <label for="fatherHusbandName">Father / Husband Name</label>
+                <input pInputText id="fatherHusbandName" formControlName="fatherHusbandName" placeholder="Father or husband name" />
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('dateOfBirth')">
+                <label for="dateOfBirth">Date of Birth <span class="req">*</span></label>
+                <input pInputText type="date" id="dateOfBirth" formControlName="dateOfBirth" />
+                @if (isInvalid('dateOfBirth')) {
+                  <small class="field-error">{{ fieldError('dateOfBirth') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('mobile')">
+                <label for="mobile">Mobile Number <span class="req">*</span></label>
+                <input pInputText id="mobile" formControlName="mobile" placeholder="10-digit mobile" inputmode="numeric" maxlength="10" />
+                @if (isInvalid('mobile')) {
+                  <small class="field-error">{{ fieldError('mobile') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('whatsapp')">
+                <label for="whatsapp">WhatsApp Number</label>
+                <input pInputText id="whatsapp" formControlName="whatsapp" placeholder="10-digit WhatsApp" inputmode="numeric" maxlength="10" />
+                @if (isInvalid('whatsapp')) {
+                  <small class="field-error">{{ fieldError('whatsapp') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('email')">
+                <label for="email">Email ID</label>
+                <input pInputText id="email" formControlName="email" placeholder="name@company.com" />
+                @if (isInvalid('email')) {
+                  <small class="field-error">{{ fieldError('email') }}</small>
+                }
+              </div>
+              <div class="field">
+                <label for="gender">Gender</label>
+                <p-select
+                  inputId="gender"
+                  formControlName="gender"
+                  [options]="genderOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select gender"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+              </div>
+              <div class="field">
+                <label for="maritalStatus">Marital Status</label>
+                <p-select
+                  inputId="maritalStatus"
+                  formControlName="maritalStatus"
+                  [options]="maritalOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select status"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+              </div>
+              <div class="field">
+                <label for="emergencyContact">Emergency Contact</label>
+                <input pInputText id="emergencyContact" formControlName="emergencyContact" placeholder="Name and number" />
+              </div>
+            </div>
+          }
+
+          @case (2) {
+            <div class="grid-3">
+              <div class="field" [class.field--invalid]="isInvalid('department')">
+                <label for="department">Department <span class="req">*</span></label>
+                <p-select
+                  inputId="department"
+                  formControlName="department"
+                  [options]="mergedSelectOptions(form.get('department')?.value, departmentOptions())"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select department"
+                  [filter]="true"
+                  filterBy="label"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+                @if (isInvalid('department')) {
+                  <small class="field-error">{{ fieldError('department') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('designation')">
+                <label for="designation">Designation / Post <span class="req">*</span></label>
+                <p-select
+                  inputId="designation"
+                  formControlName="designation"
+                  [options]="mergedSelectOptions(form.get('designation')?.value, designationOptions())"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select designation"
+                  [filter]="true"
+                  filterBy="label"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+                @if (isInvalid('designation')) {
+                  <small class="field-error">{{ fieldError('designation') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('employmentType')">
+                <label for="employmentType">Employment Type <span class="req">*</span></label>
+                <p-select
+                  inputId="employmentType"
+                  formControlName="employmentType"
+                  [options]="employmentTypeOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select type"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+                @if (isInvalid('employmentType')) {
+                  <small class="field-error">{{ fieldError('employmentType') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('dateOfJoining')">
+                <label for="dateOfJoining">Date of Joining <span class="req">*</span></label>
+                <input pInputText type="date" id="dateOfJoining" formControlName="dateOfJoining" />
+                @if (isInvalid('dateOfJoining')) {
+                  <small class="field-error">{{ fieldError('dateOfJoining') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('branch')">
+                <label for="branch">Branch / Work Location <span class="req">*</span></label>
+                <p-select
+                  inputId="branch"
+                  formControlName="branch"
+                  [options]="mergedSelectOptions(form.get('branch')?.value, branchOptions())"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select branch"
+                  [filter]="true"
+                  filterBy="label"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+                @if (isInvalid('branch')) {
+                  <small class="field-error">{{ fieldError('branch') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('workMode')">
+                <label for="workMode">Work Mode <span class="req">*</span></label>
+                <p-select
+                  inputId="workMode"
+                  formControlName="workMode"
+                  [options]="workModeOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select work mode"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+                @if (isInvalid('workMode')) {
+                  <small class="field-error">{{ fieldError('workMode') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('reportingPerson')">
+                <label for="reportingPerson">Reporting Person <span class="req">*</span></label>
+                <p-select
+                  inputId="reportingPerson"
+                  formControlName="reportingPerson"
+                  [options]="mergedSelectOptions(form.get('reportingPerson')?.value, staffOptions())"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select reporting person"
+                  [filter]="true"
+                  filterPlaceholder="Search employee..."
+                  filterBy="label,email"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                  scrollHeight="240px"
+                />
+                @if (isInvalid('reportingPerson')) {
+                  <small class="field-error">{{ fieldError('reportingPerson') }}</small>
+                }
+              </div>
+              <div class="field">
+                <label for="reportingPersonId">Reporting Person ID</label>
+                <input pInputText id="reportingPersonId" formControlName="reportingPersonId" readonly placeholder="Auto-filled" />
+              </div>
+              <div class="field">
+                <label for="reportingPersonPost">Reporting Person Post</label>
+                <input pInputText id="reportingPersonPost" formControlName="reportingPersonPost" readonly placeholder="Auto-filled" />
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('shift')">
+                <label for="shift">Shift / Duty Timing <span class="req">*</span></label>
+                <p-select
+                  inputId="shift"
+                  formControlName="shift"
+                  [options]="mergedSelectOptions(form.get('shift')?.value, shiftOptions)"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select shift"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+                @if (isInvalid('shift')) {
+                  <small class="field-error">{{ fieldError('shift') }}</small>
+                }
+              </div>
+              <div class="field">
+                <label for="probationPeriod">Probation Period</label>
+                <p-select
+                  inputId="probationPeriod"
+                  formControlName="probationPeriod"
+                  [options]="probationOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select period"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+              </div>
+              <div class="field">
+                <label for="noticePeriod">Notice Period</label>
+                <p-select
+                  inputId="noticePeriod"
+                  formControlName="noticePeriod"
+                  [options]="noticeOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select notice period"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+              </div>
+            </div>
+          }
+
+          @case (3) {
+            <div class="grid-3">
+              <div class="field" [class.field--invalid]="isInvalid('monthlyCtc')">
+                <label for="monthlyCtc">Monthly CTC <span class="req">*</span></label>
+                <input pInputText id="monthlyCtc" formControlName="monthlyCtc" inputmode="decimal" placeholder="0" />
+                @if (isInvalid('monthlyCtc')) {
+                  <small class="field-error">{{ fieldError('monthlyCtc') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('basicSalary')">
+                <label for="basicSalary">Basic Salary <span class="req">*</span></label>
+                <input pInputText id="basicSalary" formControlName="basicSalary" inputmode="decimal" placeholder="0" />
+                @if (isInvalid('basicSalary')) {
+                  <small class="field-error">{{ fieldError('basicSalary') }}</small>
+                }
+              </div>
+              <div class="field">
+                <label for="hra">HRA</label>
+                <input pInputText id="hra" formControlName="hra" inputmode="decimal" placeholder="0" />
+              </div>
+              <div class="field">
+                <label for="conveyanceAllowance">Conveyance Allowance</label>
+                <input pInputText id="conveyanceAllowance" formControlName="conveyanceAllowance" inputmode="decimal" placeholder="0" />
+              </div>
+              <div class="field">
+                <label for="specialAllowance">Special Allowance</label>
+                <input pInputText id="specialAllowance" formControlName="specialAllowance" inputmode="decimal" placeholder="0" />
+              </div>
+              <div class="field">
+                <label for="otherAllowance">Other Allowance</label>
+                <input pInputText id="otherAllowance" formControlName="otherAllowance" inputmode="decimal" placeholder="0" />
+              </div>
+              <div class="field">
+                <label for="fixedGrossSalary">Fixed Gross Salary</label>
+                <input pInputText id="fixedGrossSalary" formControlName="fixedGrossSalary" readonly />
+                <span class="field-hint">Basic + HRA + allowances</span>
+              </div>
+              <div class="field">
+                <label for="variableIncentive">Variable / Incentive</label>
+                <input pInputText id="variableIncentive" formControlName="variableIncentive" inputmode="decimal" placeholder="0" />
+              </div>
+              <div class="field">
+                <label for="totalMonthlyCtc">Total Monthly CTC</label>
+                <input pInputText id="totalMonthlyCtc" formControlName="totalMonthlyCtc" readonly />
+                <span class="field-hint">Fixed Gross + Variable</span>
+              </div>
+              <div class="field setting-row">
+                <div>
+                  <label for="pfApplicable">PF Applicable</label>
+                  <p>Mark if Provident Fund applies.</p>
+                </div>
+                <p-toggleswitch formControlName="pfApplicable" inputId="pfApplicable" />
+              </div>
+              <div class="field setting-row">
+                <div>
+                  <label for="esiApplicable">ESI Applicable</label>
+                  <p>Mark if ESI applies.</p>
+                </div>
+                <p-toggleswitch formControlName="esiApplicable" inputId="esiApplicable" />
+              </div>
+              <div class="field">
+                <label for="otherDeduction">Other Deduction</label>
+                <input pInputText id="otherDeduction" formControlName="otherDeduction" inputmode="decimal" placeholder="0" />
+              </div>
+              <div class="field">
+                <label for="netTakeHome">Net Take-Home</label>
+                <input pInputText id="netTakeHome" formControlName="netTakeHome" readonly />
+                <span class="field-hint">Total CTC − other deduction</span>
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('salaryEffectiveFrom')">
+                <label for="salaryEffectiveFrom">Salary Effective From <span class="req">*</span></label>
+                <input pInputText type="date" id="salaryEffectiveFrom" formControlName="salaryEffectiveFrom" />
+                @if (isInvalid('salaryEffectiveFrom')) {
+                  <small class="field-error">{{ fieldError('salaryEffectiveFrom') }}</small>
+                }
+              </div>
+              <div class="field">
+                <label for="paymentMode">Payment Mode</label>
+                <p-select
+                  inputId="paymentMode"
+                  formControlName="paymentMode"
+                  [options]="paymentModeOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select mode"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+              </div>
+            </div>
+          }
+
+          @case (4) {
+            <div class="grid-3 doc-grid">
+              @for (doc of documentFields; track doc.key) {
+                <div class="field" [class.field--invalid]="doc.required && isInvalid(doc.key)">
+                  <label>
+                    {{ doc.label }}
+                    @if (doc.required) {
+                      <span class="req">*</span>
+                    }
+                  </label>
+                  <label
+                    class="doc-upload-zone"
+                    [class.doc-upload-zone--filled]="hasDocument(doc.key)"
+                    [class.doc-upload-zone--loading]="submitting() && isPendingDocument(doc.key)"
+                  >
+                    <input type="file" accept="image/*,.pdf" hidden (change)="onDocumentSelected($event, doc.key)" />
+                    @if (submitting() && isPendingDocument(doc.key)) {
+                      <span class="doc-upload-zone__text">
+                        <i class="pi pi-spin pi-spinner"></i>
+                        Saving...
+                      </span>
+                    } @else if (isPendingDocument(doc.key)) {
+                      <span class="doc-upload-zone__text doc-upload-zone__text--done">
+                        <i class="pi pi-file"></i>
+                        {{ documentLabel(doc.key) }}
+                      </span>
+                    } @else if (hasDocument(doc.key)) {
+                      <span class="doc-upload-zone__text doc-upload-zone__text--done">
+                        <i class="pi pi-check"></i>
+                        Uploaded
+                      </span>
+                    } @else {
+                      <span class="doc-upload-zone__text">
+                        <span class="doc-upload-zone__action">UPLOAD</span>
+                        <span class="doc-upload-zone__sep">|</span>
+                        <span class="doc-upload-zone__hint">{{ doc.hint }}</span>
+                      </span>
+                    }
+                  </label>
+                  @if (doc.required && isInvalid(doc.key)) {
+                    <small class="field-error">{{ fieldError(doc.key) }}</small>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          @case (5) {
+            <div class="grid-3">
+              <div class="field" [class.field--invalid]="isInvalid('accountHolderName')">
+                <label for="accountHolderName">Account Holder Name <span class="req">*</span></label>
+                <input pInputText id="accountHolderName" formControlName="accountHolderName" placeholder="As per bank records" />
+                @if (isInvalid('accountHolderName')) {
+                  <small class="field-error">{{ fieldError('accountHolderName') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('accountNumber')">
+                <label for="accountNumber">Account Number <span class="req">*</span></label>
+                <input pInputText id="accountNumber" formControlName="accountNumber" inputmode="numeric" placeholder="8–18 digits" />
+                @if (isInvalid('accountNumber')) {
+                  <small class="field-error">{{ fieldError('accountNumber') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('ifscCode')">
+                <label for="ifscCode">IFSC Code <span class="req">*</span></label>
+                <input pInputText id="ifscCode" formControlName="ifscCode" placeholder="SBIN0001234" maxlength="11" />
+                @if (isInvalid('ifscCode')) {
+                  <small class="field-error">{{ fieldError('ifscCode') }}</small>
+                }
+              </div>
+              <div class="field">
+                <label for="uanNumber">UAN Number</label>
+                <input pInputText id="uanNumber" formControlName="uanNumber" placeholder="Universal Account Number" />
+              </div>
+              <div class="field">
+                <label for="esicNumber">ESIC Number</label>
+                <input pInputText id="esicNumber" formControlName="esicNumber" placeholder="ESIC number" />
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('verificationStatus')">
+                <label for="verificationStatus">Verification Status <span class="req">*</span></label>
+                <p-select
+                  inputId="verificationStatus"
+                  formControlName="verificationStatus"
+                  [options]="verificationOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select status"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+                @if (isInvalid('verificationStatus')) {
+                  <small class="field-error">{{ fieldError('verificationStatus') }}</small>
+                }
+              </div>
+            </div>
+          }
+
+          @case (6) {
+            <div class="review-grid">
+              <section class="review-card">
+                <header>
+                  <h3>Created By</h3>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(0)"></button>
+                </header>
+                <dl>
+                  <div><dt>Onboarded By</dt><dd>{{ display(form.getRawValue().onboardedBy) }}</dd></div>
+                  <div><dt>Employee ID</dt><dd>{{ display(form.getRawValue().employeeId) }}</dd></div>
+                  <div><dt>Onboarding Date</dt><dd>{{ display(form.getRawValue().onboardingDate) }}</dd></div>
+                </dl>
+              </section>
+
+              <section class="review-card">
+                <header>
+                  <h3>Personal Details</h3>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(1)"></button>
+                </header>
+                <dl>
+                  <div><dt>Full Name</dt><dd>{{ display(form.getRawValue().fullName) }}</dd></div>
+                  <div><dt>Father / Husband</dt><dd>{{ display(form.getRawValue().fatherHusbandName) }}</dd></div>
+                  <div><dt>Date of Birth</dt><dd>{{ display(form.getRawValue().dateOfBirth) }}</dd></div>
+                  <div><dt>Mobile</dt><dd>{{ display(form.getRawValue().mobile) }}</dd></div>
+                  <div><dt>WhatsApp</dt><dd>{{ display(form.getRawValue().whatsapp) }}</dd></div>
+                  <div><dt>Email</dt><dd>{{ display(form.getRawValue().email) }}</dd></div>
+                  <div><dt>Gender</dt><dd>{{ display(form.getRawValue().gender) }}</dd></div>
+                  <div><dt>Marital Status</dt><dd>{{ display(form.getRawValue().maritalStatus) }}</dd></div>
+                  <div><dt>Emergency Contact</dt><dd>{{ display(form.getRawValue().emergencyContact) }}</dd></div>
+                </dl>
+              </section>
+
+              <section class="review-card">
+                <header>
+                  <h3>Job &amp; Reporting</h3>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(2)"></button>
+                </header>
+                <dl>
+                  <div><dt>Department</dt><dd>{{ display(form.getRawValue().department) }}</dd></div>
+                  <div><dt>Designation</dt><dd>{{ display(form.getRawValue().designation) }}</dd></div>
+                  <div><dt>Employment Type</dt><dd>{{ display(form.getRawValue().employmentType) }}</dd></div>
+                  <div><dt>Date of Joining</dt><dd>{{ display(form.getRawValue().dateOfJoining) }}</dd></div>
+                  <div><dt>Branch</dt><dd>{{ display(form.getRawValue().branch) }}</dd></div>
+                  <div><dt>Work Mode</dt><dd>{{ display(form.getRawValue().workMode) }}</dd></div>
+                  <div><dt>Reporting Person</dt><dd>{{ display(form.getRawValue().reportingPerson) }}</dd></div>
+                  <div><dt>Reporting ID</dt><dd>{{ display(form.getRawValue().reportingPersonId) }}</dd></div>
+                  <div><dt>Reporting Post</dt><dd>{{ display(form.getRawValue().reportingPersonPost) }}</dd></div>
+                  <div><dt>Shift</dt><dd>{{ display(form.getRawValue().shift) }}</dd></div>
+                  <div><dt>Probation</dt><dd>{{ display(form.getRawValue().probationPeriod) }}</dd></div>
+                  <div><dt>Notice Period</dt><dd>{{ display(form.getRawValue().noticePeriod) }}</dd></div>
+                </dl>
+              </section>
+
+              <section class="review-card">
+                <header>
+                  <h3>Salary Structure</h3>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(3)"></button>
+                </header>
+                <dl>
+                  <div><dt>Monthly CTC</dt><dd>{{ inr(form.getRawValue().monthlyCtc) }}</dd></div>
+                  <div><dt>Basic</dt><dd>{{ inr(form.getRawValue().basicSalary) }}</dd></div>
+                  <div><dt>HRA</dt><dd>{{ inr(form.getRawValue().hra) }}</dd></div>
+                  <div><dt>Fixed Gross</dt><dd>{{ inr(form.getRawValue().fixedGrossSalary) }}</dd></div>
+                  <div><dt>Variable</dt><dd>{{ inr(form.getRawValue().variableIncentive) }}</dd></div>
+                  <div><dt>Total CTC</dt><dd>{{ inr(form.getRawValue().totalMonthlyCtc) }}</dd></div>
+                  <div><dt>PF Applicable</dt><dd>{{ display(form.getRawValue().pfApplicable) }}</dd></div>
+                  <div><dt>ESI Applicable</dt><dd>{{ display(form.getRawValue().esiApplicable) }}</dd></div>
+                  <div><dt>Net Take-Home</dt><dd>{{ inr(form.getRawValue().netTakeHome) }}</dd></div>
+                  <div><dt>Effective From</dt><dd>{{ display(form.getRawValue().salaryEffectiveFrom) }}</dd></div>
+                  <div><dt>Payment Mode</dt><dd>{{ display(form.getRawValue().paymentMode) }}</dd></div>
+                </dl>
+              </section>
+
+              <section class="review-card">
+                <header>
+                  <h3>Documents &amp; Verification</h3>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(4)"></button>
+                </header>
+                <dl>
+                  @for (doc of documentFields; track doc.key) {
+                    <div>
+                      <dt>{{ doc.label }}</dt>
+                      <dd>{{ hasDocument(doc.key) ? (isPendingDocument(doc.key) ? 'Selected' : 'Uploaded') : '—' }}</dd>
+                    </div>
+                  }
+                </dl>
+              </section>
+
+              <section class="review-card">
+                <header>
+                  <h3>Bank &amp; Statutory</h3>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(5)"></button>
+                </header>
+                <dl>
+                  <div><dt>Account Holder</dt><dd>{{ display(form.getRawValue().accountHolderName) }}</dd></div>
+                  <div><dt>Account Number</dt><dd>{{ display(form.getRawValue().accountNumber) }}</dd></div>
+                  <div><dt>IFSC</dt><dd>{{ display(form.getRawValue().ifscCode) }}</dd></div>
+                  <div><dt>UAN</dt><dd>{{ display(form.getRawValue().uanNumber) }}</dd></div>
+                  <div><dt>ESIC</dt><dd>{{ display(form.getRawValue().esicNumber) }}</dd></div>
+                  <div><dt>Verification</dt><dd>{{ display(form.getRawValue().verificationStatus) }}</dd></div>
+                </dl>
+              </section>
+            </div>
+          }
+        }
+      </div>
+
+      <div class="wizard__nav">
+        <button
+          pButton
+          type="button"
+          severity="secondary"
+          [outlined]="true"
+          icon="pi pi-arrow-left"
+          label="Back"
+          [disabled]="activeStep() === 0 || submitting()"
+          (click)="back()"
+        ></button>
+
+        @if (activeStep() === steps.length - 1) {
+          <div class="wizard__nav-end">
+            <button
+              pButton
+              type="button"
+              severity="secondary"
+              [outlined]="true"
+              icon="pi pi-save"
+              label="Save Draft"
+              [disabled]="submitting()"
+              [loading]="submittingKind() === 'draft'"
+              (click)="saveDraft()"
+            ></button>
+            <button
+              pButton
+              type="button"
+              severity="secondary"
+              [outlined]="true"
+              icon="pi pi-eye"
+              label="Preview Profile"
+              [disabled]="submitting()"
+              (click)="previewProfile()"
+            ></button>
+            <button
+              pButton
+              type="button"
+              icon="pi pi-check"
+              label="Approve &amp; Onboard"
+              [disabled]="submitting()"
+              [loading]="submittingKind() === 'approved'"
+              (click)="approveAndOnboard()"
+            ></button>
+          </div>
+        } @else {
+          <div class="wizard__nav-end">
+            <button
+              pButton
+              type="button"
+              icon="pi pi-arrow-right"
+              iconPos="right"
+              label="Next"
+              [disabled]="submitting()"
+              (click)="next()"
+            ></button>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}

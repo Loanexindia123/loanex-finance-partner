@@ -3,6 +3,9 @@ import { sendSuccess } from '../../common/utils/api-response';
 import { BadRequestError } from '../../common/errors/app-error';
 import {
   AdminLoginBody,
+  AdminForgotPasswordBody,
+  AdminResetPasswordBody,
+  AdminVerifyResetOtpBody,
   ChangePasswordBody,
   CompleteRegistrationBody,
   ForgotPasswordBody,
@@ -18,7 +21,6 @@ import {
   readRefreshToken,
   setRefreshTokenCookie,
 } from './auth-cookies';
-
 import type { AuthenticatedRequest } from '../../common/middleware/authenticate';
 
 function maybeSetRefreshCookie(res: Response, data: Record<string, unknown>): void {
@@ -80,6 +82,21 @@ export class AuthController {
 
   resetPassword = async (req: Request, res: Response): Promise<void> => {
     const data = await authService.resetPassword(req.body as ResetPasswordBody);
+    sendSuccess(res, data, data.message);
+  };
+
+  adminForgotPassword = async (req: Request, res: Response): Promise<void> => {
+    const data = await authService.adminForgotPassword(req.body as AdminForgotPasswordBody);
+    sendSuccess(res, data, data.message);
+  };
+
+  adminVerifyResetOtp = async (req: Request, res: Response): Promise<void> => {
+    const data = await authService.adminVerifyResetOtp(req.body as AdminVerifyResetOtpBody);
+    sendSuccess(res, data, data.message);
+  };
+
+  adminResetPassword = async (req: Request, res: Response): Promise<void> => {
+    const data = await authService.adminResetPassword(req.body as AdminResetPasswordBody);
     sendSuccess(res, data, data.message);
   };
 

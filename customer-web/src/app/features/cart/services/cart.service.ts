@@ -3,6 +3,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Observable, catchError, map, of, tap, throwError } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ApiSuccess } from '../../../core/models/auth.models';
+import { resolveMediaUrl } from '../../../shared/utils/media-url';
 import { LayoutUiService } from '../../../layout/services/layout-ui.service';
 
 export interface CartProduct {
@@ -132,9 +133,28 @@ export class CartService {
   }
 
   private applyCart(data: CartResponse): void {
-    this.cartSignal.set(data);
+    const resolved: CartResponse = {
+      ...data,
+      items: (data.items ?? []).map((item) => ({
+        ...item,
+        product: {
+          ...item.product,
+          imageUrl: resolveMediaUrl(item.product?.imageUrl),
+        },
+      })),
+      item: data.item
+        ? {
+            ...data.item,
+            product: {
+              ...data.item.product,
+              imageUrl: resolveMediaUrl(data.item.product?.imageUrl),
+            },
+          }
+        : data.item,
+    };
+    this.cartSignal.set(resolved);
     this.loaded = true;
-    this.layoutUi.cartCount.set(data.summary.totalItems);
+    this.layoutUi.cartCount.set(resolved.summary.totalItems);
   }
 
   private wrap<T>(source: Observable<ApiSuccess<T>>): Observable<T> {

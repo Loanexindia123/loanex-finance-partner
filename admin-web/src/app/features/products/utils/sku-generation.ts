@@ -1,12 +1,52 @@
-/** Ported 1:1 from admin-app/src/modules/products/utils/skuGeneration.ts */
+/** Ported from admin-app/src/modules/products/utils/skuGeneration.ts — extended for product-field fallback. */
 
 export function getMockExistingSkus(additionalSkus: string[] = []): string[] {
   const demo = ['TN-X1-256-001', 'TN-X1-256-002'];
   return [...new Set([...demo, ...additionalSkus.filter(Boolean)])];
 }
 
+export type ProductSkuSource = {
+  modelNumber?: string | null;
+  productName?: string | null;
+  shortName?: string | null;
+  productType?: string | null;
+  brand?: string | null;
+  category?: string | null;
+  subCategory?: string | null;
+};
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Keep only A–Z, 0–9 and single hyphens — safe for typical SKU validation. */
+export function sanitizeSkuBase(value: string): string {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * Allocate `{base}-001`, `-002`, … by scanning existing SKUs for the next free 3-digit suffix.
+ */
+export function allocateSkuWithNumericSuffix(
+  base: string,
+  existingSkus: string[] = getMockExistingSkus(),
+): string {
+  const pattern = new RegExp(`^${escapeRegExp(base)}-(\\d{3})$`);
+  let maxNum = 0;
+
+  for (const sku of existingSkus) {
+    const match = sku.trim().match(pattern);
+    if (match) {
+      maxNum = Math.max(maxNum, parseInt(match[1], 10));
+    }
+  }
+
+  return `${base}-${String(maxNum + 1).padStart(3, '0')}`;
 }
 
 /**
@@ -19,17 +59,46 @@ export function generateSkuFromModelNumber(
 ): string | null {
   const base = modelNumber.trim();
   if (!base) return null;
+  return allocateSkuWithNumericSuffix(base, existingSkus);
+}
 
-  const pattern = new RegExp(`^${escapeRegExp(base)}-(\\d{3})$`);
-  let maxNum = 0;
+function buildFallbackSkuBase(source: ProductSkuSource): string {
+  const namePart = String(source.shortName ?? '').trim() || String(source.productName ?? '').trim();
+  const segments = [source.brand, source.productType, namePart, source.category, source.subCategory]
+    .map((v) => sanitizeSkuBase(String(v ?? '')))
+    .filter(Boolean);
 
-  for (const sku of existingSkus) {
-    const match = sku.trim().match(pattern);
-    if (match) {
-      maxNum = Math.max(maxNum, parseInt(match[1], 10));
-    }
+  const deduped: string[] = [];
+  for (const seg of segments) {
+    if (deduped[deduped.length - 1] !== seg) deduped.push(seg);
   }
 
-  const next = maxNum + 1;
-  return `${base}-${String(next).padStart(3, '0')}`;
+  let base = deduped.join('-');
+  const MAX_BASE = 48;
+  while (base.length > MAX_BASE && deduped.length > 1) {
+    deduped.pop();
+    base = deduped.join('-');
+  }
+  if (base.length > MAX_BASE) {
+    base = base.slice(0, MAX_BASE).replace(/-+$/g, '');
+  }
+
+  return base || 'PROD';
+}
+
+/**
+ * Generate a unique SKU from available product fields.
+ * Prefers model number (existing behaviour). Falls back to other form fields, then `PROD`.
+ */
+export function generateProductSku(
+  source: ProductSkuSource,
+  existingSkus: string[] = getMockExistingSkus(),
+): string {
+  const modelNumber = String(source.modelNumber ?? '').trim();
+  if (modelNumber) {
+    return allocateSkuWithNumericSuffix(modelNumber, existingSkus);
+  }
+
+  const base = buildFallbackSkuBase(source);
+  return allocateSkuWithNumericSuffix(base, existingSkus);
 }

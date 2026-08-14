@@ -1,8 +1,8 @@
 <div class="lx-ap">
   <section class="lx-ap__card" aria-labelledby="lx-ap-title">
     <header class="lx-ap__header">
-      <h1 id="lx-ap-title">AutoPay</h1>
-      <p>Automatically pay your monthly EMI on the due date.</p>
+      <h1 id="lx-ap-title">Auto EMI</h1>
+      <p>Authorize bank eMandate for automatic monthly EMI payments.</p>
     </header>
 
     @if (error(); as err) {
@@ -13,7 +13,7 @@
     }
 
     @if (loading() && !status()) {
-      <p class="lx-ap__loading" aria-live="polite">Loading AutoPay…</p>
+      <p class="lx-ap__loading" aria-live="polite">Loading Auto EMI…</p>
     }
 
     @if (status(); as data) {
@@ -31,24 +31,60 @@
           <dd>{{ formatDate(data.loan.nextEmiDueDate) }}</dd>
         </div>
         <div>
-          <dt>Current AutoPay Status</dt>
+          <dt>Auto EMI Status</dt>
           <dd>
             <span
               class="lx-ap__badge"
-              [class.is-on]="data.autopayStatus === 'ENABLED'"
-              [class.is-pending]="data.autopayStatus === 'PENDING'"
+              [class.is-on]="isActive()"
+              [class.is-pending]="mandateStatus() === 'PENDING' || confirming()"
+              [class.is-fail]="
+                mandateStatus() === 'FAILED' ||
+                mandateStatus() === 'CANCELLED' ||
+                mandateStatus() === 'EXPIRED'
+              "
             >
-              {{ formatStatus(data.autopayStatus) }}
+              {{ statusMessage() || formatStatus(data.autopayStatus) }}
             </span>
           </dd>
         </div>
       </dl>
 
+      @if (isActive()) {
+        <aside class="lx-ap__notice lx-ap__notice--success" role="status">
+          Auto EMI Active — monthly EMIs will be collected automatically on the due date.
+        </aside>
+      } @else if (mandateStatus() === 'PENDING' || confirming()) {
+        <aside class="lx-ap__notice" role="status">
+          @if (pollTimedOut()) {
+            Auto EMI setup is still being confirmed. Refresh status after completing bank
+            authorization, or retry setup if you cancelled.
+          } @else {
+            Auto EMI setup is being confirmed.
+          }
+        </aside>
+        @if (popupBlocked()) {
+          <aside class="lx-ap__alert" role="alert">
+            Your browser blocked the authorization window. Use Continue Bank Authorization below.
+          </aside>
+        }
+      } @else if (mandateStatus() === 'FAILED') {
+        <aside class="lx-ap__alert" role="status">Auto EMI setup failed.</aside>
+      } @else if (mandateStatus() === 'CANCELLED') {
+        <aside class="lx-ap__alert" role="status">Auto EMI setup was cancelled.</aside>
+      } @else if (mandateStatus() === 'EXPIRED') {
+        <aside class="lx-ap__alert" role="status">Auto EMI setup expired.</aside>
+      } @else if (mandateStatus() === 'PAUSED') {
+        <aside class="lx-ap__notice" role="status">Auto EMI is paused.</aside>
+      }
+
       @if (data.canEnable) {
         <section aria-labelledby="lx-ap-options-title">
-          <h2 id="lx-ap-options-title" class="lx-ap__section-title">AutoPay Options</h2>
+          <h2 id="lx-ap-options-title" class="lx-ap__section-title">Set Up Auto EMI Payment</h2>
+          <p class="lx-ap__lead">
+            Complete bank authorization to enable automatic monthly EMI payments.
+          </p>
           <form class="lx-ap__form" [formGroup]="form">
-            <div class="lx-ap__options" role="radiogroup" aria-label="AutoPay method">
+            <div class="lx-ap__options" role="radiogroup" aria-label="Auto EMI method">
               @for (option of data.options; track option.code) {
                 <label class="lx-ap__option" [class.is-selected]="selectedMethod() === option.code">
                   <input type="radio" formControlName="paymentMethod" [value]="option.code" />
@@ -60,13 +96,15 @@
             <h3 class="lx-ap__section-title">Mandate Summary</h3>
             <div class="lx-ap__fields">
               <label>
-                <span>Bank</span>
+                <span>Bank (optional)</span>
                 <input type="text" formControlName="bankName" placeholder="Bank name" />
               </label>
-              <label>
-                <span>UPI ID</span>
-                <input type="text" formControlName="upiId" placeholder="name@upi" />
-              </label>
+              @if (selectedMethod() === 'UPI_AUTOPAY') {
+                <label>
+                  <span>UPI ID</span>
+                  <input type="text" formControlName="upiId" placeholder="name@upi" />
+                </label>
+              }
               <label>
                 <span>Maximum Debit Amount</span>
                 <input type="number" formControlName="maximumDebitAmount" min="1" step="0.01" />
@@ -84,9 +122,9 @@
         </section>
       }
 
-      @if (showMandate() && data.mandate; as mandate) {
+      @if (data.mandate; as mandate) {
         <section class="lx-ap__mandate" aria-labelledby="lx-ap-mandate-title">
-          <h2 id="lx-ap-mandate-title" class="lx-ap__section-title">View Mandate</h2>
+          <h2 id="lx-ap-mandate-title" class="lx-ap__section-title">Mandate Details</h2>
           <dl class="lx-ap__meta">
             <div>
               <dt>Mandate Reference</dt>
@@ -105,10 +143,6 @@
               <dd>{{ mandate.bankName || '—' }}</dd>
             </div>
             <div>
-              <dt>UPI ID</dt>
-              <dd>{{ mandate.upiId || '—' }}</dd>
-            </div>
-            <div>
               <dt>Maximum Debit Amount</dt>
               <dd>{{ formatMoney(mandate.maximumDebitAmount) }}</dd>
             </div>
@@ -125,22 +159,6 @@
               <dd>{{ formatStatus(mandate.status) }}</dd>
             </div>
           </dl>
-          @if (mandate.status === 'PENDING') {
-            <aside class="lx-ap__notice" role="status">
-              Mandate is pending approval. Approve it from the payment link below — AutoPay
-              will be enabled automatically once approved.
-            </aside>
-            @if (mandate.approvalUrl) {
-              <a
-                class="lx-btn lx-btn--primary lx-ap__approve-link"
-                [href]="mandate.approvalUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Approve Mandate
-              </a>
-            }
-          }
         </section>
       }
 
@@ -152,24 +170,43 @@
             [disabled]="submitting()"
             (click)="enableAutopay()"
           >
-            Enable AutoPay
+            Set Up Auto EMI
           </button>
         }
-        @if (data.canDisable) {
+
+        @if (!isActive() && (mandateStatus() === 'PENDING' || confirming() || pollTimedOut())) {
+          @if (approvalUrl() || data.mandate?.approvalUrl) {
+            <button type="button" class="lx-btn lx-btn--primary" (click)="openPendingApproval()">
+              Continue Bank Authorization
+            </button>
+          }
+          <button type="button" class="lx-btn lx-btn--outline" (click)="refreshStatus()">
+            Refresh Status
+          </button>
+        }
+
+        @if (canRetry() && !data.canEnable) {
+          <button
+            type="button"
+            class="lx-btn lx-btn--outline"
+            [disabled]="submitting()"
+            (click)="retryAutoEmi()"
+          >
+            Retry Auto EMI Setup
+          </button>
+        }
+
+        @if (data.canDisable && isActive()) {
           <button
             type="button"
             class="lx-btn lx-btn--outline"
             [disabled]="submitting()"
             (click)="disableAutopay()"
           >
-            Disable AutoPay
+            Disable Auto EMI
           </button>
         }
-        @if (data.mandate) {
-          <button type="button" class="lx-btn lx-btn--outline" (click)="viewMandate()">
-            View Mandate
-          </button>
-        }
+
         <a routerLink="/my-emi" class="lx-btn lx-btn--outline">Back to My EMI</a>
       </div>
     }

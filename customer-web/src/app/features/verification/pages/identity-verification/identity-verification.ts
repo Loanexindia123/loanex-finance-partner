@@ -47,16 +47,15 @@ export class IdentityVerificationComponent implements OnInit, OnDestroy {
   // States
   readonly aadhaarVerified = signal(false);
   readonly panVerified = signal(false);
-  // Bank verification temporarily disabled — KYC via Aadhaar for now
-  // readonly bankVerified = signal(false);
+  readonly bankVerified = signal(false);
 
   // Data
   readonly displayMobile = signal('');
   readonly maskedAadhaar = signal<string | null>(null);
   readonly maskedPan = signal<string | null>(null);
   readonly creditScore = signal<number | null>(null);
-  // readonly maskedBankAccount = signal<string | null>(null);
-  // readonly verifiedBankName = signal<string | null>(null);
+  readonly maskedBankAccount = signal<string | null>(null);
+  readonly verifiedBankName = signal<string | null>(null);
 
   // DigiLocker State
   readonly digilockerStep = signal<'enter' | 'redirect' | 'fetching' | 'done'>('enter');
@@ -83,25 +82,26 @@ export class IdentityVerificationComponent implements OnInit, OnDestroy {
     dob: ['', Validators.required],
   });
 
-  // Bank Verification State — temporarily disabled; KYC via Aadhaar for now
-  // readonly verifyingBank = signal(false);
-  // readonly bankSuccessPulse = signal(false);
-  // readonly bankFormError = signal<string | null>(null);
-  // readonly bankForm = this.fb.nonNullable.group({
-  //   accountHolderName: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100)]],
-  //   bankName: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
-  //   accountNumber: ['', [Validators.required, Validators.pattern(/^\d{8,18}$/)]],
-  //   confirmAccountNumber: ['', [Validators.required, Validators.pattern(/^\d{8,18}$/)]],
-  //   ifscCode: ['', [Validators.required, Validators.pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/)]],
-  //   accountType: ['SAVINGS' as 'SAVINGS' | 'CURRENT', Validators.required],
-  // });
+  // Bank Verification State
+  readonly verifyingBank = signal(false);
+  readonly bankSuccessPulse = signal(false);
+  readonly bankFormError = signal<string | null>(null);
+  readonly bankForm = this.fb.nonNullable.group({
+    accountHolderName: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100)]],
+    bankName: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
+    accountNumber: ['', [Validators.required, Validators.pattern(/^\d{8,18}$/)]],
+    confirmAccountNumber: ['', [Validators.required, Validators.pattern(/^\d{8,18}$/)]],
+    ifscCode: ['', [Validators.required, Validators.pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/)]],
+    accountType: ['SAVINGS' as 'SAVINGS' | 'CURRENT', Validators.required],
+  });
 
   readonly formattedMobile = computed(() => this.formatIndianMobile(this.displayMobile()));
-  /** Progress label for KYC stepper — Bank skipped for now (Aadhaar → PAN → EMI). */
+  /** Progress label for KYC stepper — Aadhaar → PAN → Bank → EMI. */
   readonly kycStepLabel = computed(() => {
-    if (!this.aadhaarVerified()) return 'Step 1 of 3 — Aadhaar';
-    if (!this.panVerified()) return 'Step 2 of 3 — PAN';
-    return 'Step 3 of 3 — EMI Eligibility';
+    if (!this.aadhaarVerified()) return 'Step 1 of 4 — Aadhaar';
+    if (!this.panVerified()) return 'Step 2 of 4 — PAN';
+    if (!this.bankVerified()) return 'Step 3 of 4 — Bank Account';
+    return 'Step 4 of 4 — EMI Eligibility';
   });
 
   ngOnInit(): void {
@@ -140,6 +140,7 @@ export class IdentityVerificationComponent implements OnInit, OnDestroy {
         this.bootstrapping.set(false);
         this.aadhaarVerified.set(status.aadhaarVerified);
         this.panVerified.set(status.panVerified);
+        this.bankVerified.set(status.bankVerified);
 
         if (status.aadhaarVerified) {
           this.digilockerStep.set('done');
@@ -211,6 +212,10 @@ export class IdentityVerificationComponent implements OnInit, OnDestroy {
         if (status.kyc?.panNumber) {
           this.maskedPan.set(this.maskString(status.kyc.panNumber));
         }
+
+        if (status.panVerified) {
+          this.hydrateBankSection(status.bankVerified);
+        }
       },
       error: () => {
         this.bootstrapping.set(false);
@@ -223,31 +228,31 @@ export class IdentityVerificationComponent implements OnInit, OnDestroy {
     void this.router.navigateByUrl('/verification/summary');
   }
 
-  // private hydrateBankSection(alreadyBankVerified: boolean): void {
-  //   const fullName = [
-  //     this.experianForm.value.first_name,
-  //     this.experianForm.value.last_name,
-  //   ]
-  //     .filter(Boolean)
-  //     .join(' ')
-  //     .trim();
-  //   if (fullName && !this.bankForm.value.accountHolderName) {
-  //     this.bankForm.patchValue({ accountHolderName: fullName });
-  //   }
-  //
-  //   this.verification.getBankStatus().subscribe({
-  //     next: (bank) => {
-  //       this.bankVerified.set(bank.bankVerified || alreadyBankVerified);
-  //       if (bank.bankVerified) {
-  //         this.maskedBankAccount.set(bank.accountNumberMasked);
-  //         this.verifiedBankName.set(bank.bankName);
-  //       }
-  //     },
-  //     error: () => {
-  //       /* status endpoint optional for showing the form */
-  //     },
-  //   });
-  // }
+  private hydrateBankSection(alreadyBankVerified: boolean): void {
+    const fullName = [
+      this.experianForm.value.first_name,
+      this.experianForm.value.last_name,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    if (fullName && !this.bankForm.value.accountHolderName) {
+      this.bankForm.patchValue({ accountHolderName: fullName });
+    }
+
+    this.verification.getBankStatus().subscribe({
+      next: (bank) => {
+        this.bankVerified.set(bank.bankVerified || alreadyBankVerified);
+        if (bank.bankVerified) {
+          this.maskedBankAccount.set(bank.accountNumberMasked);
+          this.verifiedBankName.set(bank.bankName);
+        }
+      },
+      error: () => {
+        /* status endpoint optional for showing the form */
+      },
+    });
+  }
 
   // --- DigiLocker Flow ---
   startDigilocker(): void {
@@ -470,8 +475,8 @@ export class IdentityVerificationComponent implements OnInit, OnDestroy {
           setTimeout(() => this.panSuccessPulse.set(false), 2000);
           this.toastSuccess('Experian Credit Report fetched successfully.');
 
-          // Bank verification temporarily disabled — go to EMI summary after PAN
-          window.setTimeout(() => this.goToSummary(), 1200);
+          this.hydrateBankSection(false);
+          window.setTimeout(() => this.scrollToBankSection(), 400);
         },
         error: () => {
           this.verifyingPan.set(false);
@@ -480,11 +485,67 @@ export class IdentityVerificationComponent implements OnInit, OnDestroy {
       });
   }
 
-  // --- Bank Verification Flow — temporarily disabled; KYC via Aadhaar for now ---
-  // onIfscInput(event: Event): void { ... }
-  // onBankAccountInput(...): void { ... }
-  // verifyBank(): void { ... }
-  // private scrollToBankSection(): void { ... }
+  // --- Bank Verification Flow ---
+
+  onIfscInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 11);
+    this.bankForm.controls.ifscCode.setValue(value);
+    input.value = value;
+  }
+
+  onBankAccountInput(control: 'accountNumber' | 'confirmAccountNumber', event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value.replace(/\D/g, '').slice(0, 18);
+    this.bankForm.controls[control].setValue(value);
+    input.value = value;
+  }
+
+  verifyBank(): void {
+    if (this.bankVerified()) return;
+
+    this.bankForm.markAllAsTouched();
+    if (this.bankForm.invalid) {
+      this.bankFormError.set('Please correct the highlighted fields.');
+      return;
+    }
+
+    const { accountNumber, confirmAccountNumber } = this.bankForm.getRawValue();
+    if (accountNumber !== confirmAccountNumber) {
+      this.bankFormError.set('Account number and confirm account number must match.');
+      return;
+    }
+
+    this.bankFormError.set(null);
+    this.verifyingBank.set(true);
+    const payload = this.bankForm.getRawValue();
+
+    this.verification.verifyBank(payload).subscribe({
+      next: (res) => {
+        this.verifyingBank.set(false);
+        this.bankVerified.set(true);
+        this.maskedBankAccount.set(res.accountNumberMasked ?? null);
+        this.verifiedBankName.set(res.bankName ?? payload.bankName);
+        this.bankSuccessPulse.set(true);
+        setTimeout(() => this.bankSuccessPulse.set(false), 2000);
+        this.toastSuccess('Bank Account Verified Successfully');
+      },
+      error: () => {
+        this.verifyingBank.set(false);
+        this.bankFormError.set(this.verification.error());
+        this.toastError(this.verification.error() ?? 'Bank verification failed.');
+      },
+    });
+  }
+
+  private scrollToBankSection(): void {
+    window.setTimeout(() => {
+      document.getElementById('lx-idv-bank')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
 
   // --- Utils ---
 

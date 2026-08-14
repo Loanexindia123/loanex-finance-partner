@@ -3,6 +3,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Observable, catchError, map, shareReplay, tap, throwError } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ApiSuccess } from '../../../core/models/auth.models';
+import { resolveMediaUrl } from '../../../shared/utils/media-url';
 
 export type PurchaseType = 'EMI' | 'DIRECT' | 'COD';
 
@@ -234,7 +235,7 @@ export class CheckoutApiService {
     }
     return this.wrap(
       this.http.get<ApiSuccess<CheckoutSummary>>(`${this.baseUrl}/${productId || 'none'}`, { params }),
-    );
+    ).pipe(map((summary) => this.withResolvedCheckoutImages(summary)));
   }
 
   create(payload: {
@@ -325,6 +326,23 @@ export class CheckoutApiService {
   clearError(): void {
     this.errorSignal.set(null);
     this.errorCodeSignal.set(null);
+  }
+
+  private withResolvedCheckoutImages(summary: CheckoutSummary): CheckoutSummary {
+    return {
+      ...summary,
+      product: {
+        ...summary.product,
+        imageUrl: resolveMediaUrl(summary.product?.imageUrl),
+      },
+      items: summary.items?.map((row) => ({
+        ...row,
+        product: {
+          ...row.product,
+          imageUrl: resolveMediaUrl(row.product?.imageUrl),
+        },
+      })),
+    };
   }
 
   private wrap<T>(source: Observable<ApiSuccess<T>>): Observable<T> {

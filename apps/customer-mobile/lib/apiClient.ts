@@ -69,8 +69,13 @@ async function request(method: string, endpoint: string, body?: any) {
 
   const json = await res.json();
   if (!json.success) {
-    const err: any = new Error(json.message || `Request failed (${res.status})`);
+    const err: Error & { status?: number; code?: string; details?: unknown } = new Error(
+      json.message || `Request failed (${res.status})`,
+    );
+    err.status = res.status;
     if (res.status === 401) err.code = 'SESSION_EXPIRED';
+    else if (json.code) err.code = String(json.code);
+    if (json.details !== undefined) err.details = json.details;
     throw err;
   }
   return json;

@@ -27,9 +27,14 @@
           <p>
             Aadhaar: <strong>{{ aadhaarVerified() ? 'Verified' : 'Pending' }}</strong>
             · PAN: <strong>{{ panVerified() ? 'Verified' : 'Pending' }}</strong>
+            · Bank: <strong>{{ bankVerified() ? 'Verified' : 'Pending' }}</strong>
           </p>
           <a routerLink="/verification" class="lx-btn lx-btn--outline">
-            {{ aadhaarVerified() && panVerified() ? 'View KYC' : 'Continue Verification' }}
+            {{
+              aadhaarVerified() && panVerified() && bankVerified()
+                ? 'View KYC'
+                : 'Continue Verification'
+            }}
           </a>
         }
       </section>

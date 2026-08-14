@@ -10,6 +10,12 @@ import { Router, RouterLink } from '@angular/router';
 import { formatInr } from '../../../../shared/utils/currency';
 import { LoanDashboard, LoanService } from '../../services/loan.service';
 
+/** LoanDashboard narrowed to the "has an active loan" case — loan/summary are guaranteed present. */
+type ActiveLoanDashboard = LoanDashboard & {
+  loan: NonNullable<LoanDashboard['loan']>;
+  summary: NonNullable<LoanDashboard['summary']>;
+};
+
 @Component({
   selector: 'app-emi-dashboard',
   imports: [RouterLink],
@@ -25,7 +31,7 @@ export class EmiDashboardComponent implements OnInit {
   readonly downloading = signal(false);
   readonly error = signal<string | null>(null);
   readonly info = signal<string | null>(null);
-  readonly dashboard = signal<LoanDashboard | null>(null);
+  readonly dashboard = signal<ActiveLoanDashboard | null>(null);
   readonly showSchedule = signal(false);
 
   readonly hasActiveLoan = computed(() => this.dashboard()?.loan.loanStatus === 'ACTIVE');
@@ -99,7 +105,13 @@ export class EmiDashboardComponent implements OnInit {
     this.loanApi.getDashboard().subscribe({
       next: (data) => {
         this.loading.set(false);
-        this.dashboard.set(data);
+        // Empty dashboard (no loans) arrives as null / loan-less payload — not an error.
+        if (this.hasActiveLoanData(data)) {
+          this.dashboard.set(data);
+        } else {
+          this.dashboard.set(null);
+          this.info.set('You have no active EMI loan yet.');
+        }
       },
       error: () => {
         this.loading.set(false);
@@ -107,6 +119,10 @@ export class EmiDashboardComponent implements OnInit {
         this.error.set(this.loanApi.error() ?? 'Unable to load EMI dashboard.');
       },
     });
+  }
+
+  private hasActiveLoanData(data: LoanDashboard | null): data is ActiveLoanDashboard {
+    return !!data && !!data.loan && !!data.summary;
   }
 
   private download(type: 'statement' | 'agreement', fallbackName: string): void {

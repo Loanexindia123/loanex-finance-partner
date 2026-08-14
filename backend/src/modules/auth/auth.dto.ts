@@ -76,10 +76,27 @@ export const forgotPasswordBodySchema = z.object({
   mobile: indianMobileSchema,
 });
 
+/** Admin portal: Employee ID or registered mobile. */
+export const adminForgotPasswordBodySchema = z.object({
+  identifier: z
+    .string()
+    .trim()
+    .min(1, 'Employee ID or registered mobile is required')
+    .max(64),
+});
+
 export const resetPasswordBodySchema = z.object({
   mobile: indianMobileSchema,
   otp: otpSchema,
   newPassword: passwordSchema,
+});
+
+/** Admin portal reset — same shape as customer reset; staff-only on the server. */
+export const adminResetPasswordBodySchema = resetPasswordBodySchema;
+
+export const adminVerifyResetOtpBodySchema = z.object({
+  mobile: indianMobileSchema,
+  otp: otpSchema,
 });
 
 export const changePasswordBodySchema = z.object({
@@ -115,7 +132,10 @@ export type AdminLoginBody = z.infer<typeof adminLoginBodySchema>;
 export type SendOtpBody = z.infer<typeof sendOtpBodySchema>;
 export type VerifyOtpBody = z.infer<typeof verifyOtpBodySchema>;
 export type ForgotPasswordBody = z.infer<typeof forgotPasswordBodySchema>;
+export type AdminForgotPasswordBody = z.infer<typeof adminForgotPasswordBodySchema>;
 export type ResetPasswordBody = z.infer<typeof resetPasswordBodySchema>;
+export type AdminResetPasswordBody = z.infer<typeof adminResetPasswordBodySchema>;
+export type AdminVerifyResetOtpBody = z.infer<typeof adminVerifyResetOtpBodySchema>;
 export type ChangePasswordBody = z.infer<typeof changePasswordBodySchema>;
 export type CompleteRegistrationBody = z.infer<typeof completeRegistrationBodySchema>;
 export type RefreshTokenBody = z.infer<typeof refreshTokenBodySchema>;

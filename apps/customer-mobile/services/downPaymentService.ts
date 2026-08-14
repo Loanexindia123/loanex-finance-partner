@@ -1,4 +1,5 @@
 import { api } from '../lib/apiClient';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 export interface DownPaymentContext {
   applicationId: string;
@@ -62,7 +63,11 @@ export async function getDownPaymentContext(
       ? `/payments/down-payment?applicationId=${encodeURIComponent(applicationId)}`
       : '/payments/down-payment',
   );
-  return res.data;
+  const data = res.data as DownPaymentContext;
+  return {
+    ...data,
+    productImage: resolveMediaUrl(data?.productImage),
+  };
 }
 
 export async function createDownPaymentOrder(

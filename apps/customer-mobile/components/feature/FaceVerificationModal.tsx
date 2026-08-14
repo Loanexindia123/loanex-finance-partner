@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Colors, Fonts, Spacing, Radius, Shadow } from '../../constants/theme';
 import { matchFace } from '../../services/faceService';
 
@@ -13,104 +13,220 @@ interface FaceVerificationModalProps {
   onSuccess: () => void;
 }
 
+type Phase = 'intro' | 'camera' | 'matching' | 'verified' | 'denied';
+
 /**
- * Face verification — triggered on EVERY EMI application (whether KYC is done
- * or not) so we can confirm the person using the account is still the person
- * whose Aadhaar was verified. The backend POST /verification/face-match
- * compares the captured selfie against the Aadhaar profile photo.
+ * Face verification — live FRONT camera selfie only (no gallery/upload).
+ * Uses existing POST /verification/face-match via matchFace().
  */
 export default function FaceVerificationModal({
   visible,
   onClose,
   onSuccess,
 }: FaceVerificationModalProps) {
-  const [loading, setLoading] = useState(false);
-  const [verified, setVerified] = useState(false);
+  const cameraRef = useRef<CameraView>(null);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [phase, setPhase] = useState<Phase>('intro');
+  const [cameraReady, setCameraReady] = useState(false);
+  const [capturing, setCapturing] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (visible) {
-      setLoading(false);
-      setVerified(false);
+      setPhase('intro');
+      setCameraReady(false);
+      setCapturing(false);
     }
   }, [visible]);
 
-  async function handleCapture() {
+  async function startCamera() {
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Camera permission is required to verify your face.');
+      const current = permission?.granted
+        ? permission
+        : await requestPermission();
+      if (!current?.granted) {
+        setPhase('denied');
+        Alert.alert(
+          'Camera Permission Required',
+          'LoanEx needs camera access to capture a live selfie for face verification. Gallery photos are not allowed.',
+        );
+        return;
+      }
+      setCameraReady(false);
+      setPhase('camera');
+    } catch {
+      setPhase('denied');
+      Alert.alert(
+        'Camera Unavailable',
+        'Unable to open the camera. Please check permissions and try again.',
+      );
+    }
+  }
+
+  async function captureAndVerify() {
+    if (!cameraRef.current || !cameraReady || capturing || phase === 'matching') {
+      return;
+    }
+
+    try {
+      setCapturing(true);
+      const photo = await cameraRef.current.takePictureAsync({
+        base64: true,
+        quality: 0.5,
+        skipProcessing: false,
+        shutterSound: false,
+      });
+
+      const base64 = photo?.base64;
+      if (!base64) {
+        Alert.alert(
+          'Capture Failed',
+          'No selfie was captured. Please position your face and try again.',
+        );
+        setCapturing(false);
         return;
       }
 
-      const result = await ImagePicker.launchCameraAsync({
-        cameraType: ImagePicker.CameraType.front,
-        base64: true,
-        quality: 0.5,
-      });
+      setPhase('matching');
+      setCapturing(false);
 
-      if (result.canceled || !result.assets?.[0]?.base64) {
-        return; // user cancelled
-      }
-
-      setLoading(true);
-      const matchResult = await matchFace(result.assets[0].base64);
+      const matchResult = await matchFace(base64);
       const ok =
         matchResult?.data?.match_status === true ||
         matchResult?.verified === true ||
         matchResult?.status?.code === 200;
 
       if (ok) {
-        setVerified(true);
+        setPhase('verified');
         onSuccess();
       } else {
         Alert.alert(
           'Match Failed',
           'Face match could not be confirmed. Please try again in better lighting.',
         );
+        setPhase('camera');
+        setCameraReady(false);
       }
     } catch (e: any) {
-      Alert.alert('Verification Failed', e?.message || 'Face verification failed. Please try again.');
-    } finally {
-      setLoading(false);
+      Alert.alert(
+        'Verification Failed',
+        e?.message || 'Face verification failed. Please try again.',
+      );
+      setPhase('camera');
+      setCameraReady(false);
+      setCapturing(false);
     }
   }
 
+  function handleClose() {
+    setPhase('intro');
+    setCameraReady(false);
+    setCapturing(false);
+    onClose();
+  }
+
+  const showCamera = visible && (phase === 'camera' || phase === 'matching');
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <View style={styles.iconWrap}>
-            <MaterialIcons name="face-retouching-natural" size={44} color={Colors.primary} />
-          </View>
-          <Text style={styles.title}>Verify it's you</Text>
-          <Text style={styles.subtitle}>
-            For your security, we verify your face against the Aadhaar photo on your
-            account before every EMI application.
-          </Text>
-
-          {verified ? (
-            <View style={styles.verifiedBox}>
-              <MaterialIcons name="check-circle" size={22} color={Colors.success} />
-              <Text style={styles.verifiedTxt}>Face verified</Text>
-            </View>
+        <View style={[styles.card, showCamera && styles.cardCamera]}>
+          {phase === 'verified' ? (
+            <>
+              <View style={styles.iconWrap}>
+                <MaterialIcons name="check-circle" size={44} color={Colors.success} />
+              </View>
+              <Text style={styles.title}>Face verified</Text>
+              <Text style={styles.subtitle}>
+                Your live selfie matched the Aadhaar photo on your account.
+              </Text>
+              <Pressable style={styles.cancelBtn} onPress={handleClose}>
+                <Text style={styles.cancelTxt}>Continue</Text>
+              </Pressable>
+            </>
+          ) : phase === 'denied' ? (
+            <>
+              <View style={styles.iconWrap}>
+                <MaterialIcons name="no-photography" size={44} color={Colors.error} />
+              </View>
+              <Text style={styles.title}>Camera access needed</Text>
+              <Text style={styles.subtitle}>
+                Face verification requires a live selfie from your front camera.
+                Photo gallery upload is not allowed. Enable camera permission and try again.
+              </Text>
+              <Pressable style={styles.primaryBtn} onPress={startCamera}>
+                <Text style={styles.primaryBtnTxt}>Try again</Text>
+              </Pressable>
+              <Pressable style={styles.cancelBtn} onPress={handleClose}>
+                <Text style={styles.cancelTxt}>Cancel</Text>
+              </Pressable>
+            </>
+          ) : showCamera ? (
+            <>
+              <Text style={styles.title}>Live selfie</Text>
+              <Text style={styles.subtitle}>
+                Position your face in the frame, then capture. Only a fresh camera selfie is accepted.
+              </Text>
+              <View style={styles.previewWrap}>
+                <CameraView
+                  ref={cameraRef}
+                  style={styles.preview}
+                  facing="front"
+                  mirror={true}
+                  mode="picture"
+                  onCameraReady={() => setCameraReady(true)}
+                />
+                {phase === 'matching' && (
+                  <View style={styles.matchingOverlay}>
+                    <ActivityIndicator color="#fff" size="large" />
+                    <Text style={styles.matchingTxt}>Matching face…</Text>
+                  </View>
+                )}
+              </View>
+              <Pressable
+                style={[
+                  styles.primaryBtn,
+                  (!cameraReady || capturing || phase === 'matching') && styles.btnDisabled,
+                ]}
+                onPress={captureAndVerify}
+                disabled={!cameraReady || capturing || phase === 'matching'}
+              >
+                {capturing || phase === 'matching' ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <MaterialIcons name="camera-alt" size={22} color="#fff" />
+                    <Text style={styles.primaryBtnTxt}>Capture selfie</Text>
+                  </>
+                )}
+              </Pressable>
+              <Pressable
+                style={styles.cancelBtn}
+                onPress={handleClose}
+                disabled={phase === 'matching'}
+              >
+                <Text style={styles.cancelTxt}>Cancel</Text>
+              </Pressable>
+            </>
           ) : (
-            <Pressable style={[styles.faceBtn, loading && { opacity: 0.7 }]} onPress={handleCapture} disabled={loading}>
-              {loading ? (
-                <ActivityIndicator color="#fff" size="large" />
-              ) : (
-                <>
-                  <MaterialIcons name="camera-alt" size={40} color="#fff" />
-                  <Text style={styles.faceBtnTxt}>Tap to scan your face</Text>
-                </>
-              )}
-            </Pressable>
+            <>
+              <View style={styles.iconWrap}>
+                <MaterialIcons name="face-retouching-natural" size={44} color={Colors.primary} />
+              </View>
+              <Text style={styles.title}>Verify it&apos;s you</Text>
+              <Text style={styles.subtitle}>
+                For your security, we capture a live selfie with your front camera and match it
+                against the Aadhaar photo on your account. Gallery photos cannot be used.
+              </Text>
+              <Pressable style={styles.faceBtn} onPress={startCamera}>
+                <MaterialIcons name="photo-camera" size={40} color="#fff" />
+                <Text style={styles.faceBtnTxt}>Start Face Verification</Text>
+                <Text style={styles.faceBtnSub}>Opens front camera</Text>
+              </Pressable>
+              <Pressable style={styles.cancelBtn} onPress={handleClose}>
+                <Text style={styles.cancelTxt}>Cancel</Text>
+              </Pressable>
+            </>
           )}
-
-          <View style={styles.actions}>
-            <Pressable style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelTxt}>Cancel</Text>
-            </Pressable>
-          </View>
         </View>
       </View>
     </Modal>
@@ -133,6 +249,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...Shadow.lg as object,
   },
+  cardCamera: {
+    maxHeight: '92%',
+  },
   iconWrap: {
     width: 84,
     height: 84,
@@ -142,8 +261,43 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: Spacing.lg,
   },
-  title: { fontSize: Fonts.xl, fontWeight: Fonts.bold, color: Colors.textPrimary, marginBottom: Spacing.sm },
-  subtitle: { fontSize: Fonts.md, color: Colors.textSecondary, textAlign: 'center', lineHeight: 21, marginBottom: Spacing.xl },
+  title: {
+    fontSize: Fonts.xl,
+    fontWeight: Fonts.bold,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: Fonts.md,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: Spacing.xl,
+  },
+  previewWrap: {
+    width: '100%',
+    aspectRatio: 3 / 4,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    marginBottom: Spacing.lg,
+  },
+  preview: {
+    flex: 1,
+  },
+  matchingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  matchingTxt: {
+    color: '#fff',
+    fontSize: Fonts.md,
+    fontWeight: Fonts.semiBold,
+  },
   faceBtn: {
     width: '100%',
     height: 170,
@@ -155,19 +309,20 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   faceBtnTxt: { color: '#fff', fontSize: Fonts.lg, fontWeight: Fonts.bold },
-  verifiedBox: {
+  faceBtnSub: { color: 'rgba(255,255,255,0.85)', fontSize: Fonts.sm },
+  primaryBtn: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Colors.successLight,
-    padding: Spacing.lg,
-    borderRadius: Radius.md,
-    marginBottom: Spacing.lg,
-    width: '100%',
     justifyContent: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
-  verifiedTxt: { fontSize: Fonts.md, color: Colors.success, fontWeight: Fonts.semiBold },
-  actions: { width: '100%' },
-  cancelBtn: { alignItems: 'center', padding: Spacing.md },
+  primaryBtnTxt: { color: '#fff', fontSize: Fonts.lg, fontWeight: Fonts.bold },
+  btnDisabled: { opacity: 0.5 },
+  cancelBtn: { alignItems: 'center', padding: Spacing.md, width: '100%' },
   cancelTxt: { color: Colors.textSecondary, fontSize: Fonts.md, fontWeight: Fonts.medium },
 });

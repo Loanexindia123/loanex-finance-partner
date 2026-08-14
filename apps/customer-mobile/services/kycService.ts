@@ -5,14 +5,9 @@ import { api } from '../lib/apiClient';
 const kycInFlight = new Map<string, Promise<CustomerKYC | null>>();
 
 /**
- * Fetch the customer's KYC row from the real backend aggregate
- * (GET /verification/status). Returns the raw customer_kyc record with
- * completion derived from the server-side verification flags, so the UI's
- * "KYC verified" state matches what the website shows.
- *
- * Concurrent callers for the same userId share one HTTP request; different
- * userIds never share. After settle, the in-flight entry is cleared so the
- * next call issues a fresh network request.
+ * Fetch KYC + verification flags from GET /verification/status.
+ * Top-level aadhaarVerified / panVerified / bankVerified / faceVerified are
+ * the source of truth for status UI (do not drop bank/face).
  */
 export async function getKYC(userId: string): Promise<CustomerKYC | null> {
   if (!userId) return null;
@@ -24,17 +19,41 @@ export async function getKYC(userId: string): Promise<CustomerKYC | null> {
     try {
       const res = await api.get('/verification/status');
       const status = res.data ?? {};
-      const kyc: any = status.kyc ?? null;
-      if (!kyc) return null;
+      const kyc: any = status.kyc ?? {};
+
+      const aadhaarVerified = Boolean(
+        status.aadhaarVerified ?? kyc.aadharVerified ?? kyc.aadhaarVerified,
+      );
+      const panVerified = Boolean(
+        status.panVerified ?? kyc.pan_verified ?? kyc.panVerified,
+      );
+      const bankVerified = Boolean(status.bankVerified ?? kyc.bankVerified);
+      const faceVerified = Boolean(
+        status.faceVerified ?? kyc.face_verified ?? kyc.faceVerified,
+      );
       const completed =
-        kyc.kycCompleted === true ||
         status.kycCompleted === true ||
-        status.verificationStatus === 'COMPLETED';
+        status.verificationStatus === 'COMPLETED' ||
+        kyc.kycCompleted === true;
+
       return {
         ...kyc,
         userId,
+        fullName: kyc.fullName ?? '',
+        aadharNumber: kyc.aadharNumber ?? kyc.aadhar_number ?? '',
+        panNumber: kyc.panNumber ?? '',
+        cibilScore: Number(kyc.cibil_score ?? kyc.cibilScore ?? 0),
+        cibilChecked: Boolean(kyc.cibilChecked ?? panVerified),
+        aadharVerified: aadhaarVerified,
+        aadhaarVerified,
+        panVerified,
+        bankVerified,
+        faceVerified,
         kycCompleted: completed,
-        kycCompletedAt: kyc.kycCompletedAt ?? (completed ? kyc.updatedAt ?? null : null),
+        kycCompletedAt:
+          kyc.kycCompletedAt ?? (completed ? kyc.updatedAt ?? null : null),
+        createdAt: kyc.createdAt ?? '',
+        updatedAt: kyc.updatedAt ?? '',
       };
     } catch {
       return null;

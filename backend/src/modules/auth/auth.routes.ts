@@ -5,7 +5,10 @@ import { validateRequest } from '../../common/middleware/validate';
 import { env } from '../../config/env';
 import { authController } from './auth.controller';
 import {
+  adminForgotPasswordBodySchema,
   adminLoginBodySchema,
+  adminResetPasswordBodySchema,
+  adminVerifyResetOtpBodySchema,
   changePasswordBodySchema,
   completeRegistrationBodySchema,
   forgotPasswordBodySchema,
@@ -85,6 +88,24 @@ authRouter.post(
   '/reset-password',
   validateRequest(resetPasswordBodySchema),
   asyncHandler(authController.resetPassword),
+);
+
+authRouter.post(
+  '/admin-forgot-password',
+  validateRequest(adminForgotPasswordBodySchema),
+  asyncHandler(authController.adminForgotPassword),
+);
+
+authRouter.post(
+  '/admin-verify-reset-otp',
+  validateRequest(adminVerifyResetOtpBodySchema),
+  asyncHandler(authController.adminVerifyResetOtp),
+);
+
+authRouter.post(
+  '/admin-reset-password',
+  validateRequest(adminResetPasswordBodySchema),
+  asyncHandler(authController.adminResetPassword),
 );
 
 authRouter.post(

@@ -73,6 +73,7 @@ productRouter.get(
 
   '/',
 
+  optionalAuthenticate,
   validateRequest(listProductsQuerySchema, 'query'),
   asyncHandler(productController.list),
 );

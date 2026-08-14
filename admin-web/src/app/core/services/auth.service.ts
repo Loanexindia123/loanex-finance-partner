@@ -21,6 +21,7 @@ function normalizeLoginUser(raw: AdminLoginRawResponse['user']): AdminUser {
     roleId: raw.roleId,
     roleName: raw.roleName,
     permissions: raw.permissions ?? [],
+    mustChangePassword: !!raw.mustChangePassword,
     status: 'ACTIVE',
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
@@ -36,10 +37,23 @@ function normalizeMeUser(raw: MeRawResponse['user'], fallback: AdminUser | null)
     roleId: raw.roleId ?? fallback?.roleId ?? null,
     roleName: raw.roleName ?? fallback?.roleName ?? null,
     permissions: raw.permissions ?? fallback?.permissions ?? [],
+    mustChangePassword:
+      raw.mustChangePassword !== undefined
+        ? !!raw.mustChangePassword
+        : !!fallback?.mustChangePassword,
     status: raw.status || fallback?.status || 'ACTIVE',
     createdAt: raw.createdAt || fallback?.createdAt || '',
     updatedAt: raw.updatedAt || fallback?.updatedAt || '',
   };
+}
+
+export interface AdminForgotPasswordResult {
+  otpSent: boolean;
+  mobile: string;
+  mobileMasked: string;
+  expiresInMinutes: number;
+  resendCooldownSeconds: number;
+  message: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -109,6 +123,75 @@ export class AuthService {
         newPassword,
       })
       .pipe(map(() => void 0));
+  }
+
+  /** Staff-only forgot password — reuses existing OTP SMS pipeline. */
+  adminForgotPassword(identifier: string): Observable<AdminForgotPasswordResult> {
+    return this.http
+      .post<ApiEnvelope<AdminForgotPasswordResult>>(apiUrl('/auth/admin-forgot-password'), {
+        identifier: identifier.trim(),
+      })
+      .pipe(
+        map((res) => {
+          if (!res.success) throw res;
+          const data = (res.data ?? {}) as Partial<AdminForgotPasswordResult>;
+          return {
+            otpSent: !!data.otpSent,
+            mobile: String(data.mobile ?? ''),
+            mobileMasked: String(data.mobileMasked ?? ''),
+            expiresInMinutes: Number(data.expiresInMinutes ?? 10),
+            resendCooldownSeconds: Number(data.resendCooldownSeconds ?? 30),
+            message:
+              data.message ||
+              'If an eligible staff account matches, an OTP has been sent to the registered mobile number.',
+          };
+        }),
+      );
+  }
+
+  adminVerifyResetOtp(mobile: string, otp: string): Observable<{ verified: boolean; message: string }> {
+    return this.http
+      .post<ApiEnvelope<{ verified?: boolean; message?: string }>>(
+        apiUrl('/auth/admin-verify-reset-otp'),
+        { mobile, otp },
+      )
+      .pipe(
+        map((res) => {
+          if (!res.success) throw res;
+          return {
+            verified: !!(res.data as { verified?: boolean } | undefined)?.verified,
+            message:
+              (res.data as { message?: string } | undefined)?.message ||
+              res.message ||
+              'OTP verified.',
+          };
+        }),
+      );
+  }
+
+  adminResetPassword(
+    mobile: string,
+    otp: string,
+    newPassword: string,
+  ): Observable<{ reset: boolean; message: string }> {
+    return this.http
+      .post<ApiEnvelope<{ reset?: boolean; message?: string }>>(apiUrl('/auth/admin-reset-password'), {
+        mobile,
+        otp,
+        newPassword,
+      })
+      .pipe(
+        map((res) => {
+          if (!res.success) throw res;
+          return {
+            reset: !!(res.data as { reset?: boolean } | undefined)?.reset,
+            message:
+              (res.data as { message?: string } | undefined)?.message ||
+              res.message ||
+              'Password reset successfully.',
+          };
+        }),
+      );
   }
 
   /**

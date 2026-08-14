@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { NotFoundError } from '../../../common/errors/app-error';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/errors/app-error';
 import { jsonDb } from '../../../config/json-db';
 import { calculateEmiBreakdown } from '../../loan/service/emi-calculator.service';
 import { stockState } from '../../../common/utils/inventory';
@@ -10,6 +10,13 @@ import {
   isCustomerVisibleProduct,
   resolveCustomerFacingName,
 } from '../utils/customer-visibility';
+import {
+  assertCanAccessProductByCreator,
+  resolveProductCreatorScope,
+  stripClientOwnershipFields,
+  type ProductCreatorScope,
+} from '../utils/product-ownership';
+import { loadEmployeeRecordsForHierarchy } from '../../admin/employee/employee.service';
 import type { Product } from '../../../types/database.types';
 type ProductVariant = any;
 
@@ -681,9 +688,31 @@ function mapPdpProduct(
 }
 
 export class ProductService {
-  async list(query: ListProductsQuery) {
+  async list(
+    query: ListProductsQuery,
+    options?: {
+      forceCustomerVisible?: boolean;
+      /** Authenticated staff user id — enables hierarchy filtering when not customer catalog. */
+      actorUserId?: string;
+    },
+  ) {
+    let allowedCreatorIds: Set<string> | undefined;
+    // Customer catalog must never be scoped by employee hierarchy.
+    if (!options?.forceCustomerVisible && options?.actorUserId) {
+      const scope = await resolveProductCreatorScope(
+        options.actorUserId,
+        loadEmployeeRecordsForHierarchy,
+      );
+      if (!scope.orgWide) {
+        allowedCreatorIds = scope.allowedCreatorIds;
+      }
+    }
+
     const [{ rows, total }, filters] = await Promise.all([
-      productRepository.list(query),
+      productRepository.list(query, {
+        forceCustomerVisible: options?.forceCustomerVisible,
+        allowedCreatorIds,
+      }),
       productRepository.getDistinctFilters(),
     ]);
 
@@ -706,7 +735,31 @@ export class ProductService {
     };
   }
 
-  async getById(productId: string, options?: { allowHidden?: boolean }) {
+  private async resolveStaffScope(actorUserId: string | undefined): Promise<ProductCreatorScope | null> {
+    if (!actorUserId) return null;
+    return resolveProductCreatorScope(actorUserId, loadEmployeeRecordsForHierarchy);
+  }
+
+  private async assertStaffProductAccess(
+    product: { creatorId?: string | null },
+    actorUserId: string | undefined,
+    requireActor: boolean,
+  ): Promise<void> {
+    if (!actorUserId) {
+      if (requireActor) {
+        throw new ForbiddenError('You do not have access to this product');
+      }
+      return;
+    }
+    const scope = await this.resolveStaffScope(actorUserId);
+    if (!scope) return;
+    assertCanAccessProductByCreator(product, scope);
+  }
+
+  async getById(
+    productId: string,
+    options?: { allowHidden?: boolean; actorUserId?: string },
+  ) {
     const product = await productRepository.findByIdWithVariants(productId);
     if (!product) {
       throw new NotFoundError('Product not found.');
@@ -716,13 +769,21 @@ export class ProductService {
       throw new NotFoundError('Product not found.');
     }
 
+    // Staff detail: enforce onboarding-chain ownership. Customer path skips this.
+    if (options?.allowHidden) {
+      await this.assertStaffProductAccess(product, options.actorUserId, true);
+    }
+
     const statsMap = await productRepository.getReviewStats([productId]);
     const stats = statsMap.get(productId) ?? { averageRating: 0, reviewCount: 0 };
 
     return mapPdpProduct(product, stats);
   }
 
-  async getBySlug(slug: string, options?: { allowHidden?: boolean }) {
+  async getBySlug(
+    slug: string,
+    options?: { allowHidden?: boolean; actorUserId?: string },
+  ) {
     const product = await productRepository.findBySlugWithVariants(slug);
     if (!product) {
       throw new NotFoundError('Product not found.');
@@ -730,6 +791,10 @@ export class ProductService {
 
     if (!options?.allowHidden && !isCustomerVisibleProduct(product)) {
       throw new NotFoundError('Product not found.');
+    }
+
+    if (options?.allowHidden) {
+      await this.assertStaffProductAccess(product, options.actorUserId, true);
     }
 
     const statsMap = await productRepository.getReviewStats([product.id]);
@@ -898,10 +963,18 @@ export class ProductService {
       if (v === undefined || (typeof v === 'string' && v.trim() === '')) delete mapped[key];
     });
 
+    // Ownership is never taken from the client payload.
+    stripClientOwnershipFields(mapped);
+
     return mapped;
   }
 
-  async create(data: any) {
+  async create(data: any, actorUserId: string) {
+    const creatorId = String(actorUserId ?? '').trim();
+    if (!creatorId) {
+      throw new ForbiddenError('Not authorized to create products');
+    }
+
     data = await persistInlineProductImages(data);
     const mapped = this.mapPayloadToPrisma(data);
     if (!mapped.id) {
@@ -916,16 +989,41 @@ export class ProductService {
       mapped.discount = mapped.mrp - mapped.price;
       mapped.discountPrice = mapped.price;
     }
+    // Creator always from authenticated session — ignore client spoofing.
+    mapped.creatorId = creatorId;
     const created = await productRepository.create(mapped);
     await this.syncEmiPlansFromWizard(created.id, data);
     return created;
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, data: any, actorUserId: string) {
     const existing = await productRepository.findById(id);
     if (!existing) {
       throw new NotFoundError('Product not found.');
     }
+
+    await this.assertStaffProductAccess(existing, actorUserId, true);
+
+    // Status-only updates (approve / reject) must not re-run the full wizard mapper.
+    const providedKeys = Object.keys(data ?? {}).filter((key) => data[key] !== undefined);
+    if (providedKeys.length === 1 && providedKeys[0] === 'status') {
+      const nextStatus = String(data.status ?? '').trim().toLowerCase();
+      const allowed = new Set([
+        'active',
+        'draft',
+        'pending_approval',
+        'rejected',
+        'inactive',
+        'out_of_stock',
+        'archived',
+      ]);
+      if (!allowed.has(nextStatus)) {
+        throw new BadRequestError('Invalid product status.');
+      }
+      // Do not change ownership on approve/reject.
+      return productRepository.update(id, { status: nextStatus });
+    }
+
     data = await persistInlineProductImages(data);
     const mapped = this.mapPayloadToPrisma(data);
     // Preserve marketing flags when this request didn't explicitly set them
@@ -949,11 +1047,19 @@ export class ProductService {
     }
     // mapPayloadToPrisma hard-defaults several fields (price 0, stock 0,
     // status 'active', emiAvailable true, warranty '1 Year', …). For partial
-    // updates (e.g. a marketing-flag toggle that sends only { featured }) those
-    // defaults would clobber real data, so restore the stored value for any
-    // field the caller did not explicitly provide.
+    // updates (e.g. a marketing-flag toggle or status approval that sends only
+    // { status }) those defaults would clobber real data, so restore the stored
+    // value for any field the caller did not explicitly provide.
     const source = { ...data, ...(data.wizardData || {}) };
     for (const key of [
+      'name',
+      'sku',
+      'brand',
+      'description',
+      'shortDescription',
+      'categoryId',
+      'category',
+      'image',
       'price',
       'mrp',
       'stock',
@@ -963,16 +1069,48 @@ export class ProductService {
       'gst',
       'warranty',
       'warrantyType',
+      'hsnCode',
+      'manufacturer',
       'galleryImages',
+      'specifications',
+      'features',
+      'boxContents',
+      'variants',
+      'productType',
+      'modelNumber',
+      'barcode',
+      'countryOfOrigin',
+      'productCondition',
+      'colourSizeVariant',
+      'productVideoUrl',
+      'metaTitle',
+      'metaDescription',
+      'keywords',
+      'slug',
+      'wizardData',
     ]) {
       if (source[key] === undefined && mapped[key] !== undefined) {
         mapped[key] = existing[key];
+      }
+    }
+    // Drop undefined mapped keys so repository merge keeps existing values.
+    for (const key of Object.keys(mapped)) {
+      if (mapped[key] === undefined) {
+        delete mapped[key];
       }
     }
     if (mapped.mrp != null && mapped.price != null && mapped.mrp > mapped.price) {
       mapped.discount = mapped.mrp - mapped.price;
       mapped.discountPrice = mapped.price;
     }
+    // Ownership is immutable after create — never transfer on edit.
+    const existingCreatorId = String(existing.creatorId ?? '').trim();
+    if (existingCreatorId) {
+      mapped.creatorId = existingCreatorId;
+    } else {
+      delete mapped.creatorId;
+    }
+    stripClientOwnershipFields(data);
     const updated = await productRepository.update(id, mapped);
     await deleteOrphanedProductImages(existing, updated, id);
     // Only touch the plans collection when the request actually carries plans;
@@ -1016,11 +1154,12 @@ export class ProductService {
     }
   }
 
-  async remove(id: string) {
+  async remove(id: string, actorUserId: string) {
     const existing = await productRepository.findById(id);
     if (!existing) {
       throw new NotFoundError('Product not found.');
     }
+    await this.assertStaffProductAccess(existing, actorUserId, true);
     await productRepository.remove(id);
     await deleteOrphanedProductImages(existing, null, id);
     return { id };

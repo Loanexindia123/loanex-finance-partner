@@ -63,10 +63,20 @@ export class ProductService {
     return this.http.post<ApiEnvelope<Product>>(apiUrl('/products'), payload).pipe(unwrapApi());
   }
 
-  update(productId: string, payload: ProductPayload): Observable<Product> {
+  update(productId: string, payload: ProductPayload | Partial<ProductPayload>): Observable<Product> {
     return this.http
       .put<ApiEnvelope<Product>>(apiUrl(`/products/${productId}`), payload)
       .pipe(unwrapApi());
+  }
+
+  /** Approve a pending product for customer visibility (status → active). */
+  approve(productId: string): Observable<Product> {
+    return this.update(productId, { status: 'active' });
+  }
+
+  /** Reject a pending product (status → rejected). Remains hidden from customers. */
+  reject(productId: string): Observable<Product> {
+    return this.update(productId, { status: 'rejected' });
   }
 
   delete(productId: string): Observable<void> {

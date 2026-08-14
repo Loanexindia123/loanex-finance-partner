@@ -16,6 +16,16 @@
       <p class="lx-emi-dash__loading" aria-live="polite">Loading EMI dashboard…</p>
     }
 
+    @if (!loading() && !dashboard() && !error()) {
+      <div class="lx-emi-dash__empty" role="status">
+        <p>You have no active EMI loan yet.</p>
+        <div class="lx-emi-dash__actions">
+          <a routerLink="/my-emis" class="lx-btn lx-btn--outline">View Applications</a>
+          <a routerLink="/products" class="lx-btn lx-btn--primary">Browse Products</a>
+        </div>
+      </div>
+    }
+
     @if (!loading() && !dashboard() && error()) {
       <div class="lx-emi-dash__actions">
         <a routerLink="/order/confirmation" class="lx-btn lx-btn--outline">Order Confirmation</a>

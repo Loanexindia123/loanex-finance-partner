@@ -113,6 +113,19 @@ export const SEED_ROLES: SeedRole[] = [
     permissions: ['products.view', 'products.create', 'products.edit', 'customers.view', 'orders.view'],
     isSystem: false,
   },
+  {
+    name: 'Employee',
+    description: 'Employee portal: products, product masters and own dealers',
+    permissions: [
+      'products.view',
+      'products.create',
+      'products.edit',
+      'masters.view',
+      'masters.create',
+      'masters.edit',
+    ],
+    isSystem: false,
+  },
 ];
 
 /** Coerce a role's permissions field (jsonb array or JSON string) into a string[]. */

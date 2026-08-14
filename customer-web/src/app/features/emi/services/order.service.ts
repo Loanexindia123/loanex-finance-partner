@@ -3,6 +3,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Observable, catchError, map, tap, throwError } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ApiSuccess } from '../../../core/models/auth.models';
+import { resolveMediaUrl } from '../../../shared/utils/media-url';
 
 export interface OrderListItem {
   id: string;
@@ -169,11 +170,15 @@ export class OrderService {
   readonly error = this.errorSignal.asReadonly();
 
   list(): Observable<OrderListResponse> {
-    return this.wrap(this.http.get<ApiSuccess<OrderListResponse>>(this.baseUrl));
+    return this.wrap(this.http.get<ApiSuccess<OrderListResponse>>(this.baseUrl)).pipe(
+      map((data) => this.withResolvedOrderListImages(data)),
+    );
   }
 
   getCurrent(): Observable<OrderConfirmationDetails> {
-    return this.wrap(this.http.get<ApiSuccess<OrderConfirmationDetails>>(`${this.baseUrl}/current`));
+    return this.wrap(
+      this.http.get<ApiSuccess<OrderConfirmationDetails>>(`${this.baseUrl}/current`),
+    ).pipe(map((data) => this.withResolvedOrderDetailImages(data)));
   }
 
   getById(orderId: string): Observable<OrderConfirmationDetails> {
@@ -184,7 +189,7 @@ export class OrderService {
 
     return this.wrap(
       this.http.get<ApiSuccess<OrderConfirmationDetails>>(`${this.baseUrl}/${orderId}`),
-    );
+    ).pipe(map((data) => this.withResolvedOrderDetailImages(data)));
   }
 
   getTracking(orderId: string): Observable<OrderTrackingDetails> {
@@ -195,7 +200,7 @@ export class OrderService {
 
     return this.wrap(
       this.http.get<ApiSuccess<OrderTrackingDetails>>(`${this.baseUrl}/${orderId}/tracking`),
-    );
+    ).pipe(map((data) => this.withResolvedOrderDetailImages(data) as OrderTrackingDetails));
   }
 
   downloadReceipt(orderId: string): Observable<Blob> {
@@ -208,6 +213,36 @@ export class OrderService {
 
   clearError(): void {
     this.errorSignal.set(null);
+  }
+
+  private withResolvedOrderListImages(data: OrderListResponse): OrderListResponse {
+    return {
+      ...data,
+      items: (data.items ?? []).map((order) => ({
+        ...order,
+        product: order.product
+          ? { ...order.product, imageUrl: resolveMediaUrl(order.product.imageUrl) }
+          : order.product,
+        items: order.items?.map((row) => ({
+          ...row,
+          product: {
+            ...row.product,
+            imageUrl: resolveMediaUrl(row.product?.imageUrl),
+          },
+        })),
+      })),
+    };
+  }
+
+  private withResolvedOrderDetailImages<T extends OrderConfirmationDetails>(data: T): T {
+    return {
+      ...data,
+      productImage: resolveMediaUrl(data.productImage),
+      items: data.items?.map((row) => ({
+        ...row,
+        productImage: resolveMediaUrl(row.productImage),
+      })),
+    };
   }
 
   private downloadPdf(orderId: string, type: 'receipt' | 'invoice'): Observable<Blob> {

@@ -20,11 +20,25 @@ const MENU = [
 
 export default function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
-  const { kyc, kycLoading, isKYCComplete } = useKYC();
+  const {
+    kyc,
+    kycLoading,
+    isKYCComplete,
+    aadhaarVerified,
+    panVerified,
+    bankVerified,
+    faceVerified,
+    refresh,
+  } = useKYC();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  useFocusEffect(useCallback(() => { refreshUser(); }, []));
+  useFocusEffect(
+    useCallback(() => {
+      refreshUser();
+      refresh();
+    }, [refreshUser, refresh]),
+  );
   const [kycModal, setKycModal] = useState(false);
 
   const maskAadhar = (aadhar: string) => {
@@ -36,6 +50,13 @@ export default function ProfileScreen() {
     if (!pan || pan.length < 4) return 'XXXXXXXXXX';
     return `${pan.slice(0, 2)}******${pan.slice(-2)}`;
   };
+
+  const statusRows = [
+    { label: 'Aadhaar Verification', verified: aadhaarVerified },
+    { label: 'PAN Verification', verified: panVerified },
+    { label: 'Bank Account Verification', verified: bankVerified },
+    { label: 'Face Verification', verified: faceVerified },
+  ];
 
   async function handleLogout() {
     await logout();
@@ -71,7 +92,7 @@ export default function ProfileScreen() {
             <Text style={styles.phone}>+91 {user?.phone}</Text>
             {user?.email ? <Text style={styles.email}>{user.email}</Text> : null}
           </View>
-          {kyc && isKYCComplete ? (
+          {kyc ? (
             <Pressable style={styles.editBtn} onPress={() => setKycModal(true)}>
               <MaterialIcons name="visibility" size={18} color={Colors.primary} />
             </Pressable>
@@ -84,38 +105,62 @@ export default function ProfileScreen() {
           onPress={() => {
             if (!isKYCComplete) {
               router.push('/kyc-verification' as any);
+            } else {
+              setKycModal(true);
             }
           }}
         >
           {kycLoading ? (
             <ActivityIndicator color={Colors.primary} />
-          ) : isKYCComplete && kyc ? (
+          ) : (
             <>
               <View style={styles.kycTop}>
-                <View style={styles.kycBadgeComplete}>
-                  <MaterialIcons name="verified" size={16} color={Colors.success} />
-                  <Text style={styles.kycBadgeTxt}>KYC Verified</Text>
-                </View>
+                {isKYCComplete ? (
+                  <View style={styles.kycBadgeComplete}>
+                    <MaterialIcons name="verified" size={16} color={Colors.success} />
+                    <Text style={styles.kycBadgeTxt}>KYC Verified</Text>
+                  </View>
+                ) : (
+                  <View style={styles.kycIncompleteHeader}>
+                    <MaterialIcons name="verified-user" size={18} color={Colors.warning} />
+                    <Text style={styles.kycIncompleteTitle}>KYC Not Completed</Text>
+                  </View>
+                )}
+                {!isKYCComplete ? (
+                  <MaterialIcons name="chevron-right" size={18} color={Colors.textTertiary} />
+                ) : null}
               </View>
-              <View style={styles.kycDetails}>
-                <View style={styles.kycItem}>
-                  <MaterialIcons name="trending-up" size={14} color={Colors.success} />
-                  <Text style={styles.kycItemTxt}>CIBIL Score</Text>
-                  <Text style={[styles.kycItemVal, { fontWeight: Fonts.bold, color: Colors.primary, fontSize: Fonts.md }]}>{kyc.cibilScore}</Text>
-                </View>
+
+              <View style={styles.statusList}>
+                {statusRows.map((row) => (
+                  <View key={row.label} style={styles.statusRow}>
+                    <Text style={styles.statusLabel}>{row.label}</Text>
+                    <View style={[styles.statusPill, row.verified ? styles.statusPillOk : styles.statusPillPending]}>
+                      <MaterialIcons
+                        name={row.verified ? 'check-circle' : 'schedule'}
+                        size={14}
+                        color={row.verified ? Colors.success : Colors.warning}
+                      />
+                      <Text style={[styles.statusPillTxt, { color: row.verified ? Colors.success : Colors.warning }]}>
+                        {row.verified ? 'Verified' : 'Pending'}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
               </View>
+
+              {isKYCComplete && kyc ? (
+                <View style={[styles.kycDetails, { marginTop: Spacing.md }]}>
+                  <View style={styles.kycItem}>
+                    <MaterialIcons name="trending-up" size={14} color={Colors.success} />
+                    <Text style={styles.kycItemTxt}>CIBIL Score</Text>
+                    <Text style={[styles.kycItemVal, { fontWeight: Fonts.bold, color: Colors.primary, fontSize: Fonts.md }]}>{kyc.cibilScore}</Text>
+                  </View>
+                </View>
+              ) : !isKYCComplete ? (
+                <Text style={styles.kycIncompleteSub}>Tap to continue identity verification</Text>
+              ) : null}
             </>
-          ) : (
-            <View style={styles.kycIncomplete}>
-              <View style={styles.kycIconWrap}>
-                <MaterialIcons name="verified-user" size={24} color={Colors.warning} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.kycIncompleteTitle}>KYC Not Completed</Text>
-                <Text style={styles.kycIncompleteSub}>Verify your identity to start shopping</Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={18} color={Colors.textTertiary} />
-            </View>
           )}
         </Pressable>
 
@@ -179,6 +224,25 @@ export default function ProfileScreen() {
                       <Text style={{ fontSize: Fonts.md, color: Colors.textPrimary, fontWeight: Fonts.medium, marginTop: 4 }}>{kyc.gender || 'N/A'}</Text>
                     </View>
                   </View>
+
+                  <View style={styles.modalStatusBlock}>
+                    <Text style={styles.modalStatusTitle}>Verification Status</Text>
+                    {statusRows.map((row) => (
+                      <View key={row.label} style={styles.statusRow}>
+                        <Text style={styles.statusLabel}>{row.label}</Text>
+                        <View style={[styles.statusPill, row.verified ? styles.statusPillOk : styles.statusPillPending]}>
+                          <MaterialIcons
+                            name={row.verified ? 'check-circle' : 'schedule'}
+                            size={14}
+                            color={row.verified ? Colors.success : Colors.warning}
+                          />
+                          <Text style={[styles.statusPillTxt, { color: row.verified ? Colors.success : Colors.warning }]}>
+                            {row.verified ? 'Verified' : 'Pending'}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               ) : (
                 <Text style={{ color: Colors.textSecondary, textAlign: 'center' }}>KYC information not available.</Text>
@@ -230,7 +294,17 @@ const styles = StyleSheet.create({
   kycItemTxt: { fontSize: Fonts.xs, color: Colors.textSecondary, flex: 1 },
   kycItemVal: { fontSize: Fonts.xs, color: Colors.textSecondary },
   kycIncomplete: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  kycIncompleteHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   kycIconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.warningLight, alignItems: 'center', justifyContent: 'center' },
   kycIncompleteTitle: { fontSize: Fonts.sm, fontWeight: Fonts.semiBold, color: Colors.textPrimary },
-  kycIncompleteSub: { fontSize: Fonts.xs, color: Colors.textTertiary, marginTop: 2 },
+  kycIncompleteSub: { fontSize: Fonts.xs, color: Colors.textTertiary, marginTop: Spacing.sm },
+  statusList: { gap: 8 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
+  statusLabel: { fontSize: Fonts.sm, color: Colors.textPrimary, flex: 1, paddingRight: Spacing.sm },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.full },
+  statusPillOk: { backgroundColor: Colors.successLight },
+  statusPillPending: { backgroundColor: Colors.warningLight },
+  statusPillTxt: { fontSize: Fonts.xs, fontWeight: Fonts.semiBold },
+  modalStatusBlock: { marginTop: Spacing.md, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.borderLight, gap: 8 },
+  modalStatusTitle: { fontSize: Fonts.sm, fontWeight: Fonts.semiBold, color: Colors.textPrimary, marginBottom: 4 },
 });

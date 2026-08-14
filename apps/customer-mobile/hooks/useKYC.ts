@@ -33,5 +33,20 @@ export function useKYC() {
 
   const isKYCComplete = kyc?.kycCompleted === true;
 
-  return { kyc, kycLoading, isKYCComplete, refresh };
+  // Server-backed flags from GET /verification/status (via getKYC mapping).
+  const aadhaarVerified = kyc?.aadhaarVerified === true || kyc?.aadharVerified === true;
+  const panVerified = kyc?.panVerified === true;
+  const bankVerified = kyc?.bankVerified === true;
+  const faceVerified = kyc?.faceVerified === true;
+
+  return {
+    kyc,
+    kycLoading,
+    isKYCComplete,
+    aadhaarVerified,
+    panVerified,
+    bankVerified,
+    faceVerified,
+    refresh,
+  };
 }

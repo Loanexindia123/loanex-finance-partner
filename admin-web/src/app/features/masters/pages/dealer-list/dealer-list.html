@@ -17,7 +17,7 @@
     <i class="pi pi-search" aria-hidden="true"></i>
     <input
       type="search"
-      placeholder="Search by name, code, owner, mobile..."
+      placeholder="Search by name, code, GSTIN, branch, mobile..."
       [ngModel]="searchTerm()"
       (ngModelChange)="searchTerm.set($event); resetPage()"
     />
@@ -90,6 +90,8 @@
           <th>Owner</th>
           <th>Mobile</th>
           <th>Branch</th>
+          <th>GSTIN</th>
+          <th>Settlement</th>
           <th>Form Status</th>
           <th>Verification</th>
           <th>Catalog</th>
@@ -122,6 +124,8 @@
           </td>
           <td class="mono-cell">{{ dealer.mobile || '—' }}</td>
           <td class="text-cell">{{ dealer.branch || dealer.dealerBranch || '—' }}</td>
+          <td class="mono-cell">{{ dealer.gstNumber || '—' }}</td>
+          <td class="text-cell">{{ dealer.paymentCycle || dealer.paymentSchedule || '—' }}</td>
           <td><app-status-badge [status]="dealer.formStatus || 'draft'" /></td>
           <td><app-status-badge [status]="dealer.verificationStatus || 'pending'" /></td>
           <td><app-status-badge [status]="dealer.status === 'active' ? 'active' : 'inactive'" /></td>

@@ -28,7 +28,9 @@ export const listProductsQuerySchema = z.object({
     .transform((v) => (typeof v === 'boolean' ? v : v === 'true'))
     .optional(),
   sort: z.enum(['price_asc', 'price_desc', 'latest', 'name']).default('latest'),
-  status: z.enum(['all', 'active', 'inactive', 'draft']).optional(),
+  status: z
+    .enum(['all', 'active', 'inactive', 'draft', 'pending_approval', 'rejected'])
+    .optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(1000).default(12),
 });
@@ -70,7 +72,17 @@ export const createProductBodySchema = z
     price: z.coerce.number().min(0),
     mrp: z.coerce.number().min(0).optional(),
     stock: z.coerce.number().int().min(0).optional(),
-    status: z.enum(['active', 'draft', 'out_of_stock', 'archived', 'inactive']).optional(),
+    status: z
+      .enum([
+        'active',
+        'draft',
+        'pending_approval',
+        'rejected',
+        'out_of_stock',
+        'archived',
+        'inactive',
+      ])
+      .optional(),
     emiAvailable: z.boolean().optional(),
     featured: z.boolean().optional(),
     trending: z.boolean().optional(),

@@ -1,5 +1,6 @@
 import { Order, OrderItem, OrderStatus, EMIDetails } from '../types';
 import { api } from '../lib/apiClient';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 // ─── Backend → mobile mappers ─────────────────────────────────────────────
 
@@ -17,7 +18,7 @@ function toOrderItem(raw: any): OrderItem {
   return {
     productId: p.id ?? raw.productId ?? '',
     productName: p.name ?? raw.productName ?? 'Product',
-    image: p.imageUrl ?? p.image ?? raw.productImage ?? raw.image ?? '',
+    image: resolveMediaUrl(p.imageUrl ?? p.image ?? raw.productImage ?? raw.image ?? ''),
     quantity: Number(raw.quantity ?? 1),
     price: Number(raw.unitPrice ?? raw.price ?? raw.orderAmount ?? 0),
   };
@@ -99,7 +100,7 @@ function toOrder(raw: any): Order {
       ? [{
           productId: raw.product.id,
           productName: raw.product.name ?? 'Product',
-          image: raw.product.imageUrl ?? raw.product.image ?? '',
+          image: resolveMediaUrl(raw.product.imageUrl ?? raw.product.image ?? ''),
           quantity: 1,
           price: Number(raw.orderAmount ?? 0),
         }]
@@ -218,7 +219,7 @@ export async function addOrder(orderData: AddOrderInput): Promise<Order> {
       : orderData.items.map((i: any) => ({
           productId: i.productId,
           productName: i.productName ?? 'Product',
-          image: i.image ?? '',
+          image: resolveMediaUrl(i.image ?? ''),
           quantity: Number(i.quantity ?? 1),
           price: Number(i.price ?? 0),
         }));

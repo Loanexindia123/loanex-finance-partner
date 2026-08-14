@@ -6,10 +6,10 @@ import { RbacService } from '../../core/services/rbac.service';
 import { LayoutService } from '../layout.service';
 
 const NAV_GROUPS: readonly { routes: readonly string[] }[] = [
-  { routes: ['/dashboard', '/products', '/customers', '/orders'] },
+  { routes: ['/dashboard', '/products', '/masters/dealers', '/customers', '/orders'] },
   { routes: ['/emi', '/loans', '/fi'] },
-  { routes: ['/users', '/roles', '/notifications'] },
-  { routes: ['/masters/dealers', '/masters', '/reports', '/settings'] },
+  { routes: ['/users', '/employees', '/roles', '/notifications'] },
+  { routes: ['/masters', '/reports', '/settings'] },
 ];
 
 @Component({
