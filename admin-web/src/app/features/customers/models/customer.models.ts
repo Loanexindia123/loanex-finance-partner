@@ -37,6 +37,9 @@ export interface KycAddress {
   line1?: string;
   line2?: string;
   fullAddress?: string;
+  po?: string;
+  subdist?: string;
+  vtc?: string;
 }
 
 /** Raw /admin/kyc or /admin/users/:id/kyc row. */
@@ -211,16 +214,26 @@ export function formatKycAddress(kyc: KycRecord | null | undefined): string {
   const address = kyc?.address;
   if (!address) return '—';
   if (address.fullAddress?.trim()) return address.fullAddress.trim();
-  const parts = [
+
+  const rawParts = [
     address.line1,
     address.line2,
+    address.vtc,
+    address.po,
+    address.subdist,
     address.dist || address.district || address.city,
     address.state,
     address.pincode || address.zip,
     address.country,
   ]
     .map((part) => part?.trim())
-    .filter(Boolean);
+    .filter((part): part is string => !!part);
+
+  // DigiLocker often repeats the same value across vtc/po/subdist
+  // (e.g. "Janta Colony" in all three) — drop consecutive duplicates
+  // so the address doesn't read "Janta Colony, Janta Colony, Jaipur...".
+  const parts = rawParts.filter((part, i) => rawParts.indexOf(part) === i);
+
   return parts.length ? parts.join(', ') : '—';
 }
 
