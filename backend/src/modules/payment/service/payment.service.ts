@@ -821,7 +821,7 @@ export class PaymentService {
     return { handled: false, reason: 'UNHANDLED_EVENT', event: eventName };
   }
 
-  // ── Lifetime one-time KYC verification fee (₹299) ─────────────────────────
+  // ── Lifetime one-time KYC verification fee (₹399) ─────────────────────────
 
   async getKycFeeStatus(userId: string) {
     const existing = await paymentRepository.findSuccessKycVerification(userId);

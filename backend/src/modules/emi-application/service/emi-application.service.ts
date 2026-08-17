@@ -359,7 +359,7 @@ export class EmiApplicationService {
       );
     }
 
-    // Lifetime ₹299 KYC fee — Mongo-backed SUCCESS payment required before EMI create.
+    // Lifetime ₹399 KYC fee — Mongo-backed SUCCESS payment required before EMI create.
     const kycFeePaid = await paymentRepository.findSuccessKycVerification(userId);
     if (!kycFeePaid) {
       throw new ConflictError('KYC verification fee must be paid before submitting an EMI application.', {

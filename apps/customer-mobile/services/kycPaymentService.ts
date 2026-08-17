@@ -37,7 +37,7 @@ export interface VerifyKycFeeResponse {
   paidAt: string | null;
 }
 
-/** Lifetime one-time KYC verification fee status (₹299, backend-enforced). */
+/** Lifetime one-time KYC verification fee status (₹399, backend-enforced). */
 export async function getKycFeeStatus(): Promise<KycFeeStatus> {
   const res = await api.get('/payments/kyc-fee/status');
   return res.data;

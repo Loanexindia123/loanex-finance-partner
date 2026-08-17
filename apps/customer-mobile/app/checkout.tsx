@@ -120,12 +120,13 @@ export default function CheckoutScreen() {
   // Face verification — required on every EMI application (whether KYC is
   // done or not), to confirm the account holder is still the KYC'd person.
   const [showFaceVerify, setShowFaceVerify] = useState(false);
-  // KYC verification fee (₹299, one-time) — charged before EMI application,
+  // KYC verification fee (₹399, one-time) — charged before EMI application,
   // exactly like the web verification-summary flow.
   const [showKycFeeModal, setShowKycFeeModal] = useState(false);
   const [kycFeeOrder, setKycFeeOrder] = useState<{
     keyId: string;
     orderId: string;
+    amount: number;
     amountPaise: number;
     currency: string;
     prefill: { name: string; email: string; contact: string };
@@ -284,7 +285,7 @@ export default function CheckoutScreen() {
     return true;
   };
 
-  // ─── One-time KYC verification fee (₹299) — mirrors the web flow ────────
+  // ─── One-time KYC verification fee (₹399) — mirrors the web flow ────────
   const ensureKycFeePaid = async (): Promise<boolean> => {
     try {
       const status = await getKycFeeStatus();
@@ -302,6 +303,7 @@ export default function CheckoutScreen() {
       setKycFeeOrder({
         keyId: order.keyId,
         orderId: order.razorpayOrderId,
+        amount: order.amount,
         amountPaise: order.amountPaise,
         currency: order.currency,
         prefill: order.prefill,
@@ -921,7 +923,10 @@ export default function CheckoutScreen() {
         <View style={{ flex: 1, backgroundColor: Colors.background }}>
           <View style={[s.payHeader, { paddingTop: insets.top + Spacing.md }]}>
             <Text style={s.payHeaderTitle}>KYC Verification Fee</Text>
-            <Text style={s.payHeaderAmount}>{APP_CONFIG.currency}399</Text>
+            <Text style={s.payHeaderAmount}>
+              {APP_CONFIG.currency}
+              {(kycFeeOrder?.amount ?? Math.round((kycFeeOrder?.amountPaise ?? 0) / 100)).toLocaleString('en-IN')}
+            </Text>
             <Pressable style={s.payHeaderClose} onPress={() => { setShowKycFeeModal(false); setKycFeeOrder(null); }}>
               <MaterialIcons name="close" size={22} color={Colors.textPrimary} />
             </Pressable>

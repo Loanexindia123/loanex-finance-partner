@@ -68,12 +68,13 @@ export default function EmiApplyScreen() {
   // Declaration consent — mirrors the web verification-summary.
   const [accepted, setAccepted] = useState(false);
   const [acceptedOneTimePayment, setAcceptedOneTimePayment] = useState(false);
-  // One-time KYC verification fee (₹299) — charged before the application is
+  // One-time KYC verification fee (₹399) — charged before the application is
   // submitted, exactly like the web verification-summary flow.
   const [showKycFeeModal, setShowKycFeeModal] = useState(false);
   const [kycFeeOrder, setKycFeeOrder] = useState<{
     keyId: string;
     orderId: string;
+    amount: number;
     amountPaise: number;
     currency: string;
     prefill: { name: string; email: string; contact: string };
@@ -218,7 +219,7 @@ export default function EmiApplyScreen() {
     }
     setSubmitting(true);
     try {
-      // Lifetime one-time KYC verification fee (₹299) — mirror of the web.
+      // Lifetime one-time KYC verification fee (₹399) — mirror of the web.
       const status = await getKycFeeStatus();
       if (!status.paid) {
         const order = await createKycFeeOrder();
@@ -235,6 +236,7 @@ export default function EmiApplyScreen() {
         setKycFeeOrder({
           keyId: order.keyId,
           orderId: order.razorpayOrderId,
+          amount: order.amount,
           amountPaise: order.amountPaise,
           currency: order.currency,
           prefill: order.prefill,
@@ -558,12 +560,14 @@ export default function EmiApplyScreen() {
         onSuccess={handleFaceVerified}
       />
 
-      {/* KYC verification fee WebView (one-time ₹299, mirrors the web) */}
+      {/* KYC verification fee WebView (one-time ₹399, mirrors the web) */}
       <Modal visible={showKycFeeModal && !!kycFeeOrder} animationType="slide" onRequestClose={() => setShowKycFeeModal(false)}>
         <View style={{ flex: 1, backgroundColor: Colors.background }}>
           <View style={[s.payHeader, { paddingTop: insets.top + Spacing.md }]}>
             <Text style={s.payHeaderTitle}>KYC Verification Fee</Text>
-            <Text style={s.payHeaderAmount}>{'₹399'}</Text>
+            <Text style={s.payHeaderAmount}>
+              {`₹${(kycFeeOrder?.amount ?? Math.round((kycFeeOrder?.amountPaise ?? 0) / 100)).toLocaleString('en-IN')}`}
+            </Text>
             <Pressable style={s.iconBtn} onPress={() => { setShowKycFeeModal(false); setKycFeeOrder(null); }}>
               <MaterialIcons name="close" size={22} color={Colors.textPrimary} />
             </Pressable>
