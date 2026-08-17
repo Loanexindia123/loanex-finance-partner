@@ -1,0 +1,106 @@
+<div class="toolbar">
+  <h2 class="toolbar__title">Staff Users</h2>
+  <button *appCan="'users.create'" class="toolbar__add" type="button" (click)="openAdd()">
+    <i class="pi pi-plus" aria-hidden="true"></i>
+    Add User
+  </button>
+</div>
+
+@if (loading()) {
+  <app-branded-loader message="Loading users..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (items().length === 0) {
+  <app-empty-state icon="pi-users" title="No staff users yet" description="Add your first Sales Executive to get started." />
+} @else {
+  <div class="table-shell">
+    <p-table [value]="items()" dataKey="id" [rowHover]="true" styleClass="catalog-table">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Mobile</th>
+          <th>Role</th>
+          <th>Status</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-user>
+        <tr>
+          <td>{{ user.profile?.fullName || '—' }}</td>
+          <td>{{ user.email || '—' }}</td>
+          <td>{{ user.phone || '—' }}</td>
+          <td>{{ user.roleName || '—' }}</td>
+          <td>
+            <button
+              type="button"
+              class="status-toggle"
+              [attr.data-blocked]="user.status === 'BLOCKED'"
+              (click)="toggleStatus(user)"
+            >
+              {{ user.status === 'BLOCKED' ? 'Disabled' : 'Active' }}
+            </button>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+}
+
+<p-dialog
+  header="Add User"
+  [visible]="formOpen()"
+  (visibleChange)="!$event && closeForm()"
+  [modal]="true"
+  [draggable]="false"
+  [closable]="!saving()"
+  appendTo="body"
+  styleClass="admin-dialog"
+  [style]="{ width: 'min(480px, calc(100vw - 2rem))' }"
+>
+  <form [formGroup]="form" class="user-form" (ngSubmit)="submit()">
+    <div class="field">
+      <label for="name">Full Name</label>
+      <input id="name" pInputText formControlName="name" placeholder="e.g. Rahul Sharma" />
+      @if (form.get('name')?.invalid && form.get('name')?.touched) {
+        <small class="field-error">Name is required.</small>
+      }
+    </div>
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" pInputText formControlName="email" placeholder="name@loanex.com" />
+      @if (form.get('email')?.invalid && form.get('email')?.touched) {
+        <small class="field-error">Enter a valid email address.</small>
+      }
+    </div>
+    <div class="field">
+      <label for="mobile">Mobile Number</label>
+      <input id="mobile" pInputText formControlName="mobile" placeholder="10-digit mobile" />
+      @if (form.get('mobile')?.invalid && form.get('mobile')?.touched) {
+        <small class="field-error">Enter a valid 10-digit mobile number.</small>
+      }
+    </div>
+    <div class="field">
+      <label for="role">Role</label>
+      <p-select inputId="role" [options]="roleOptions" formControlName="role" optionLabel="label" optionValue="value" appendTo="body" [checkmark]="false" />
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <p-password inputId="password" formControlName="password" [feedback]="false" [toggleMask]="true" styleClass="user-password" />
+      @if (form.get('password')?.invalid && form.get('password')?.touched) {
+        <small class="field-error">Min 8 characters, with uppercase, lowercase and a number.</small>
+      }
+    </div>
+    <div class="field">
+      <label for="confirmPassword">Confirm Password</label>
+      <p-password inputId="confirmPassword" formControlName="confirmPassword" [feedback]="false" [toggleMask]="true" styleClass="user-password" />
+      @if (form.errors?.['mismatch'] && form.get('confirmPassword')?.touched) {
+        <small class="field-error">Passwords do not match.</small>
+      }
+    </div>
+  </form>
+
+  <ng-template pTemplate="footer">
+    <button pButton type="button" label="Cancel" severity="secondary" [outlined]="true" [disabled]="saving()" (click)="closeForm()"></button>
+    <button pButton type="button" label="Add User" icon="pi pi-plus" [loading]="saving()" [disabled]="saving()" (click)="submit()"></button>
+  </ng-template>
+</p-dialog>
