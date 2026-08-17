@@ -30,9 +30,8 @@
         @for (item of group; track item.route) {
           <a
             class="sidebar__link"
+            [class.sidebar__link--active]="isActive(item)"
             [routerLink]="item.route"
-            routerLinkActive="sidebar__link--active"
-            [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
             [pTooltip]="collapsed() ? item.label : ''"
             tooltipPosition="right"
             (click)="onLinkClick()"

@@ -1,0 +1,293 @@
+<section class="section-card">
+  <div class="section-card__head">
+    <div>
+      <h3>EMI Product Configuration</h3>
+      <p>Default charges and approval rules for this product.</p>
+    </div>
+  </div>
+  <div class="field">
+    <label>Default Down Payment Percentage (%)</label>
+    <p-inputNumber
+      [ngModel]="numOrEmpty(draftSettings().defaultDownPaymentPercent)"
+      (ngModelChange)="patchSettings({ defaultDownPaymentPercent: strOrEmpty($event) })"
+      suffix="%"
+    />
+  </div>
+  <div class="grid-2">
+    <div class="field">
+      <label>Min Customer Down Payment (₹)</label>
+      <p-inputNumber
+        [ngModel]="numOrEmpty(draftSettings().minCustomerDownPayment)"
+        (ngModelChange)="patchSettings({ minCustomerDownPayment: strOrEmpty($event) })"
+        mode="currency"
+        currency="INR"
+        locale="en-IN"
+      />
+    </div>
+    <div class="field">
+      <label>Max Down Payment (₹)</label>
+      <p-inputNumber
+        [ngModel]="numOrEmpty(draftSettings().maxDownPayment)"
+        (ngModelChange)="patchSettings({ maxDownPayment: strOrEmpty($event) })"
+        mode="currency"
+        currency="INR"
+        locale="en-IN"
+      />
+    </div>
+    <div class="field">
+      <label>Service Charge Method</label>
+      <p-select
+        [options]="serviceChargeMethodOptions"
+        [ngModel]="draftSettings().serviceChargeMethod"
+        (ngModelChange)="patchSettings({ serviceChargeMethod: $event || '' })"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="Select method"
+        [showClear]="true"
+        appendTo="body"
+        panelStyleClass="catalog-filter-panel"
+        [checkmark]="false"
+        scrollHeight="240px"
+      />
+    </div>
+    <div class="field">
+      <label>Documentation Charge (₹)</label>
+      <p-inputNumber
+        [ngModel]="numOrEmpty(draftSettings().documentationCharge)"
+        (ngModelChange)="patchSettings({ documentationCharge: strOrEmpty($event) })"
+        mode="currency"
+        currency="INR"
+        locale="en-IN"
+      />
+    </div>
+    <div class="field">
+      <label>Verification Charge (₹)</label>
+      <p-inputNumber
+        [ngModel]="numOrEmpty(draftSettings().verificationCharge)"
+        (ngModelChange)="patchSettings({ verificationCharge: strOrEmpty($event) })"
+        mode="currency"
+        currency="INR"
+        locale="en-IN"
+      />
+    </div>
+    <div class="field">
+      <label>First EMI Due After (days)</label>
+      <input
+        pInputText
+        [ngModel]="draftSettings().firstEmiDueAfter"
+        (ngModelChange)="patchSettings({ firstEmiDueAfter: $event })"
+        placeholder="e.g. 30"
+        inputmode="numeric"
+      />
+    </div>
+    <div class="field">
+      <label>Grace Period (days)</label>
+      <input
+        pInputText
+        [ngModel]="draftSettings().gracePeriod"
+        (ngModelChange)="patchSettings({ gracePeriod: $event })"
+        placeholder="e.g. 7"
+        inputmode="numeric"
+      />
+    </div>
+  </div>
+  <div class="setting-row">
+    <div>
+      <label>Down Payment Editable at Approval</label>
+      <p>Allow changing down payment during loan approval</p>
+    </div>
+    <p-toggleswitch
+      [ngModel]="draftSettings().downPaymentEditableAtApproval"
+      (ngModelChange)="patchSettings({ downPaymentEditableAtApproval: $event })"
+    />
+  </div>
+</section>
+
+<section class="section-card">
+  <div class="section-card__head">
+    <div>
+      <h3>EMI Plan Table</h3>
+      <p>{{ draftPlans().length }} option(s)</p>
+    </div>
+    <button pButton type="button" icon="pi pi-plus" label="Add EMI Option" (click)="openAddEmiModal()"></button>
+  </div>
+  @if (draftPlans().length === 0) {
+    <div class="empty-hint empty-hint--tall">
+      <i class="pi pi-credit-card" aria-hidden="true"></i>
+      <div>
+        <strong>No EMI options configured</strong>
+        <p>Use + Add EMI Option to create plans with any tenure.</p>
+      </div>
+    </div>
+  } @else {
+    <div class="table-wrap">
+      <table class="emi-table">
+        <thead>
+          <tr>
+            <th>Enable</th>
+            <th>Plan Name</th>
+            <th>EMI Duration</th>
+            <th>Down Payment</th>
+            <th>Service Charge</th>
+            <th>Delivery Charge</th>
+            <th>Monthly EMI</th>
+            <th>Min Eligibility</th>
+            <th>Visibility</th>
+            <th>Edit</th>
+            <th>Delete</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (plan of draftPlans(); track plan.id; let i = $index) {
+            <tr [class.is-disabled]="!plan.enabled">
+              <td>
+                <p-toggleswitch
+                  [ngModel]="plan.enabled"
+                  (ngModelChange)="togglePlanEnabled(i, $event)"
+                  [inputId]="'detail-emi-enabled-' + i"
+                />
+              </td>
+              <td>{{ display(plan.planName) }}</td>
+              <td>{{ display(plan.months) }}</td>
+              <td>{{ money(plan.downPayment) }}</td>
+              <td>{{ money(plan.serviceCharge) }}</td>
+              <td>{{ money(plan.deliveryCharge) }}</td>
+              <td>{{ sellingPrice() > 0 && plan.months ? inr(emiRowCalcs(i).monthlyEmi) : '—' }}</td>
+              <td>{{ money(plan.minEligibilityAmount) }}</td>
+              <td>{{ plan.customerVisibility === 'visible' ? 'Visible' : 'Hidden' }}</td>
+              <td>
+                <button pButton type="button" size="small" [text]="true" label="Edit" (click)="openEditEmiModal(i)"></button>
+              </td>
+              <td>
+                <button
+                  pButton
+                  type="button"
+                  size="small"
+                  [text]="true"
+                  severity="danger"
+                  label="Delete"
+                  (click)="removeEmiPlan(i)"
+                ></button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>
+
+<p-dialog
+  [header]="emiEditing()?.planName ? 'Edit EMI Option' : 'Add EMI Option'"
+  [visible]="emiModalOpen()"
+  (visibleChange)="!$event && closeEmiModal()"
+  [modal]="true"
+  [draggable]="false"
+  appendTo="body"
+  styleClass="admin-dialog"
+  [style]="{ width: 'min(640px, calc(100vw - 2rem))' }"
+>
+  @if (emiEditing(); as plan) {
+    <div class="field">
+      <label>Plan Name</label>
+      <input
+        pInputText
+        [ngModel]="plan.planName"
+        (ngModelChange)="updateEmiDraft({ planName: $event })"
+        placeholder="e.g. Standard 18 Month"
+      />
+    </div>
+    <div class="field">
+      <label>EMI Duration (Months)</label>
+      <input
+        pInputText
+        [ngModel]="plan.months"
+        (ngModelChange)="updateEmiDraft({ months: $event })"
+        placeholder="Any value — 3, 5, 11, 18…"
+        inputmode="numeric"
+      />
+    </div>
+    <div class="grid-2">
+      <div class="field">
+        <label>Down Payment (₹)</label>
+        <input
+          pInputText
+          [ngModel]="plan.downPayment"
+          (ngModelChange)="updateEmiDraft({ downPayment: $event })"
+          inputmode="decimal"
+        />
+      </div>
+      <div class="field">
+        <label>Service Charge (₹)</label>
+        <input
+          pInputText
+          [ngModel]="plan.serviceCharge"
+          (ngModelChange)="updateEmiDraft({ serviceCharge: $event })"
+          inputmode="decimal"
+        />
+      </div>
+      <div class="field">
+        <label>Delivery Charge (₹)</label>
+        <input
+          pInputText
+          [ngModel]="plan.deliveryCharge"
+          (ngModelChange)="updateEmiDraft({ deliveryCharge: $event })"
+          inputmode="decimal"
+        />
+      </div>
+      <div class="field">
+        <label>Minimum Eligibility Amount (₹)</label>
+        <input
+          pInputText
+          [ngModel]="plan.minEligibilityAmount"
+          (ngModelChange)="updateEmiDraft({ minEligibilityAmount: $event })"
+          inputmode="decimal"
+        />
+      </div>
+    </div>
+    <div class="field">
+      <label>Customer Visibility</label>
+      <p-select
+        [options]="emiVisibilityOptions"
+        [ngModel]="plan.customerVisibility"
+        (ngModelChange)="updateEmiDraft({ customerVisibility: $event })"
+        optionLabel="label"
+        optionValue="value"
+        appendTo="body"
+        panelStyleClass="catalog-filter-panel"
+        [checkmark]="false"
+      />
+    </div>
+    <div class="setting-row">
+      <div>
+        <label>Enable this EMI option</label>
+      </div>
+      <p-toggleswitch [ngModel]="plan.enabled" (ngModelChange)="updateEmiDraft({ enabled: $event })" />
+    </div>
+    @if (emiModalCalcs() && sellingPrice() > 0) {
+      <section class="section-card calc-card">
+        <h3>Auto Calculated Preview</h3>
+        <dl>
+          <div><dt>EMI Principal</dt><dd>{{ inr(emiModalCalcs()!.loanAmount) }}</dd></div>
+          <div><dt>Monthly EMI</dt><dd>{{ plan.months ? inr(emiModalCalcs()!.monthlyEmi) : '—' }}</dd></div>
+          <div><dt>Down Payment (Upfront)</dt><dd>{{ inr(emiModalCalcs()!.upfrontPayment) }}</dd></div>
+          <div><dt>Total Payable</dt><dd>{{ inr(emiModalCalcs()!.totalPayable) }}</dd></div>
+        </dl>
+      </section>
+    } @else {
+      <p class="muted">Selling price is required to preview calculated values.</p>
+    }
+  }
+  <ng-template pTemplate="footer">
+    <button
+      pButton
+      type="button"
+      [rounded]="true"
+      severity="secondary"
+      [outlined]="true"
+      label="Cancel"
+      (click)="closeEmiModal()"
+    ></button>
+    <button pButton type="button" [rounded]="true" label="Save Option" (click)="saveEmiModal()"></button>
+  </ng-template>
+</p-dialog>

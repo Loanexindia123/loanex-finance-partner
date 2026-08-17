@@ -1,0 +1,657 @@
+<header class="form-header">
+  <div class="form-header__left">
+    <button
+      pButton
+      type="button"
+      icon="pi pi-arrow-left"
+      label="Back to list"
+      [text]="true"
+      (click)="backToList()"
+    ></button>
+    <div>
+      <h1>{{ isEdit ? 'Continue Freelancer / Growing Partner Onboarding' : 'Freelancer / Growing Partner Onboarding' }}</h1>
+      <p>Seven steps for incentive-based partners. Drafts keep all entered information.</p>
+    </div>
+  </div>
+  <div class="id-chip">
+    <span>Agent / Growing Partner ID</span>
+    <strong>{{ agentIdLabel() }}</strong>
+  </div>
+</header>
+
+@if (loading()) {
+  <app-branded-loader message="Loading freelancer profile..." />
+} @else {
+  <div class="notice" role="status">
+    <strong>IMPORTANT:</strong>
+    This profile has no salary. Payout will be incentive/commission-based only as per approved policy.
+    Do not represent this person as an employee.
+  </div>
+
+  <div class="wizard" [formGroup]="form">
+    <aside class="wizard__aside">
+      <nav class="wizard__steps" aria-label="Freelancer onboarding steps">
+        @for (step of steps; track step.key; let i = $index) {
+          <button
+            type="button"
+            class="wizard__step"
+            [class.wizard__step--active]="activeStep() === i"
+            [class.wizard__step--done]="isStepComplete(i) && activeStep() !== i"
+            (click)="goToStep(i)"
+          >
+            <span class="wizard__marker">
+              <span class="wizard__step-index">
+                @if (isStepComplete(i) && activeStep() !== i) {
+                  <i class="pi pi-check" aria-hidden="true"></i>
+                } @else {
+                  {{ i + 1 }}
+                }
+              </span>
+            </span>
+            <span class="wizard__step-title">{{ step.title }}</span>
+          </button>
+        }
+      </nav>
+      <p class="aside-note">Incentive / commission only. Not an employee.</p>
+    </aside>
+
+    <div class="wizard__panel">
+      <header class="panel-head">
+        <span class="panel-head__icon" aria-hidden="true">
+          <i class="pi" [class]="currentStep().icon"></i>
+        </span>
+        <div>
+          <h2>{{ currentStep().title }}</h2>
+          <p>{{ currentStep().description }}</p>
+        </div>
+      </header>
+
+      <div class="panel-body">
+        @switch (activeStep()) {
+          @case (0) {
+            <div class="grid-3">
+              <div class="field" [class.field--invalid]="isInvalid('creatorType')">
+                <label for="creatorType">Creator Type <span class="req">*</span></label>
+                <p-select
+                  inputId="creatorType"
+                  formControlName="creatorType"
+                  [options]="creatorTypeOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select creator type"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+                @if (isInvalid('creatorType')) {
+                  <small class="field-error">{{ fieldError('creatorType') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="creatorSearchEnabled() && isInvalid('creatorId')">
+                <label for="creatorId">Search Creator</label>
+                <p-select
+                  inputId="creatorId"
+                  formControlName="creatorId"
+                  [options]="mergedSelectOptions(form.get('creatorId')?.value, creatorOptions())"
+                  optionLabel="label"
+                  optionValue="value"
+                  [placeholder]="creatorSearchEnabled() ? 'Search creator...' : 'Not required for Direct'"
+                  [filter]="true"
+                  filterPlaceholder="Search by name or ID"
+                  filterBy="label,name,code"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                  scrollHeight="240px"
+                />
+                <span class="field-hint">
+                  {{ creatorSearchEnabled() ? 'Select from Employee Master or existing agents.' : 'Direct onboarding does not require a referrer.' }}
+                </span>
+              </div>
+              <div class="field">
+                <label for="creatorIdValue">Creator ID</label>
+                <input pInputText id="creatorIdValue" [value]="form.getRawValue().creatorId || ''" readonly />
+                <span class="field-hint">Auto-filled from the selected creator. Never edited manually.</span>
+              </div>
+            </div>
+          }
+
+          @case (1) {
+            <div class="grid-3">
+              <div class="field" [class.field--invalid]="isInvalid('fullName')">
+                <label for="fullName">Full Name <span class="req">*</span></label>
+                <input pInputText id="fullName" formControlName="fullName" placeholder="Please enter your full name" />
+                @if (isInvalid('fullName')) {
+                  <small class="field-error">{{ fieldError('fullName') }}</small>
+                }
+              </div>
+              <div class="field">
+                <label for="fatherHusbandName">Father / Husband Name</label>
+                <input pInputText id="fatherHusbandName" formControlName="fatherHusbandName" placeholder="Please enter father's / husband's name" />
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('dateOfBirth')">
+                <label for="dateOfBirth">Date of Birth <span class="req">*</span></label>
+                <input pInputText type="date" id="dateOfBirth" formControlName="dateOfBirth" />
+                @if (isInvalid('dateOfBirth')) {
+                  <small class="field-error">{{ fieldError('dateOfBirth') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('mobile')">
+                <label for="mobile">Mobile Number <span class="req">*</span></label>
+                <input pInputText id="mobile" formControlName="mobile" placeholder="Enter your 10-digit mobile number" inputmode="numeric" maxlength="10" />
+                @if (isInvalid('mobile')) {
+                  <small class="field-error">{{ fieldError('mobile') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('whatsapp')">
+                <div class="field-label-row">
+                  <label for="whatsapp">WhatsApp Number</label>
+                  <button type="button" class="field-link" (click)="copyMobileToWhatsapp()">
+                    Same as mobile
+                  </button>
+                </div>
+                <input pInputText id="whatsapp" formControlName="whatsapp" placeholder="Optional WhatsApp number" inputmode="numeric" maxlength="10" />
+                @if (isInvalid('whatsapp')) {
+                  <small class="field-error">{{ fieldError('whatsapp') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('email')">
+                <label for="email">Email ID</label>
+                <input pInputText id="email" formControlName="email" placeholder="Enter your email address" />
+                @if (isInvalid('email')) {
+                  <small class="field-error">{{ fieldError('email') }}</small>
+                }
+              </div>
+              <div class="field">
+                <label for="gender">Gender</label>
+                <p-select
+                  inputId="gender"
+                  formControlName="gender"
+                  [options]="genderOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select gender"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+              </div>
+              <div class="field">
+                <label for="education">Education</label>
+                <p-select
+                  inputId="education"
+                  formControlName="education"
+                  [options]="mergedSelectOptions(form.get('education')?.value, educationOptions)"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select education"
+                  [filter]="true"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+              </div>
+              <div class="field">
+                <label for="occupation">Occupation</label>
+                <p-select
+                  inputId="occupation"
+                  formControlName="occupation"
+                  [options]="mergedSelectOptions(form.get('occupation')?.value, occupationOptions)"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select occupation"
+                  [filter]="true"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+              </div>
+            </div>
+          }
+
+          @case (2) {
+            <div class="grid-3">
+              <div class="field field--wide" [class.field--invalid]="isInvalid('currentAddress')">
+                <label for="currentAddress">Current Address <span class="req">*</span></label>
+                <input pInputText id="currentAddress" formControlName="currentAddress" placeholder="House / street / locality" />
+                @if (isInvalid('currentAddress')) {
+                  <small class="field-error">{{ fieldError('currentAddress') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('pincode')">
+                <label for="pincode">Pincode <span class="req">*</span></label>
+                <input pInputText id="pincode" formControlName="pincode" placeholder="6-digit pincode" inputmode="numeric" maxlength="6" />
+                @if (isInvalid('pincode')) {
+                  <small class="field-error">{{ fieldError('pincode') }}</small>
+                }
+              </div>
+              <div class="field">
+                <label for="googleLocation">Google Location</label>
+                <input pInputText id="googleLocation" formControlName="googleLocation" placeholder="Maps link or location text" />
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('preferredWorkArea')">
+                <label for="preferredWorkArea">Preferred Work Area <span class="req">*</span></label>
+                <input pInputText id="preferredWorkArea" formControlName="preferredWorkArea" placeholder="Pincode / city / district" />
+                @if (isInvalid('preferredWorkArea')) {
+                  <small class="field-error">{{ fieldError('preferredWorkArea') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('workMode')">
+                <label for="workMode">Work Mode <span class="req">*</span></label>
+                <p-select
+                  inputId="workMode"
+                  formControlName="workMode"
+                  [options]="workModeOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Field, Online or Both"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+                @if (isInvalid('workMode')) {
+                  <small class="field-error">{{ fieldError('workMode') }}</small>
+                }
+              </div>
+              <div class="field">
+                <label for="emergencyContactName">Emergency Contact Name</label>
+                <input pInputText id="emergencyContactName" formControlName="emergencyContactName" placeholder="Contact person name" />
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('emergencyContactMobile')">
+                <label for="emergencyContactMobile">Emergency Contact Mobile</label>
+                <input pInputText id="emergencyContactMobile" formControlName="emergencyContactMobile" placeholder="10-digit mobile" inputmode="numeric" maxlength="10" />
+                @if (isInvalid('emergencyContactMobile')) {
+                  <small class="field-error">{{ fieldError('emergencyContactMobile') }}</small>
+                }
+              </div>
+            </div>
+          }
+
+          @case (3) {
+            <div class="grid-3">
+              <div class="field" [class.field--invalid]="isInvalid('aadhaarNumber')">
+                <label for="aadhaarNumber">Aadhaar Number</label>
+                <input pInputText id="aadhaarNumber" formControlName="aadhaarNumber" placeholder="12-digit Aadhaar" inputmode="numeric" maxlength="12" />
+                <span class="field-hint">Used only to prevent duplicate onboarding.</span>
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('panNumber')">
+                <label for="panNumber">PAN Number</label>
+                <input pInputText id="panNumber" formControlName="panNumber" placeholder="ABCDE1234F" maxlength="10" />
+              </div>
+            </div>
+            <div class="grid-3 doc-grid">
+              @for (doc of documentFields; track doc.key) {
+                <div class="field" [class.field--invalid]="doc.required && isInvalid(doc.key)">
+                  <label>
+                    {{ doc.label }}
+                    @if (doc.required) {
+                      <span class="req">*</span>
+                    }
+                  </label>
+                  <label
+                    class="doc-upload-zone"
+                    [class.doc-upload-zone--filled]="hasDocument(doc.key)"
+                    [class.doc-upload-zone--loading]="submitting() && isPendingDocument(doc.key)"
+                  >
+                    <input type="file" accept="image/*,.pdf" hidden (change)="onDocumentSelected($event, doc.key)" />
+                    @if (submitting() && isPendingDocument(doc.key)) {
+                      <span class="doc-upload-zone__text">
+                        <i class="pi pi-spin pi-spinner"></i>
+                        Saving...
+                      </span>
+                    } @else if (isPendingDocument(doc.key)) {
+                      <span class="doc-upload-zone__text doc-upload-zone__text--done">
+                        <i class="pi pi-file"></i>
+                        {{ documentLabel(doc.key) }}
+                      </span>
+                    } @else if (hasDocument(doc.key)) {
+                      <span class="doc-upload-zone__text doc-upload-zone__text--done">
+                        <i class="pi pi-check"></i>
+                        Uploaded
+                      </span>
+                    } @else {
+                      <span class="doc-upload-zone__text">
+                        <span class="doc-upload-zone__action">UPLOAD</span>
+                        <span class="doc-upload-zone__sep">|</span>
+                        <span>{{ doc.hint }}</span>
+                      </span>
+                    }
+                  </label>
+                  @if (doc.required && isInvalid(doc.key)) {
+                    <small class="field-error">{{ fieldError(doc.key) }}</small>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          @case (4) {
+            <div class="grid-3">
+              <div class="field" [class.field--invalid]="isInvalid('agentType')">
+                <label for="agentType">Agent Type <span class="req">*</span></label>
+                <p-select
+                  inputId="agentType"
+                  formControlName="agentType"
+                  [options]="agentTypeOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select agent type"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+                @if (isInvalid('agentType')) {
+                  <small class="field-error">{{ fieldError('agentType') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('preferredDepartments')">
+                <label for="preferredDepartments">Preferred Department <span class="req">*</span></label>
+                <p-multiselect
+                  inputId="preferredDepartments"
+                  formControlName="preferredDepartments"
+                  [options]="departmentOptions()"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select departments"
+                  [filter]="true"
+                  display="chip"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+                @if (isInvalid('preferredDepartments')) {
+                  <small class="field-error">{{ fieldError('preferredDepartments') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('allowedWork')">
+                <label for="allowedWork">Allowed Work <span class="req">*</span></label>
+                <p-multiselect
+                  inputId="allowedWork"
+                  formControlName="allowedWork"
+                  [options]="allowedWorkOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select allowed work"
+                  display="chip"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+                @if (isInvalid('allowedWork')) {
+                  <small class="field-error">{{ fieldError('allowedWork') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('assignedManagerId')">
+                <label for="assignedManagerId">Assigned Manager <span class="req">*</span></label>
+                <p-select
+                  inputId="assignedManagerId"
+                  formControlName="assignedManagerId"
+                  [options]="mergedSelectOptions(form.get('assignedManagerId')?.value, staffOptions())"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Search staff"
+                  [filter]="true"
+                  filterBy="label,name,code"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                  scrollHeight="240px"
+                />
+                @if (isInvalid('assignedManagerId')) {
+                  <small class="field-error">{{ fieldError('assignedManagerId') }}</small>
+                }
+              </div>
+              <div class="field">
+                <label for="branch">Branch / Territory</label>
+                <p-select
+                  inputId="branch"
+                  formControlName="branch"
+                  [options]="mergedSelectOptions(form.get('branch')?.value, branchOptions())"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select branch"
+                  [filter]="true"
+                  [showClear]="true"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+              </div>
+              <div class="field">
+                <label for="trainingStatus">Training Status</label>
+                <p-select
+                  inputId="trainingStatus"
+                  formControlName="trainingStatus"
+                  [options]="trainingOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Select status"
+                  appendTo="body"
+                  panelStyleClass="catalog-filter-panel"
+                />
+              </div>
+            </div>
+          }
+
+          @case (5) {
+            <div class="payout-note">
+              This is an agent / partner payout account, not employee payroll. No salary, PF or ESI is created.
+            </div>
+            <div class="grid-3">
+              <div class="field" [class.field--invalid]="isInvalid('accountNumber')">
+                <label for="accountNumber">Account Number <span class="req">*</span></label>
+                <input pInputText id="accountNumber" formControlName="accountNumber" placeholder="8–18 digits" inputmode="numeric" autocomplete="off" />
+                @if (isInvalid('accountNumber')) {
+                  <small class="field-error">{{ fieldError('accountNumber') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('confirmAccountNumber')">
+                <label for="confirmAccountNumber">Confirm Account Number <span class="req">*</span></label>
+                <input pInputText id="confirmAccountNumber" formControlName="confirmAccountNumber" placeholder="Re-enter account number" inputmode="numeric" autocomplete="off" />
+                @if (isInvalid('confirmAccountNumber')) {
+                  <small class="field-error">{{ fieldError('confirmAccountNumber') }}</small>
+                }
+              </div>
+              <div class="field" [class.field--invalid]="isInvalid('ifscCode')">
+                <label for="ifscCode">IFSC Code <span class="req">*</span></label>
+                <input pInputText id="ifscCode" formControlName="ifscCode" placeholder="SBIN0001234" maxlength="11" />
+                @if (isInvalid('ifscCode')) {
+                  <small class="field-error">{{ fieldError('ifscCode') }}</small>
+                }
+              </div>
+              <div class="field field--wide" [class.field--invalid]="isInvalid('policyAccepted')">
+                <label class="consent" for="policyAccepted">
+                  <input id="policyAccepted" type="checkbox" formControlName="policyAccepted" />
+                  <span>
+                    Policy Acceptance <span class="req">*</span>
+                    <small>I accept that payout is incentive / commission based as per approved company policy. I am not an employee of LoanEx.</small>
+                  </span>
+                </label>
+                @if (isInvalid('policyAccepted')) {
+                  <small class="field-error">{{ fieldError('policyAccepted') }}</small>
+                }
+              </div>
+            </div>
+          }
+
+          @case (6) {
+            <div class="review-grid">
+              <section class="review-card">
+                <header>
+                  <h3>Referred By</h3>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(0)"></button>
+                </header>
+                <dl>
+                  <div><dt>Creator Type</dt><dd>{{ display(form.getRawValue().creatorType) }}</dd></div>
+                  <div><dt>Creator</dt><dd>{{ display(form.getRawValue().creatorName) }}</dd></div>
+                  <div><dt>Creator ID</dt><dd>{{ display(form.getRawValue().creatorId) }}</dd></div>
+                </dl>
+              </section>
+              <section class="review-card">
+                <header>
+                  <h3>Personal Details</h3>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(1)"></button>
+                </header>
+                <dl>
+                  <div><dt>Full Name</dt><dd>{{ display(form.getRawValue().fullName) }}</dd></div>
+                  <div><dt>Mobile</dt><dd>{{ display(form.getRawValue().mobile) }}</dd></div>
+                  <div><dt>Date of Birth</dt><dd>{{ display(form.getRawValue().dateOfBirth) }}</dd></div>
+                  <div><dt>Email</dt><dd>{{ display(form.getRawValue().email) }}</dd></div>
+                </dl>
+              </section>
+              <section class="review-card">
+                <header>
+                  <h3>Address &amp; Work Area</h3>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(2)"></button>
+                </header>
+                <dl>
+                  <div><dt>Address</dt><dd>{{ display(form.getRawValue().currentAddress) }}</dd></div>
+                  <div><dt>Pincode</dt><dd>{{ display(form.getRawValue().pincode) }}</dd></div>
+                  <div><dt>Work Area</dt><dd>{{ display(form.getRawValue().preferredWorkArea) }}</dd></div>
+                  <div><dt>Work Mode</dt><dd>{{ display(form.getRawValue().workMode) }}</dd></div>
+                </dl>
+              </section>
+              <section class="review-card">
+                <header>
+                  <h3>Work Preferences</h3>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(4)"></button>
+                </header>
+                <dl>
+                  <div><dt>Agent Type</dt><dd>{{ display(form.getRawValue().agentType) }}</dd></div>
+                  <div><dt>Departments</dt><dd>{{ display(form.getRawValue().preferredDepartments) }}</dd></div>
+                  <div><dt>Allowed Work</dt><dd>{{ display(form.getRawValue().allowedWork) }}</dd></div>
+                  <div><dt>Manager</dt><dd>{{ display(form.getRawValue().assignedManager) }}</dd></div>
+                </dl>
+              </section>
+              <section class="review-card">
+                <header>
+                  <h3>KYC Documents</h3>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(3)"></button>
+                </header>
+                <dl>
+                  @for (doc of documentFields; track doc.key) {
+                    <div>
+                      <dt>{{ doc.label }}</dt>
+                      <dd>{{ hasDocument(doc.key) ? (isPendingDocument(doc.key) ? 'Selected' : 'Uploaded') : '—' }}</dd>
+                    </div>
+                  }
+                </dl>
+              </section>
+              <section class="review-card">
+                <header>
+                  <h3>Bank &amp; Consent</h3>
+                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(5)"></button>
+                </header>
+                <dl>
+                  <div><dt>IFSC</dt><dd>{{ display(form.getRawValue().ifscCode) }}</dd></div>
+                  <div><dt>Policy Accepted</dt><dd>{{ display(form.getRawValue().policyAccepted) }}</dd></div>
+                  <div><dt>Payout</dt><dd>Incentive / Commission</dd></div>
+                </dl>
+              </section>
+            </div>
+          }
+        }
+      </div>
+
+      <div class="wizard__nav">
+        <button
+          pButton
+          type="button"
+          severity="secondary"
+          [outlined]="true"
+          icon="pi pi-arrow-left"
+          label="Back"
+          [disabled]="activeStep() === 0 || submitting()"
+          (click)="back()"
+        ></button>
+        <div class="wizard__nav-end">
+          <button
+            pButton
+            type="button"
+            severity="secondary"
+            [outlined]="true"
+            icon="pi pi-save"
+            label="Save Draft"
+            [disabled]="submitting() || form.disabled"
+            [loading]="submittingKind() === 'draft'"
+            (click)="saveDraft()"
+          ></button>
+          <button
+            pButton
+            type="button"
+            severity="secondary"
+            [outlined]="true"
+            icon="pi pi-eye"
+            label="Preview"
+            [disabled]="submitting()"
+            (click)="openPreview()"
+          ></button>
+          @if (activeStep() === steps.length - 1) {
+            <button
+              pButton
+              type="button"
+              icon="pi pi-send"
+              label="Submit for Approval"
+              [disabled]="submitting() || form.disabled"
+              [loading]="submittingKind() === 'submit'"
+              (click)="submitForApproval()"
+            ></button>
+          } @else {
+            <button
+              pButton
+              type="button"
+              icon="pi pi-arrow-right"
+              iconPos="right"
+              label="Next"
+              [disabled]="submitting()"
+              (click)="next()"
+            ></button>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<p-dialog
+  [visible]="previewOpen()"
+  [modal]="true"
+  [draggable]="false"
+  appendTo="body"
+  header="Preview — not saved"
+  styleClass="admin-dialog"
+  [style]="{ width: 'min(760px, calc(100vw - 2rem))' }"
+  (visibleChange)="!$event && closePreview()"
+>
+  <p class="field-hint">This preview does not save, submit, or generate an Agent ID.</p>
+  <div class="review-grid">
+    <section class="review-card">
+      <h3>Personal</h3>
+      <dl>
+        <div><dt>Name</dt><dd>{{ display(form.getRawValue().fullName) }}</dd></div>
+        <div><dt>Mobile</dt><dd>{{ display(form.getRawValue().mobile) }}</dd></div>
+        <div><dt>Email</dt><dd>{{ display(form.getRawValue().email) }}</dd></div>
+      </dl>
+    </section>
+    <section class="review-card">
+      <h3>Work</h3>
+      <dl>
+        <div><dt>Agent Type</dt><dd>{{ display(form.getRawValue().agentType) }}</dd></div>
+        <div><dt>Work Mode</dt><dd>{{ display(form.getRawValue().workMode) }}</dd></div>
+        <div><dt>Manager</dt><dd>{{ display(form.getRawValue().assignedManager) }}</dd></div>
+      </dl>
+    </section>
+    <section class="review-card">
+      <h3>Address</h3>
+      <dl>
+        <div><dt>Address</dt><dd>{{ display(form.getRawValue().currentAddress) }}</dd></div>
+        <div><dt>Pincode</dt><dd>{{ display(form.getRawValue().pincode) }}</dd></div>
+        <div><dt>Work Area</dt><dd>{{ display(form.getRawValue().preferredWorkArea) }}</dd></div>
+      </dl>
+    </section>
+    <section class="review-card">
+      <h3>Payout</h3>
+      <dl>
+        <div><dt>IFSC</dt><dd>{{ display(form.getRawValue().ifscCode) }}</dd></div>
+        <div><dt>Policy</dt><dd>{{ display(form.getRawValue().policyAccepted) }}</dd></div>
+        <div><dt>Agent ID</dt><dd>{{ agentIdLabel() }}</dd></div>
+      </dl>
+    </section>
+  </div>
+  <ng-template pTemplate="footer">
+    <button pButton type="button" label="Close" (click)="closePreview()"></button>
+  </ng-template>
+</p-dialog>

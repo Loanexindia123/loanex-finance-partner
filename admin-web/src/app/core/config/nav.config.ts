@@ -36,6 +36,12 @@ export const NAV_ITEMS: NavItem[] = [
     route: '/employees',
     permissions: ['users.view'],
   },
+  {
+    label: 'Freelancer / Growing Partner',
+    icon: 'pi pi-briefcase',
+    route: '/employees/freelancer-onboarding',
+    permissions: ['freelancers.view'],
+  },
   { label: 'Roles', icon: 'pi pi-shield', route: '/roles', permissions: ['roles.view'] },
   {
     label: 'Notifications',

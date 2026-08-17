@@ -165,13 +165,12 @@
                   *appCan="'products.edit'"
                   type="button"
                   class="act act--approve"
-                  pTooltip="Approve product"
+                  pTooltip="Review EMI and approve"
                   [tooltipOptions]="actionTooltip"
-                  [disabled]="approvingId() === product.id"
-                  (click)="approve(product)"
+                  (click)="view(product)"
                 >
                   <i class="pi pi-check" aria-hidden="true"></i>
-                  Approve
+                  Review
                 </button>
               }
               <button
@@ -239,10 +238,9 @@
               *appCan="'products.edit'"
               type="button"
               class="act act--approve"
-              [disabled]="approvingId() === product.id"
-              (click)="approve(product)"
+              (click)="view(product)"
             >
-              <i class="pi pi-check" aria-hidden="true"></i> Approve
+              <i class="pi pi-check" aria-hidden="true"></i> Review
             </button>
           }
           <button *appCan="'products.delete'" type="button" class="act act--delete" (click)="askDelete(product)">

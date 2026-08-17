@@ -54,6 +54,7 @@ export interface LocalDatabaseSchema {
   delivery_zones: any[];
   product_types: any[];
   employees: any[];
+  freelancer_agents: any[];
 }
 
 const DEFAULT_INITIAL_DATA: LocalDatabaseSchema = {
@@ -76,6 +77,8 @@ const DEFAULT_INITIAL_DATA: LocalDatabaseSchema = {
         'masters.view', 'masters.create', 'masters.edit', 'masters.delete',
         'settings.view', 'settings.edit',
         'notifications.view', 'notifications.create', 'notifications.delete',
+        'freelancers.view', 'freelancers.create', 'freelancers.edit', 'freelancers.delete',
+        'freelancers.approve', 'freelancers.reject', 'freelancers.payout',
       ],
       is_system: true,
       isSystem: true,
@@ -158,6 +161,18 @@ const DEFAULT_INITIAL_DATA: LocalDatabaseSchema = {
         'masters.create',
         'masters.edit',
       ],
+      is_system: false,
+      isSystem: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: '00000000-0000-4000-8000-000000000007',
+      name: 'HR Executive',
+      description: 'Hiring: job openings and applications',
+      permissions: ['careers.view', 'careers.create', 'careers.edit', 'careers.delete'],
       is_system: false,
       isSystem: false,
       created_at: new Date().toISOString(),
@@ -251,6 +266,7 @@ const DEFAULT_INITIAL_DATA: LocalDatabaseSchema = {
     { id: 'ptype-audio', name: 'Audio', status: 'active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   ],
   employees: [],
+  freelancer_agents: [],
   products: [],
   product_emi_plans: [],
   cart_items: [],
@@ -699,6 +715,7 @@ export const ADMIN_LAZY_COLLECTIONS = [
   'delivery_zones',
   'product_types',
   'employees',
+  'freelancer_agents',
 ] as const;
 
 const ADMIN_LAZY_SET = new Set<string>(ADMIN_LAZY_COLLECTIONS);

@@ -36,6 +36,12 @@ import {
   createEmployeeBodySchema,
   updateEmployeeBodySchema,
 } from './employee/employee.validator';
+import { freelancerAgentController } from './freelancer-agent/freelancer-agent.controller';
+import {
+  createFreelancerAgentBodySchema,
+  rejectFreelancerAgentBodySchema,
+  updateFreelancerAgentBodySchema,
+} from './freelancer-agent/freelancer-agent.validator';
 
 export const adminRouter = Router();
 
@@ -62,6 +68,7 @@ adminRouter.patch(
 adminRouter.get('/users', requirePermission('users.view'), asyncHandler(adminController.listUsers));
 adminRouter.post('/users', requirePermission('users.create'), asyncHandler(adminController.createUser));
 adminRouter.patch('/users/:id', requirePermission('users.edit'), asyncHandler(adminController.updateUser));
+adminRouter.delete('/users/:id', requirePermission('users.delete'), asyncHandler(adminController.deleteUser));
 
 adminRouter.get('/kyc', requirePermission('customers.view'), asyncHandler(adminController.listKyc));
 
@@ -304,6 +311,51 @@ adminRouter.delete(
   '/employees/:id',
   requirePermission('users.delete'),
   asyncHandler(employeeController.remove),
+);
+
+// —— Freelancer / Growing Partner onboarding (dedicated collection; not employees) ——
+adminRouter.get(
+  '/freelancer-agents',
+  requirePermission('freelancers.view'),
+  asyncHandler(freelancerAgentController.list),
+);
+adminRouter.get(
+  '/freelancer-agents/creators',
+  requirePermission('freelancers.create'),
+  asyncHandler(freelancerAgentController.listCreators),
+);
+adminRouter.post(
+  '/freelancer-agents',
+  requirePermission('freelancers.create'),
+  validateRequest(createFreelancerAgentBodySchema),
+  asyncHandler(freelancerAgentController.create),
+);
+adminRouter.get(
+  '/freelancer-agents/:id',
+  requirePermission('freelancers.view'),
+  asyncHandler(freelancerAgentController.getById),
+);
+adminRouter.put(
+  '/freelancer-agents/:id',
+  requirePermission('freelancers.edit'),
+  validateRequest(updateFreelancerAgentBodySchema),
+  asyncHandler(freelancerAgentController.update),
+);
+adminRouter.post(
+  '/freelancer-agents/:id/approve',
+  requirePermission('freelancers.approve'),
+  asyncHandler(freelancerAgentController.approve),
+);
+adminRouter.post(
+  '/freelancer-agents/:id/reject',
+  requirePermission('freelancers.reject'),
+  validateRequest(rejectFreelancerAgentBodySchema),
+  asyncHandler(freelancerAgentController.reject),
+);
+adminRouter.delete(
+  '/freelancer-agents/:id',
+  requirePermission('freelancers.delete'),
+  asyncHandler(freelancerAgentController.remove),
 );
 
 // —— Master data (other collections; branches + dealers + product_types handled above) ——

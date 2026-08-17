@@ -18,6 +18,7 @@ export const MODULE_KEYS = [
   'settings',
   'notifications',
   'careers',
+  'freelancers',
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -39,6 +40,11 @@ export const MODULES: { key: ModuleKey; label: string; description: string }[] =
   { key: 'settings', label: 'Settings', description: 'Portal settings' },
   { key: 'notifications', label: 'Notifications', description: 'Push & in-app notifications' },
   { key: 'careers', label: 'Careers', description: 'Job openings & hiring' },
+  {
+    key: 'freelancers',
+    label: 'Freelancer / Growing Partner',
+    description: 'Freelancer agent onboarding, approval and payout view',
+  },
 ];
 
 export const ACTION_LABELS: Record<ActionKey, string> = {
@@ -48,10 +54,18 @@ export const ACTION_LABELS: Record<ActionKey, string> = {
   delete: 'Delete',
 };
 
+/** Extra actions that apply only to selected modules (not the 4-action grid). */
+export const EXTRA_PERMISSIONS = [
+  'freelancers.approve',
+  'freelancers.reject',
+  'freelancers.payout',
+] as const;
+
 /** Every permission string known to the system. */
-export const ALL_PERMISSIONS: string[] = MODULE_KEYS.flatMap((module) =>
-  ACTION_KEYS.map((action) => `${module}.${action}`),
-);
+export const ALL_PERMISSIONS: string[] = [
+  ...MODULE_KEYS.flatMap((module) => ACTION_KEYS.map((action) => `${module}.${action}`)),
+  ...EXTRA_PERMISSIONS,
+];
 
 /** Permissions granted to the system Super Admin role. */
 export const SUPER_ADMIN_PERMISSIONS: string[] = [...ALL_PERMISSIONS];
@@ -126,6 +140,12 @@ export const SEED_ROLES: SeedRole[] = [
     ],
     isSystem: false,
   },
+  {
+    name: 'HR Executive',
+    description: 'Hiring: job openings and applications',
+    permissions: ['careers.view', 'careers.create', 'careers.edit', 'careers.delete'],
+    isSystem: false,
+  },
 ];
 
 /** Coerce a role's permissions field (jsonb array or JSON string) into a string[]. */
@@ -145,4 +165,38 @@ export function rolePermissions(role?: any): string[] {
 
 export function hasPermission(permissions: string[], permission: string): boolean {
   return permissions.includes(permission);
+}
+
+export function isSuperAdminRole(role?: any): boolean {
+  return String(role?.name ?? '').trim().toLowerCase() === 'super admin';
+}
+
+/** Staff roles that Add User may assign. Super Admin / Admin / Employee are excluded. */
+export const OPERATIONAL_STAFF_ROLE_NAMES = [
+  'Sales Executive',
+  'Branch Manager',
+  'Credit Officer',
+  'FI Executive',
+  'HR Executive',
+] as const;
+
+export type OperationalStaffRoleName = (typeof OPERATIONAL_STAFF_ROLE_NAMES)[number];
+
+export const OPERATIONAL_STAFF_ROLE_IDS: Record<OperationalStaffRoleName, string> = {
+  'Branch Manager': '00000000-0000-4000-8000-000000000002',
+  'Credit Officer': '00000000-0000-4000-8000-000000000003',
+  'FI Executive': '00000000-0000-4000-8000-000000000004',
+  'Sales Executive': '00000000-0000-4000-8000-000000000005',
+  'HR Executive': '00000000-0000-4000-8000-000000000007',
+};
+
+export function isOperationalStaffRoleName(name: unknown): boolean {
+  const normalized = String(name ?? '').trim().toLowerCase();
+  return OPERATIONAL_STAFF_ROLE_NAMES.some((role) => role.toLowerCase() === normalized);
+}
+
+/** Super Admin always receives the current permission registry, including new modules. */
+export function effectivePermissionsForRole(role?: any): string[] {
+  if (isSuperAdminRole(role)) return [...SUPER_ADMIN_PERMISSIONS];
+  return rolePermissions(role);
 }

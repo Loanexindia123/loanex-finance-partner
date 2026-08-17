@@ -5,7 +5,12 @@ import { jsonDb } from '../../config/json-db';
 import { sendSuccess } from '../../common/utils/api-response';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../../common/errors/app-error';
 import { hashPassword } from '../../common/utils/password';
-import { rolePermissions, SUPER_ADMIN_PERMISSIONS } from '../rbac/permissions';
+import { effectivePermissionsForRole, SUPER_ADMIN_PERMISSIONS } from '../rbac/permissions';
+import {
+  assertAssignableOperationalRole,
+  ensureOperationalStaffRoles,
+  isProtectedStaffUser,
+} from '../rbac/operational-staff-roles';
 
 /** EMI statuses that FI Accept/Reject may still move (pre-final-approval). */
 const FI_MUTABLE_EMI_STATUSES = new Set<string>([
@@ -91,7 +96,7 @@ export function resolveRbacForUser(user: any) {
   const role = roleId ? jsonDb.findOne('roles', { id: roleId }) : null;
   let permissions: string[] = [];
   if (role) {
-    permissions = rolePermissions(role);
+    permissions = effectivePermissionsForRole(role);
   } else if (!roleId && String(user?.role ?? '') === 'admin') {
     // Legacy admins WITHOUT a role_id keep full access. If role_id IS set but
     // the role cannot be found (deleted / not yet synced), deny — matching
@@ -271,7 +276,10 @@ export class AdminController {
     const name = String(body.name ?? '').trim();
     const email = String(body.email ?? '').trim().toLowerCase();
     const mobile = String(body.mobile ?? '').trim();
+    await jsonDb.ensureCollection('roles');
+    await ensureOperationalStaffRoles();
     const { role, roleId } = resolveRoleAssignment(body);
+    assertAssignableOperationalRole({ role, roleId });
 
     if (!name && !email && !mobile) {
       throw new BadRequestError('At least a name, email or mobile is required');
@@ -330,15 +338,23 @@ export class AdminController {
     if (body.email !== undefined) updates.email = String(body.email).trim().toLowerCase() || null;
     if (body.mobile !== undefined) updates.phone = String(body.mobile).trim() || null;
     if (body.role !== undefined || body.roleId !== undefined) {
-      const assignment = resolveRoleAssignment(body);
-      updates.role = assignment.role;
-      updates.role_id = assignment.roleId;
-      // Prevent an admin from demoting their own account (avoids lockout).
-      if (
-        id === (req as any).user?.sub &&
-        assignment.role === 'customer'
-      ) {
-        throw new ForbiddenError('You cannot change your own account role');
+      if (isProtectedStaffUser(existing)) {
+        // Super Admin / Admin accounts keep their current role. Other profile
+        // fields on this request may still update.
+      } else {
+        await jsonDb.ensureCollection('roles');
+        await ensureOperationalStaffRoles();
+        const assignment = resolveRoleAssignment(body);
+        assertAssignableOperationalRole(assignment);
+        updates.role = assignment.role;
+        updates.role_id = assignment.roleId;
+        // Prevent an admin from demoting their own account (avoids lockout).
+        if (
+          id === (req as any).user?.sub &&
+          assignment.role === 'customer'
+        ) {
+          throw new ForbiddenError('You cannot change your own account role');
+        }
       }
     }
     if (body.password) {
@@ -389,6 +405,32 @@ export class AdminController {
     }
 
     return sendSuccess(res, serializeUser(updatedUser), 'User updated');
+  };
+
+  /** DELETE /admin/users/:id — remove an operational staff account. */
+  deleteUser = async (req: Request, res: Response) => {
+    const id = String(req.params.id ?? '');
+    const existing = jsonDb.findOne('users', { id });
+    if (!existing) {
+      throw new NotFoundError('User not found');
+    }
+    if (isProtectedStaffUser(existing)) {
+      throw new ForbiddenError('Super Admin and Admin accounts cannot be deleted');
+    }
+    if (id === String((req as any).user?.sub ?? '')) {
+      throw new ForbiddenError('You cannot delete your own account');
+    }
+
+    try {
+      const { authRepository } = await import('../auth/auth.repository');
+      await authRepository.deleteUserRefreshTokens(id);
+    } catch {
+      /* refresh tokens are optional */
+    }
+
+    await jsonDb.deleteAwaited('profiles', { id });
+    await jsonDb.deleteAwaited('users', { id });
+    return sendSuccess(res, { id }, 'User deleted');
   };
 
   /** GET /admin/kyc — all customer KYC records. */

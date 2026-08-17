@@ -70,9 +70,22 @@ export const routes: Routes = [
       },
       {
         path: 'employees',
-        canActivate: [permissionGuard('users.view')],
-        loadChildren: () =>
-          import('./features/employees/employees.routes').then((m) => m.EMPLOYEES_ROUTES),
+        children: [
+          {
+            path: 'freelancer-onboarding',
+            canActivate: [permissionGuard('freelancers.view')],
+            loadChildren: () =>
+              import('./features/freelancer-agents/freelancer-agents.routes').then(
+                (m) => m.FREELANCER_AGENTS_ROUTES,
+              ),
+          },
+          {
+            path: '',
+            canActivate: [permissionGuard('users.view')],
+            loadChildren: () =>
+              import('./features/employees/employees.routes').then((m) => m.EMPLOYEES_ROUTES),
+          },
+        ],
       },
       {
         path: 'roles',

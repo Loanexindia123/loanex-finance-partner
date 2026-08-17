@@ -1,0 +1,169 @@
+<app-page-header
+  title="Freelancer / Growing Partner Profile"
+  subtitle="Read-only view of the onboarding record"
+  backLink="/employees/freelancer-onboarding"
+  backLabel="Back to list"
+>
+  @if (canEditRecord()) {
+    <button actions pButton type="button" icon="pi pi-pencil" label="Edit" (click)="edit()"></button>
+  }
+  @if (canApproveRecord()) {
+    <button
+      actions
+      pButton
+      type="button"
+      icon="pi pi-check"
+      label="Approve"
+      [loading]="deciding() === 'approve'"
+      (click)="confirmApprove()"
+    ></button>
+  }
+  @if (canRejectRecord()) {
+    <button actions pButton type="button" icon="pi pi-times" label="Reject" severity="danger" (click)="openReject()"></button>
+  }
+</app-page-header>
+
+@if (loading()) {
+  <app-branded-loader message="Loading profile..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else if (record(); as row) {
+  <div class="profile-head">
+    <div>
+      <p class="brand">LOANEX</p>
+      <h2>{{ row.fullName || 'Untitled draft' }}</h2>
+      <p class="agent-id">Agent / Growing Partner ID: <strong>{{ agentCode() }}</strong></p>
+      <p>{{ row.agentType || 'Growing Partner' }} · Incentive / Commission · Not an employee</p>
+    </div>
+    <app-status-badge [status]="row.formStatus" />
+  </div>
+
+  <div class="review-grid">
+    <section class="review-card">
+      <h3>Personal Details</h3>
+      <dl>
+        <div><dt>Full Name</dt><dd>{{ display(row.fullName) }}</dd></div>
+        <div><dt>Father / Husband</dt><dd>{{ display(row.fatherHusbandName) }}</dd></div>
+        <div><dt>Date of Birth</dt><dd>{{ display(row.dateOfBirth) }}</dd></div>
+        <div><dt>Mobile</dt><dd>{{ display(row.mobile) }}</dd></div>
+        <div><dt>WhatsApp</dt><dd>{{ display(row.whatsapp) }}</dd></div>
+        <div><dt>Email</dt><dd>{{ display(row.email) }}</dd></div>
+        <div><dt>Gender</dt><dd>{{ display(row.gender) }}</dd></div>
+        <div><dt>Education</dt><dd>{{ display(row.education) }}</dd></div>
+        <div><dt>Occupation</dt><dd>{{ display(row.occupation) }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="review-card">
+      <h3>Address &amp; Work Area</h3>
+      <dl>
+        <div><dt>Current Address</dt><dd>{{ display(row.currentAddress) }}</dd></div>
+        <div><dt>Pincode</dt><dd>{{ display(row.pincode) }}</dd></div>
+        <div><dt>Google Location</dt><dd>{{ display(row.googleLocation) }}</dd></div>
+        <div><dt>Preferred Work Area</dt><dd>{{ display(row.preferredWorkArea) }}</dd></div>
+        <div><dt>Work Mode</dt><dd>{{ display(row.workMode) }}</dd></div>
+        <div><dt>Emergency Contact</dt><dd>{{ display(row.emergencyContactName) }}</dd></div>
+        <div><dt>Emergency Mobile</dt><dd>{{ display(row.emergencyContactMobile) }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="review-card">
+      <h3>KYC Documents</h3>
+      <dl>
+        @for (doc of documentFields; track doc.key) {
+          <div>
+            <dt>{{ doc.label }}</dt>
+            <dd>
+              @if (hasDocument(row, doc.key)) {
+                <a [href]="documentHref(row, doc.key)" target="_blank" rel="noopener">Preview / Download</a>
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+        }
+      </dl>
+    </section>
+
+    <section class="review-card">
+      <h3>Work Preferences &amp; Rights</h3>
+      <dl>
+        <div><dt>Creator Type</dt><dd>{{ display(row.creatorType) }}</dd></div>
+        <div><dt>Creator</dt><dd>{{ display(row.creatorName) }}</dd></div>
+        <div><dt>Creator ID</dt><dd>{{ display(row.creatorId) }}</dd></div>
+        <div><dt>Agent Type</dt><dd>{{ display(row.agentType) }}</dd></div>
+        <div><dt>Departments</dt><dd>{{ display(row.preferredDepartments) }}</dd></div>
+        <div><dt>Allowed Work</dt><dd>{{ display(row.allowedWork) }}</dd></div>
+        <div><dt>Assigned Manager</dt><dd>{{ display(row.assignedManager) }}</dd></div>
+        <div><dt>Branch / Territory</dt><dd>{{ display(row.branch) }}</dd></div>
+        <div><dt>Training Status</dt><dd>{{ display(row.trainingStatus) }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="review-card">
+      <h3>Bank &amp; Payout</h3>
+      <dl>
+        <div><dt>Account Number</dt><dd>{{ display(row.accountNumber) }}</dd></div>
+        <div><dt>IFSC</dt><dd>{{ display(row.ifscCode) }}</dd></div>
+        <div><dt>Payout Basis</dt><dd>Incentive / Commission</dd></div>
+        <div><dt>Policy Version</dt><dd>{{ display(row.payoutConfig.policyVersion) }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="review-card">
+      <h3>Consent</h3>
+      <dl>
+        <div><dt>Policy Accepted</dt><dd>{{ display(row.policyAccepted) }}</dd></div>
+        <div><dt>Accepted At</dt><dd>{{ display(row.policyAcceptedAt) }}</dd></div>
+        <div><dt>Policy Version</dt><dd>{{ display(row.policyVersion) }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="review-card review-card--wide">
+      <h3>Approval History</h3>
+      @if (row.approvalHistory.length) {
+        <dl>
+          @for (entry of row.approvalHistory; track $index) {
+            <div>
+              <dt>{{ entry.action }} · {{ entry.byName || entry.byId }}</dt>
+              <dd>{{ entry.at }}{{ entry.note ? ' · ' + entry.note : '' }}</dd>
+            </div>
+          }
+        </dl>
+      } @else {
+        <p class="empty-history">No approval events yet.</p>
+      }
+      <dl>
+        <div><dt>Created</dt><dd>{{ display(row.createdBy) }} · {{ display(row.createdAt) }}</dd></div>
+        <div><dt>Updated</dt><dd>{{ display(row.updatedBy) }} · {{ display(row.updatedAt) }}</dd></div>
+        <div><dt>Approved</dt><dd>{{ display(row.approvedBy) }} · {{ display(row.approvedAt) }}</dd></div>
+        <div><dt>Rejected</dt><dd>{{ display(row.rejectedBy) }} · {{ display(row.rejectedAt) }}</dd></div>
+        <div><dt>Current Status</dt><dd>{{ display(row.formStatus) }}</dd></div>
+      </dl>
+    </section>
+  </div>
+}
+
+<p-dialog
+  [visible]="rejectOpen()"
+  [modal]="true"
+  [draggable]="false"
+  appendTo="body"
+  header="Reject freelancer?"
+  styleClass="admin-dialog"
+  [style]="{ width: 'min(440px, calc(100vw - 2rem))' }"
+  (visibleChange)="!$event && rejectOpen.set(false)"
+>
+  <p>The record can be edited and submitted again. Agent ID is not generated.</p>
+  <input
+    class="reject-input"
+    type="text"
+    placeholder="Rejection reason (optional)"
+    [ngModel]="rejectReason()"
+    (ngModelChange)="rejectReason.set($event)"
+  />
+  <ng-template pTemplate="footer">
+    <button pButton type="button" label="Cancel" [text]="true" (click)="rejectOpen.set(false)"></button>
+    <button pButton type="button" label="Reject" severity="danger" [loading]="deciding() === 'reject'" (click)="rejectConfirmed()"></button>
+  </ng-template>
+</p-dialog>

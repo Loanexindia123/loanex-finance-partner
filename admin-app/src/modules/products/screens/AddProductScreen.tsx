@@ -28,6 +28,7 @@ import { Step11Review } from '../wizard/steps/Step11Review';
 import { colors } from '../../../theme/colors';
 import { shadow, spacing } from '../../../theme/spacing';
 import { RootStackParamList } from '../../../navigation/types';
+import { useRbac } from '../../../auth/rbacStore';
 import { getProductById, createProduct, updateProduct } from '../../../services/productService';
 import { ProductVariant } from '../types/product';
 import {
@@ -55,17 +56,29 @@ const STEP_COMPONENTS = [
 
 function AddProductContent({ navigation, route }: Props) {
   const { currentStep, setCurrentStep, resetForm, formData, updateForm } = useWizard();
+  const { roleName } = useRbac();
+  const isEmployee = String(roleName ?? '').trim().toLowerCase() === 'employee';
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const isEditMode = route.params?.mode === 'edit';
   const productId = route.params?.productId;
   const [loading, setLoading] = useState(isEditMode);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [productStatus, setProductStatus] = useState('');
+  const EMI_STEP = 9;
+  const visibleSteps = isEmployee ? WIZARD_STEPS.filter((step) => step !== 'EMI') : WIZARD_STEPS;
+  const displayStep =
+    isEmployee && currentStep > EMI_STEP ? currentStep - 1 : currentStep;
+  const showSaveForApproval =
+    isEmployee &&
+    (!isEditMode ||
+      ['draft', 'rejected', 'pending_approval', ''].includes(String(productStatus).toLowerCase()));
 
   useEffect(() => {
     if (isEditMode && productId) {
       const fetchProduct = async () => {
         try {
           const p = await getProductById(productId);
+          setProductStatus(String((p as any).status ?? ''));
           const wizardDataRaw = ((p as any).wizardData || {}) as Record<string, unknown>;
           // Never overwrite defaults with undefined — undefined fields crash `.trim()` calls.
           const wizardData = Object.fromEntries(
@@ -164,11 +177,17 @@ function AddProductContent({ navigation, route }: Props) {
   };
 
   const goNext = () => {
-    if (currentStep < WIZARD_STEPS.length) animateStep(currentStep + 1);
+    if (currentStep >= WIZARD_STEPS.length) return;
+    let next = currentStep + 1;
+    if (isEmployee && next === EMI_STEP) next += 1;
+    if (next <= WIZARD_STEPS.length) animateStep(next);
   };
 
   const goPrev = () => {
-    if (currentStep > 1) animateStep(currentStep - 1);
+    if (currentStep <= 1) return;
+    let prev = currentStep - 1;
+    if (isEmployee && prev === EMI_STEP) prev -= 1;
+    if (prev >= 1) animateStep(prev);
   };
 
   const handleSaveDraft = async () => {
@@ -191,7 +210,7 @@ function AddProductContent({ navigation, route }: Props) {
     }
   };
 
-  const buildPayload = (status: 'active' | 'draft') => ({
+  const buildPayload = (status: 'active' | 'draft' | 'pending_approval') => ({
     name: formData.productName,
     sku: formData.sku,
     brand: formData.brand,
@@ -203,12 +222,18 @@ function AddProductContent({ navigation, route }: Props) {
     price: parseFloat(formData.sellingPrice) || 0,
     mrp: parseFloat(formData.mrp) || 0,
     stock: parseInt(formData.availableStock, 10) || 0,
-    status,
-    emiAvailable: formData.emiEnabled,
+    status: isEmployee && status === 'active' ? 'pending_approval' : status,
+    emiAvailable: isEmployee ? false : formData.emiEnabled,
     warranty: formData.warranty,
     hsnCode: formData.hsnCode,
     manufacturer: formData.manufacturer,
-    wizardData: formData, // <--- Add all form fields as wizardData
+    wizardData: isEmployee
+      ? {
+          ...formData,
+          emiEnabled: isEditMode ? formData.emiEnabled : false,
+          emiPlans: isEditMode ? formData.emiPlans : [],
+        }
+      : formData,
   });
 
   const handlePublish = async () => {
@@ -229,7 +254,7 @@ function AddProductContent({ navigation, route }: Props) {
     }
 
     try {
-      const payload = buildPayload('active');
+      const payload = buildPayload(isEmployee ? 'pending_approval' : 'active');
 
       if (isEditMode && productId) {
         await updateProduct(productId, payload);
@@ -237,12 +262,22 @@ function AddProductContent({ navigation, route }: Props) {
         await createProduct(payload);
       }
 
-      Alert.alert('Success', `Product ${isEditMode ? 'updated' : 'published'} successfully`);
+      Alert.alert(
+        'Success',
+        isEmployee
+          ? 'Product submitted for approval.'
+          : `Product ${isEditMode ? 'updated' : 'published'} successfully`,
+      );
       resetForm();
       navigation.navigate('ProductList');
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', `Failed to ${isEditMode ? 'update' : 'publish'} product`);
+      Alert.alert(
+        'Error',
+        isEmployee
+          ? 'Failed to submit product for approval'
+          : `Failed to ${isEditMode ? 'update' : 'publish'} product`,
+      );
     }
   };
 
@@ -271,7 +306,7 @@ function AddProductContent({ navigation, route }: Props) {
           </TouchableOpacity>
         </View>
 
-        <StepProgress currentStep={currentStep} />
+        <StepProgress currentStep={displayStep} steps={visibleSteps} />
 
         <View style={styles.body}>
           <ScrollView
@@ -291,7 +326,11 @@ function AddProductContent({ navigation, route }: Props) {
             <View style={styles.reviewActions}>
               <Button title="Back" onPress={goPrev} variant="outline" style={{ flex: 1 }} />
               <Button title="Save Draft" onPress={handleSaveDraft} variant="secondary" style={{ flex: 1 }} />
-              <Button title={isEditMode ? 'Update Product' : 'Publish Product'} onPress={handlePublish} variant="accent" style={{ flex: 1 }} />
+              {!isEmployee ? (
+                <Button title={isEditMode ? 'Update Product' : 'Publish Product'} onPress={handlePublish} variant="accent" style={{ flex: 1 }} />
+              ) : showSaveForApproval ? (
+                <Button title="Save for Approval" onPress={handlePublish} variant="accent" style={{ flex: 1 }} />
+              ) : null}
             </View>
           ) : (
             <View style={styles.navActions}>

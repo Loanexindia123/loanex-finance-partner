@@ -40,7 +40,7 @@ import { authkeySmsService } from '../../common/services/authkey-sms.service';
 import { authRepository } from './auth.repository';
 import { jsonDb } from '../../config/json-db';
 import { auditLogService } from '../verification/service/audit-log.service';
-import { rolePermissions, SUPER_ADMIN_PERMISSIONS } from '../rbac/permissions';
+import { effectivePermissionsForRole, SUPER_ADMIN_PERMISSIONS } from '../rbac/permissions';
 
 /**
  * Enrich a user row with RBAC role info (roleId / roleName / permissions).
@@ -54,7 +54,7 @@ function resolveRbacInfo(user: any) {
   if (roleId) {
     const role = jsonDb.findOne('roles', { id: roleId });
     if (role) {
-      return { roleId, roleName: role.name, permissions: rolePermissions(role) };
+      return { roleId, roleName: role.name, permissions: effectivePermissionsForRole(role) };
     }
     return { roleId, roleName: null, permissions: [] };
   }
@@ -94,7 +94,7 @@ async function resolveLoginRbacInfo(user: any) {
       }
     }
     if (role) {
-      return { roleId, roleName: role.name, permissions: rolePermissions(role) };
+      return { roleId, roleName: role.name, permissions: effectivePermissionsForRole(role) };
     }
     return { roleId, roleName: null, permissions: [] };
   }

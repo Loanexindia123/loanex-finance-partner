@@ -1,4 +1,17 @@
-export type StaffRole = 'Sales Executive';
+export type StaffRole =
+  | 'Sales Executive'
+  | 'Branch Manager'
+  | 'Credit Officer'
+  | 'FI Executive'
+  | 'HR Executive';
+
+export const STAFF_ROLE_OPTIONS: { label: string; value: StaffRole }[] = [
+  { label: 'Sales Executive', value: 'Sales Executive' },
+  { label: 'Branch Manager', value: 'Branch Manager' },
+  { label: 'Credit Officer', value: 'Credit Officer' },
+  { label: 'FI Executive', value: 'FI Executive' },
+  { label: 'HR / HR Executive', value: 'HR Executive' },
+];
 
 /** Matches admin.controller.ts createUser() body exactly — confirmed against backend source. */
 export interface CreateUserPayload {

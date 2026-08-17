@@ -132,6 +132,13 @@
   line-height: 1.55;
 }
 
+.summary__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.15rem;
+}
+
 .stock-pill {
   display: inline-flex;
   align-items: center;
@@ -154,6 +161,109 @@
     background: #fee2e2;
     color: #991b1b;
   }
+}
+
+.emi-decision {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-surface-border);
+  border-radius: var(--admin-radius);
+  box-shadow: var(--admin-shadow-sm);
+  padding: 1.15rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.emi-decision__head h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--admin-text);
+}
+
+.emi-decision__head p,
+.emi-decision__note,
+.emi-decision__warn {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--admin-text-muted);
+}
+
+.emi-decision__warn {
+  margin: 0;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+}
+
+.emi-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.emi-choice__btn {
+  border: 1px solid var(--admin-surface-border);
+  background: var(--admin-surface-alt);
+  color: var(--admin-text);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.emi-choice__btn--active {
+  border-color: var(--admin-primary);
+  background: color-mix(in srgb, var(--admin-primary) 12%, white);
+  color: var(--admin-primary);
+}
+
+.emi-decision ::ng-deep .section-card {
+  box-shadow: none;
+  background: var(--admin-surface-alt);
+}
+
+.decision-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-surface-border);
+  border-radius: var(--admin-radius);
+  box-shadow: 0 -10px 28px rgb(15 23 42 / 0.1);
+}
+
+.decision-bar__hint {
+  margin: 0;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.decision-bar__buttons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.decision-bar__end {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-left: auto;
 }
 
 .sections {

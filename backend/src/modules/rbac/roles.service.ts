@@ -5,7 +5,12 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '../../common/errors/app-error';
-import { rolePermissions, SUPER_ADMIN_PERMISSIONS, ALL_PERMISSIONS } from './permissions';
+import {
+  rolePermissions,
+  SUPER_ADMIN_PERMISSIONS,
+  ALL_PERMISSIONS,
+  effectivePermissionsForRole,
+} from './permissions';
 import { rolesRepository } from './roles.repository';
 
 const KNOWN_PERMISSIONS = new Set<string>(ALL_PERMISSIONS);
@@ -132,7 +137,7 @@ export class RolesService {
           /* keep local state */
         }
       }
-      if (role) return rolePermissions(role);
+      if (role) return effectivePermissionsForRole(role);
       // role_id set but role missing → deny, never escalate.
       return [];
     }

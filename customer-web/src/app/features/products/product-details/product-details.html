@@ -52,14 +52,16 @@
       </div>
 
       <div class="lx-pdp__emi">
-        <app-emi-calculator
-          [productId]="p.id"
-          [variantId]="p.selectedVariantId"
-          [productName]="p.name"
-          [productPrice]="p.price"
-          [inStock]="p.inStock"
-          [emiPlans]="p.emiPlans || []"
-        />
+        @if ((p.emiPlans || []).length > 0) {
+          <app-emi-calculator
+            [productId]="p.id"
+            [variantId]="p.selectedVariantId"
+            [productName]="p.name"
+            [productPrice]="p.price"
+            [inStock]="p.inStock"
+            [emiPlans]="p.emiPlans || []"
+          />
+        }
       </div>
     </div>
 

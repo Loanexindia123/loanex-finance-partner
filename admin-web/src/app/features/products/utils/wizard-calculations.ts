@@ -228,3 +228,17 @@ export function formatEmiOptionLabel(plan: EmiPlanEntry, index: number): string 
   if (plan.months) return `${plan.months} Months`;
   return `EMI Option ${index + 1}`;
 }
+
+/** Enabled, visible, tenure > 0 — same rule used before product approval. */
+export function isConfiguredEmiPlan(
+  plan: Pick<EmiPlanEntry, 'enabled' | 'months' | 'customerVisibility'>,
+): boolean {
+  if (plan.enabled === false) return false;
+  const months = Number(plan.months);
+  if (!Number.isFinite(months) || months <= 0) return false;
+  return String(plan.customerVisibility ?? 'visible').toLowerCase() !== 'hidden';
+}
+
+export function hasConfiguredEmiPlan(plans: EmiPlanEntry[] | undefined): boolean {
+  return (plans ?? []).some(isConfiguredEmiPlan);
+}

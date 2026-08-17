@@ -88,7 +88,6 @@ export class ProductList {
 
   readonly deleteTarget = signal<Product | null>(null);
   readonly deleting = signal(false);
-  readonly approvingId = signal<string | null>(null);
 
   readonly categoryOptions = computed(() => [
     { label: 'All categories', value: null },
@@ -270,32 +269,6 @@ export class ProductList {
       .trim()
       .toLowerCase();
     return role !== 'employee';
-  }
-
-  approve(product: Product): void {
-    if (this.approvingId() || !this.isPendingApproval(product)) return;
-    this.approvingId.set(product.id);
-    this.products.approve(product.id).subscribe({
-      next: (updated) => {
-        this.items.update((items) =>
-          items.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
-        );
-        this.approvingId.set(null);
-        this.messages.add({
-          severity: 'success',
-          summary: 'Product approved',
-          detail: `${updated.name} is now visible to customers.`,
-        });
-      },
-      error: (err: unknown) => {
-        this.approvingId.set(null);
-        this.messages.add({
-          severity: 'error',
-          summary: 'Approval failed',
-          detail: this.extractMessage(err),
-        });
-      },
-    });
   }
 
   askDelete(product: Product): void {

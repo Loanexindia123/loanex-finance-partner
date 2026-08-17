@@ -77,6 +77,7 @@ function normalizeEmiPlans(
 }
 
 function resolveEmiPlans(detail: ProductDetail): ProductEmiPlan[] {
+  if (detail.emiAvailable === false) return [];
   const fromApi = normalizeEmiPlans(detail.emiPlans);
   if (fromApi.length > 0) return fromApi;
   return normalizeEmiPlans(detail.wizardData?.emiPlans);

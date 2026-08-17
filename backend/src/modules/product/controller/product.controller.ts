@@ -4,7 +4,6 @@ import { sendSuccess } from '../../../common/utils/api-response';
 import type { AuthenticatedRequest } from '../../../common/middleware/authenticate';
 import { ForbiddenError } from '../../../common/errors/app-error';
 import { rolesService } from '../../rbac/roles.service';
-import { jsonDb } from '../../../config/json-db';
 
 import type {
   ListProductsQuery,
@@ -15,6 +14,7 @@ import type {
 
 import { productService } from '../service/product.service';
 import { storeProductImage, streamProductImage } from '../service/product-image.service';
+import { isEmployeeUser } from '../utils/product-emi';
 
 async function canViewHiddenProducts(req: AuthenticatedRequest): Promise<boolean> {
   const userId = req.user?.sub;
@@ -33,21 +33,12 @@ async function canViewHiddenProducts(req: AuthenticatedRequest): Promise<boolean
   }
 }
 
-function isEmployeeRole(userId: string): boolean {
-  const user = jsonDb.findOne('users', { id: userId }) as any;
-  if (!user) return false;
-  const roleId = user.role_id ?? user.roleId;
-  if (!roleId) return false;
-  const role = jsonDb.findOne('roles', { id: roleId }) as any;
-  return String(role?.name ?? '').trim().toLowerCase() === 'employee';
-}
-
 /** Employees may save for approval but cannot publish/approve products. */
 function assertEmployeeCannotPublish(userId: string | undefined, status: unknown): void {
   if (!userId) return;
   const next = String(status ?? '').trim().toLowerCase();
   if (next !== 'active') return;
-  if (isEmployeeRole(userId)) {
+  if (isEmployeeUser(userId)) {
     throw new ForbiddenError(
       'Employees cannot publish products. Save for approval and wait for an admin to approve.',
     );

@@ -24,7 +24,7 @@
       [disabled]="submitting()"
       (click)="openPreview()"
     ></button>
-    @if (isEdit) {
+    @if (showPublishButton()) {
       <button
         pButton
         type="button"
@@ -57,15 +57,17 @@
         [loading]="submittingKind() === 'draft'"
         (click)="save('draft')"
       ></button>
-      <button
-        pButton
-        type="button"
-        icon="pi pi-send"
-        label="Save for Approval"
-        [disabled]="submitting()"
-        [loading]="submittingKind() === 'pending_approval'"
-        (click)="save('pending_approval')"
-      ></button>
+      @if (showSaveForApproval()) {
+        <button
+          pButton
+          type="button"
+          icon="pi pi-send"
+          label="Save for Approval"
+          [disabled]="submitting()"
+          [loading]="submittingKind() === 'pending_approval'"
+          (click)="save('pending_approval')"
+        ></button>
+      }
     }
   </div>
 </header>
@@ -75,19 +77,19 @@
 } @else {
   <div class="wizard" [formGroup]="form">
     <nav class="wizard__steps" aria-label="Product wizard steps">
-      @for (step of stepMeta; track step.title; let i = $index) {
+      @for (step of visibleStepMeta(); track step.title; let displayIndex = $index) {
         <button
           type="button"
           class="wizard__step"
-          [class.wizard__step--active]="activeStep() === i"
-          [class.wizard__step--done]="i < activeStep()"
-          (click)="goToStep(i)"
+          [class.wizard__step--active]="activeStep() === step.index"
+          [class.wizard__step--done]="step.index < activeStep()"
+          (click)="goToStep(step.index)"
         >
           <span class="wizard__step-index">
-            @if (i < activeStep()) {
+            @if (step.index < activeStep()) {
               <i class="pi pi-check" aria-hidden="true"></i>
             } @else {
-              {{ i + 1 }}
+              {{ displayIndex + 1 }}
             }
           </span>
           <span class="wizard__step-copy">
@@ -618,18 +620,22 @@
                             </div>
                             <div class="field">
                               <label>EMI Plan Mapping</label>
-                              <p-select
-                                [options]="emiPlanOptions()"
-                                formControlName="emiPlanId"
-                                optionLabel="label"
-                                optionValue="value"
-                                placeholder="Select EMI plan"
-                                [showClear]="true"
-                                appendTo="body"
-                                panelStyleClass="catalog-filter-panel"
-                                [checkmark]="false"
-                                scrollHeight="240px"
-                              />
+                              @if (hideEmiStep()) {
+                                <p class="field-hint">An admin will map EMI plans after you submit this product for approval.</p>
+                              } @else {
+                                <p-select
+                                  [options]="emiPlanOptions()"
+                                  formControlName="emiPlanId"
+                                  optionLabel="label"
+                                  optionValue="value"
+                                  placeholder="Select EMI plan"
+                                  [showClear]="true"
+                                  appendTo="body"
+                                  panelStyleClass="catalog-filter-panel"
+                                  [checkmark]="false"
+                                  scrollHeight="240px"
+                                />
+                              }
                             </div>
                           </div>
 
@@ -1322,6 +1328,16 @@
           }
 
           @case (6) {
+            @if (hideEmiStep()) {
+              <section class="section-card">
+                <div class="section-card__head">
+                  <div>
+                    <h3>EMI is configured by an admin</h3>
+                    <p>Save this product for approval. An admin will decide whether EMI is required and configure plans before it becomes visible to customers.</p>
+                  </div>
+                </div>
+              </section>
+            } @else {
             @if (effectiveSellingPrice() <= 0) {
               <div class="alert-list">
                 <div class="alert-list__item--warn">
@@ -1542,7 +1558,7 @@
                 <button pButton type="button" [rounded]="true" label="Save Option" (click)="saveEmiModal()"></button>
               </ng-template>
             </p-dialog>
-
+            }
           }
 
           @case (7) {
@@ -1723,12 +1739,18 @@
               <section class="review-card">
                 <header>
                   <h3>EMI</h3>
-                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(6)"></button>
+                  @if (!hideEmiStep()) {
+                    <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(6)"></button>
+                  }
                 </header>
-                <dl>
-                  <div><dt>Enabled</dt><dd>{{ display(form.get('emiEnabled')!.value) }}</dd></div>
-                  <div><dt>Plans</dt><dd>{{ emiPlansArr.length }}</dd></div>
-                </dl>
+                @if (hideEmiStep()) {
+                  <p>An admin will decide whether this product requires EMI after you submit it for approval.</p>
+                } @else {
+                  <dl>
+                    <div><dt>Enabled</dt><dd>{{ display(form.get('emiEnabled')!.value) }}</dd></div>
+                    <div><dt>Plans</dt><dd>{{ emiPlansArr.length }}</dd></div>
+                  </dl>
+                }
               </section>
 
               <section class="review-card">
@@ -1745,12 +1767,12 @@
 
             <section class="ready">
               <div>
-                @if (isEdit) {
+                @if (showPublishButton()) {
                   <h3>Ready to Publish</h3>
                   <p>Save as draft to keep working, or publish to make this product active in the catalogue.</p>
                 } @else {
                   <h3>Ready for Approval</h3>
-                  <p>Preview your product, then save for approval. It will stay hidden from customers until an admin approves it.</p>
+                  <p>Preview your product, then save for approval. An admin will decide EMI and approve it before customers can see it.</p>
                 }
               </div>
               <div class="form-header__actions">
@@ -1764,12 +1786,14 @@
                   [disabled]="submitting()"
                   (click)="openPreview()"
                 ></button>
-                @if (isEdit) {
+                @if (showPublishButton()) {
                   <button pButton type="button" severity="secondary" [outlined]="true" label="Save Draft" [disabled]="submitting()" [loading]="submittingKind() === 'draft'" (click)="save('draft')"></button>
                   <button pButton type="button" label="Publish Product" [disabled]="submitting()" [loading]="submittingKind() === 'active'" (click)="save('active')"></button>
                 } @else {
                   <button pButton type="button" severity="secondary" [outlined]="true" label="Save Draft" [disabled]="submitting()" [loading]="submittingKind() === 'draft'" (click)="save('draft')"></button>
-                  <button pButton type="button" icon="pi pi-send" label="Save for Approval" [disabled]="submitting()" [loading]="submittingKind() === 'pending_approval'" (click)="save('pending_approval')"></button>
+                  @if (showSaveForApproval()) {
+                    <button pButton type="button" icon="pi pi-send" label="Save for Approval" [disabled]="submitting()" [loading]="submittingKind() === 'pending_approval'" (click)="save('pending_approval')"></button>
+                  }
                 }
               </div>
             </section>
@@ -1800,7 +1824,7 @@
               [disabled]="submitting()"
               (click)="openPreview()"
             ></button>
-            @if (isEdit) {
+            @if (showPublishButton()) {
               <button
                 pButton
                 type="button"
@@ -1833,15 +1857,17 @@
                 [loading]="submittingKind() === 'draft'"
                 (click)="save('draft')"
               ></button>
-              <button
-                pButton
-                type="button"
-                icon="pi pi-send"
-                label="Save for Approval"
-                [disabled]="submitting()"
-                [loading]="submittingKind() === 'pending_approval'"
-                (click)="save('pending_approval')"
-              ></button>
+              @if (showSaveForApproval()) {
+                <button
+                  pButton
+                  type="button"
+                  icon="pi pi-send"
+                  label="Save for Approval"
+                  [disabled]="submitting()"
+                  [loading]="submittingKind() === 'pending_approval'"
+                  (click)="save('pending_approval')"
+                ></button>
+              }
             }
           </div>
         } @else {
@@ -2014,8 +2040,12 @@
           <div><dt>Delivery days</dt><dd>{{ display(form.get('deliveryDays')!.value) }}</dd></div>
           <div><dt>Delivery charges</dt><dd>{{ display(form.get('deliveryCharges')!.value) }}</dd></div>
           <div><dt>Express</dt><dd>{{ display(form.get('expressDelivery')!.value) }}</dd></div>
-          <div><dt>EMI enabled</dt><dd>{{ display(form.get('emiEnabled')!.value) }}</dd></div>
-          <div><dt>EMI plans</dt><dd>{{ emiPlansArr.length }}</dd></div>
+          @if (hideEmiStep()) {
+            <div><dt>EMI</dt><dd>Admin will decide after approval</dd></div>
+          } @else {
+            <div><dt>EMI enabled</dt><dd>{{ display(form.get('emiEnabled')!.value) }}</dd></div>
+            <div><dt>EMI plans</dt><dd>{{ emiPlansArr.length }}</dd></div>
+          }
         </dl>
       </section>
 

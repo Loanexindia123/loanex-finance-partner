@@ -20,7 +20,7 @@
         icon="pi pi-check"
         label="Approve"
         severity="success"
-        [disabled]="!product() || deciding() !== null"
+        [disabled]="!product() || deciding() !== null || !!emiApproveBlockedReason()"
         [loading]="deciding() === 'approve'"
         (click)="confirmApprove()"
       ></button>
@@ -90,11 +90,11 @@
         </div>
         <h2>{{ product.name }}</h2>
         <dl class="summary__facts">
-          @if (product.brand) {
-            <div><dt>Brand</dt><dd>{{ product.brand }}</dd></div>
+          @if (displayBrand()) {
+            <div><dt>Brand</dt><dd>{{ displayBrand() }}</dd></div>
           }
-          @if (product.sku) {
-            <div><dt>SKU</dt><dd>{{ product.sku }}</dd></div>
+          @if (displaySku()) {
+            <div><dt>SKU</dt><dd>{{ displaySku() }}</dd></div>
           }
           @if (categoryLabel()) {
             <div><dt>Category</dt><dd>{{ categoryLabel() }}</dd></div>
@@ -113,8 +113,61 @@
         @if (product.shortDescription || wizard()?.shortDescription) {
           <p class="summary__copy">{{ product.shortDescription || wizard()?.shortDescription }}</p>
         }
+        @if (canEditProducts()) {
+          <div class="summary__actions">
+            <ng-container *ngTemplateOutlet="editBtn" />
+            @if (showEmiDecision()) {
+              <ng-container *ngTemplateOutlet="rejectBtn" />
+              <ng-container *ngTemplateOutlet="approveBtn" />
+            }
+          </div>
+        }
       </div>
     </section>
+
+    @if (showEmiDecision()) {
+      <section class="emi-decision">
+        <div class="emi-decision__head">
+          <div>
+            <h3>Does this product require EMI?</h3>
+            <p>Choose EMI, save the decision, then approve or reject this product.</p>
+          </div>
+        </div>
+        <div class="emi-choice" role="group" aria-label="EMI required">
+          <button
+            type="button"
+            class="emi-choice__btn"
+            [class.emi-choice__btn--active]="emiRequired()"
+            [disabled]="savingEmi() || deciding() !== null"
+            (click)="chooseEmiRequired(true)"
+          >
+            Require EMI
+          </button>
+          <button
+            type="button"
+            class="emi-choice__btn"
+            [class.emi-choice__btn--active]="!emiRequired()"
+            [disabled]="savingEmi() || deciding() !== null"
+            (click)="chooseEmiRequired(false)"
+          >
+            Do not require EMI
+          </button>
+        </div>
+
+        @if (emiRequired()) {
+          <app-product-emi-config
+            [sellingPrice]="emiSellingPrice()"
+            [plans]="wizard()?.emiPlans ?? []"
+            [settings]="emiSettingsFromWizard()"
+            (changed)="onEmiConfigChanged()"
+          />
+        } @else {
+          <p class="emi-decision__note">
+            This product will be approved without EMI. Customers will not see EMI plans.
+          </p>
+        }
+      </section>
+    }
 
     <div class="sections">
       @for (section of sections(); track section.title) {
@@ -131,5 +184,67 @@
         </section>
       }
     </div>
+
+    @if (canEditProducts() && showEmiDecision()) {
+      <div class="decision-bar">
+        @if (emiApproveBlockedReason(); as reason) {
+          <p class="decision-bar__hint">{{ reason }}</p>
+        }
+        <div class="decision-bar__buttons">
+          <ng-container *ngTemplateOutlet="editBtn" />
+          <div class="decision-bar__end">
+            <ng-container *ngTemplateOutlet="rejectBtn" />
+            <button
+              pButton
+              type="button"
+              icon="pi pi-save"
+              label="Save EMI decision"
+              [disabled]="savingEmi() || deciding() !== null"
+              [loading]="savingEmi()"
+              (click)="saveEmiDecision()"
+            ></button>
+            <ng-container *ngTemplateOutlet="approveBtn" />
+          </div>
+        </div>
+      </div>
+    }
   </div>
 }
+
+<ng-template #editBtn>
+  <button
+    pButton
+    type="button"
+    icon="pi pi-pencil"
+    label="Edit Product"
+    severity="secondary"
+    [outlined]="true"
+    [disabled]="!product() || deciding() !== null || savingEmi()"
+    (click)="edit()"
+  ></button>
+</ng-template>
+<ng-template #rejectBtn>
+  <button
+    pButton
+    type="button"
+    icon="pi pi-times"
+    label="Reject"
+    severity="danger"
+    [outlined]="true"
+    [disabled]="!product() || deciding() !== null || savingEmi()"
+    [loading]="deciding() === 'reject'"
+    (click)="confirmReject()"
+  ></button>
+</ng-template>
+<ng-template #approveBtn>
+  <button
+    pButton
+    type="button"
+    icon="pi pi-check"
+    label="Approve"
+    severity="success"
+    [disabled]="!product() || deciding() !== null || savingEmi() || !!emiApproveBlockedReason()"
+    [loading]="deciding() === 'approve'"
+    (click)="confirmApprove()"
+  ></button>
+</ng-template>

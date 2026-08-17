@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink } from '@angular/router';
+import { filter } from 'rxjs';
 import { TooltipModule } from 'primeng/tooltip';
 import { NAV_ITEMS, NavItem } from '../../core/config/nav.config';
 import { RbacService } from '../../core/services/rbac.service';
@@ -8,23 +10,34 @@ import { LayoutService } from '../layout.service';
 const NAV_GROUPS: readonly { routes: readonly string[] }[] = [
   { routes: ['/dashboard', '/products', '/masters/dealers', '/customers', '/orders'] },
   { routes: ['/emi', '/loans', '/fi'] },
-  { routes: ['/users', '/employees', '/roles', '/notifications'] },
+  { routes: ['/users', '/employees', '/employees/freelancer-onboarding', '/roles', '/notifications'] },
   { routes: ['/masters', '/reports', '/settings'] },
 ];
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, TooltipModule],
+  imports: [RouterLink, TooltipModule],
   templateUrl: './sidebar.html',
   styleUrl: './sidebar.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Sidebar {
   private readonly rbac = inject(RbacService);
+  private readonly router = inject(Router);
   readonly layout = inject(LayoutService);
 
   readonly collapsed = this.layout.sidebarCollapsed;
+  private readonly currentUrl = signal(this.pathOnly(this.router.url));
+
+  constructor() {
+    this.router.events
+      .pipe(
+        filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe((event) => this.currentUrl.set(this.pathOnly(event.urlAfterRedirects)));
+  }
 
   readonly items = computed(() =>
     NAV_ITEMS.filter((item) => !item.permissions?.length || this.rbac.canAny(...item.permissions)),
@@ -42,7 +55,31 @@ export class Sidebar {
     return leftovers.length ? [...grouped, leftovers] : grouped;
   });
 
+  isActive(item: NavItem): boolean {
+    const url = this.currentUrl();
+    if (item.exact) {
+      return url === item.route;
+    }
+    if (!this.matchesRoute(url, item.route)) {
+      return false;
+    }
+    return !NAV_ITEMS.some(
+      (other) =>
+        other.route !== item.route &&
+        other.route.length > item.route.length &&
+        this.matchesRoute(url, other.route),
+    );
+  }
+
   onLinkClick(): void {
     this.layout.closeMobileSidebar();
+  }
+
+  private pathOnly(url: string): string {
+    return url.split('?')[0]?.split('#')[0] ?? url;
+  }
+
+  private matchesRoute(url: string, route: string): boolean {
+    return url === route || url.startsWith(`${route}/`);
   }
 }

@@ -38,4 +38,8 @@ export class UserService {
       .patch<ApiEnvelope<StaffUser>>(apiUrl(`/admin/users/${userId}`), { blocked })
       .pipe(unwrapApi());
   }
+
+  deleteUser(userId: string): Observable<void> {
+    return this.http.delete<ApiEnvelope<void>>(apiUrl(`/admin/users/${userId}`)).pipe(unwrapApi());
+  }
 }

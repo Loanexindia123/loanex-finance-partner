@@ -19,7 +19,7 @@ export interface Product {
   stock: number;
   availableStock: number;
   reservedStock: number;
-  status: 'active' | 'inactive' | 'draft' | 'out_of_stock' | 'archived';
+  status: 'active' | 'inactive' | 'draft' | 'pending_approval' | 'rejected' | 'out_of_stock' | 'archived';
   emiAvailable: boolean;
   featured: boolean;
   trending: boolean;
@@ -56,7 +56,7 @@ export interface ProductQueryParams {
   trending?: boolean;
   recommended?: boolean;
   search?: string;
-  status?: 'all' | 'active' | 'inactive' | 'draft';
+  status?: 'all' | 'active' | 'inactive' | 'draft' | 'pending_approval' | 'rejected';
 }
 
 /**

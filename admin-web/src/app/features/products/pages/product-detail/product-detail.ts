@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { CurrencyPipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
+import { CurrencyPipe, NgTemplateOutlet } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ButtonModule } from 'primeng/button';
@@ -10,17 +10,21 @@ import { ErrorState } from '../../../../shared/components/error-state/error-stat
 import { StatusBadge } from '../../../../shared/components/status-badge/status-badge';
 import { CanDirective } from '../../../../shared/directives/can.directive';
 import { AuthService } from '../../../../core/services/auth.service';
+import { RbacService } from '../../../../core/services/rbac.service';
 import { ProductService } from '../../services/product.service';
+import { ProductEmiConfig } from '../../components/product-emi-config/product-emi-config';
 import {
   Category,
   Product,
   ProductWizardData,
   initialWizardData,
+  normalizeEmiPlan,
   normalizeSupplier,
   productImageUrls,
   productStockQty,
   productStockState,
 } from '../../models/product.models';
+import { hasConfiguredEmiPlan } from '../../utils/wizard-calculations';
 
 interface DetailField {
   label: string;
@@ -37,12 +41,14 @@ interface DetailSection {
   standalone: true,
   imports: [
     CurrencyPipe,
+    NgTemplateOutlet,
     ButtonModule,
     PageHeader,
     BrandedLoader,
     ErrorState,
     StatusBadge,
     CanDirective,
+    ProductEmiConfig,
   ],
   templateUrl: './product-detail.html',
   styleUrl: './product-detail.scss',
@@ -51,6 +57,7 @@ interface DetailSection {
 export class ProductDetail {
   private readonly products = inject(ProductService);
   private readonly auth = inject(AuthService);
+  private readonly rbac = inject(RbacService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly messages = inject(MessageService);
@@ -63,6 +70,10 @@ export class ProductDetail {
   readonly categories = signal<Category[]>([]);
   readonly activeImage = signal(0);
   readonly deciding = signal<'approve' | 'reject' | null>(null);
+  readonly savingEmi = signal(false);
+  readonly emiRequired = signal(false);
+  readonly emiDirty = signal(false);
+  private readonly emiConfig = viewChild(ProductEmiConfig);
 
   readonly isPendingApproval = computed(
     () => String(this.product()?.status ?? '').toLowerCase() === 'pending_approval',
@@ -75,6 +86,25 @@ export class ProductDetail {
     return role !== 'employee';
   });
 
+  readonly canEditProducts = computed(() => this.rbac.can('products.edit'));
+
+  readonly showEmiDecision = computed(
+    () => this.isPendingApproval() && this.canApproveProducts(),
+  );
+
+  readonly savedEmiRequired = computed(() => this.product()?.emiAvailable === true);
+
+  readonly emiApproveBlockedReason = computed(() => {
+    if (!this.showEmiDecision()) return '';
+    if (this.emiDirty()) {
+      return 'Save the EMI decision before approving this product.';
+    }
+    if (this.savedEmiRequired() && !hasConfiguredEmiPlan(this.wizard()?.emiPlans)) {
+      return 'This product requires EMI. Configure at least one visible EMI plan before approving.';
+    }
+    return '';
+  });
+
   readonly gallery = computed(() => {
     const product = this.product();
     return product ? productImageUrls(product) : [];
@@ -83,7 +113,7 @@ export class ProductDetail {
   readonly wizard = computed<ProductWizardData | null>(() => {
     const product = this.product();
     if (!product) return null;
-    return { ...initialWizardData(), ...(product.wizardData ?? {}) };
+    return mergeWizardData(product.wizardData);
   });
 
   readonly categoryLabel = computed(() => {
@@ -115,8 +145,20 @@ export class ProductDetail {
 
   readonly displayPrice = computed(() => {
     const product = this.product();
-    return product?.price ?? product?.sellingPrice ?? null;
+    const wizard = this.wizard();
+    const fromProduct = Number(product?.price ?? product?.sellingPrice ?? NaN);
+    if (Number.isFinite(fromProduct) && fromProduct > 0) return fromProduct;
+    const fromWizard = Number(wizard?.sellingPrice ?? NaN);
+    return Number.isFinite(fromWizard) && fromWizard > 0 ? fromWizard : null;
   });
+
+  readonly displayBrand = computed(
+    () => String(this.product()?.brand || this.wizard()?.brand || '').trim(),
+  );
+
+  readonly displaySku = computed(
+    () => String(this.product()?.sku || this.wizard()?.sku || '').trim(),
+  );
 
   readonly sections = computed<DetailSection[]>(() => {
     const product = this.product();
@@ -171,19 +213,21 @@ export class ProductDetail {
       sections.push({ title: 'Product Specifications', fields: specSection });
     }
 
-    if ((wizard.attributes ?? []).length) {
+    const attributes = wizard.attributes ?? [];
+    if (attributes.length) {
       push(
         'Variant options',
-        wizard.attributes.map((attr) =>
+        attributes.map((attr) =>
           field(attr.name, (attr.values ?? []).join(', ')),
         ),
       );
     }
 
-    if (wizard.variants.length) {
+    const variants = wizard.variants ?? [];
+    if (variants.length) {
       push(
         'Variants',
-        wizard.variants.flatMap((variant, index) => {
+        variants.flatMap((variant, index) => {
           const prefix = `Variant ${index + 1} · `;
           return [
             field(`${prefix}Name`, variant.name),
@@ -227,9 +271,10 @@ export class ProductDetail {
       field('Serial / IMEI capture', yesNo(wizard.requiresSerialImeiCapture)),
     ]);
 
-    const suppliers = (wizard.suppliers ?? []).flatMap((entry, index) => {
+    const supplierRows = wizard.suppliers ?? [];
+    const suppliers = supplierRows.flatMap((entry, index) => {
       const s = normalizeSupplier(entry);
-      const prefix = wizard.suppliers.length > 1 ? `Supplier ${index + 1} · ` : '';
+      const prefix = supplierRows.length > 1 ? `Supplier ${index + 1} · ` : '';
       return [
         field(`${prefix}Name`, s.supplier),
         field(`${prefix}SKU`, s.supplierSku),
@@ -271,7 +316,9 @@ export class ProductDetail {
         field(`${prefix}Visibility`, plan.customerVisibility),
       );
     });
-    push('EMI information', emiFields);
+    if (!this.showEmiDecision()) {
+      push('EMI information', emiFields);
+    }
 
     push('SEO information', [
       field('Slug', wizard.slug || product.slug),
@@ -298,6 +345,7 @@ export class ProductDetail {
       next: (product) => {
         this.product.set(product);
         this.activeImage.set(0);
+        this.syncEmiDecisionFromProduct(product);
         this.loading.set(false);
       },
       error: (err: unknown) => {
@@ -319,11 +367,129 @@ export class ProductDetail {
     this.router.navigate(['/products', this.productId]);
   }
 
+  emiSellingPrice(): number {
+    const product = this.product();
+    const wizard = this.wizard();
+    const fromProduct = Number(product?.price ?? product?.sellingPrice ?? 0);
+    if (Number.isFinite(fromProduct) && fromProduct > 0) return fromProduct;
+    const fromWizard = Number(wizard?.sellingPrice ?? 0);
+    return Number.isFinite(fromWizard) ? fromWizard : 0;
+  }
+
+  emiSettingsFromWizard() {
+    const wizard = this.wizard() ?? initialWizardData();
+    return {
+      defaultDownPaymentPercent: String(wizard.defaultDownPaymentPercent ?? ''),
+      minCustomerDownPayment: String(wizard.minCustomerDownPayment ?? ''),
+      maxDownPayment: String(wizard.maxDownPayment ?? ''),
+      downPaymentEditableAtApproval: wizard.downPaymentEditableAtApproval === true,
+      serviceChargeMethod: String(wizard.serviceChargeMethod ?? ''),
+      documentationCharge: String(wizard.documentationCharge ?? ''),
+      verificationCharge: String(wizard.verificationCharge ?? ''),
+      firstEmiDueAfter: String(wizard.firstEmiDueAfter ?? ''),
+      gracePeriod: String(wizard.gracePeriod ?? ''),
+    };
+  }
+
+  chooseEmiRequired(required: boolean): void {
+    this.emiRequired.set(required);
+    this.emiDirty.set(required !== this.savedEmiRequired());
+    if (required) {
+      setTimeout(() => this.emiConfig()?.hydrate(), 0);
+    }
+  }
+
+  onEmiConfigChanged(): void {
+    this.emiDirty.set(true);
+  }
+
+  saveEmiDecision(): void {
+    const product = this.product();
+    const wizard = this.wizard();
+    if (!product || !wizard || this.savingEmi()) return;
+    if (this.emiRequired() && !hasConfiguredEmiPlan(this.emiConfig()?.getValue().emiPlans)) {
+      this.messages.add({
+        severity: 'warn',
+        summary: 'EMI plan required',
+        detail: 'Add at least one visible EMI plan before saving a required-EMI decision.',
+      });
+      return;
+    }
+
+    const config = this.emiConfig()?.getValue();
+    const settings = config?.settings ?? this.emiSettingsFromWizard();
+    const emiPlans = (config?.emiPlans ?? wizard.emiPlans ?? []).map((plan) =>
+      normalizeEmiPlan(plan),
+    );
+    const wizardData: ProductWizardData = {
+      ...wizard,
+      emiEnabled: this.emiRequired(),
+      emiPlans,
+      defaultDownPaymentPercent: settings.defaultDownPaymentPercent,
+      minCustomerDownPayment: settings.minCustomerDownPayment,
+      maxDownPayment: settings.maxDownPayment,
+      downPaymentEditableAtApproval: settings.downPaymentEditableAtApproval,
+      serviceChargeMethod: settings.serviceChargeMethod,
+      documentationCharge: settings.documentationCharge,
+      verificationCharge: settings.verificationCharge,
+      firstEmiDueAfter: settings.firstEmiDueAfter,
+      gracePeriod: settings.gracePeriod,
+    };
+
+    this.savingEmi.set(true);
+    this.products
+      .update(this.productId, {
+        status: 'pending_approval',
+        emiAvailable: this.emiRequired(),
+        wizardData,
+      })
+      .subscribe({
+        next: (updated) => {
+          this.product.set(updated);
+          this.syncEmiDecisionFromProduct(updated);
+          this.savingEmi.set(false);
+          this.messages.add({
+            severity: 'success',
+            summary: 'EMI decision saved',
+            detail: this.emiRequired()
+              ? 'EMI is required. You can now approve this product.'
+              : 'This product will be approved without EMI.',
+          });
+        },
+        error: (err: unknown) => {
+          this.savingEmi.set(false);
+          this.messages.add({
+            severity: 'error',
+            summary: 'Could not save EMI decision',
+            detail: this.extractMessage(err),
+          });
+        },
+      });
+  }
+
+  private syncEmiDecisionFromProduct(product: Product): void {
+    this.emiRequired.set(product.emiAvailable === true);
+    this.emiDirty.set(false);
+    setTimeout(() => this.emiConfig()?.hydrate(), 0);
+  }
+
   confirmApprove(): void {
     if (!this.isPendingApproval() || this.deciding()) return;
+    const blocked = this.emiApproveBlockedReason();
+    if (blocked) {
+      this.messages.add({
+        severity: 'warn',
+        summary: 'EMI decision required',
+        detail: blocked,
+      });
+      return;
+    }
+    const requiresEmi = this.savedEmiRequired();
     this.confirmation.confirm({
       header: 'Approve Product?',
-      message: 'Approve this product and make it visible to customers?',
+      message: requiresEmi
+        ? 'Approve this product with EMI and make it visible to customers?'
+        : 'Approve this product without EMI and make it visible to customers?',
       acceptLabel: 'Approve',
       rejectLabel: 'Cancel',
       acceptButtonStyleClass: 'p-button-success',
@@ -396,6 +562,28 @@ export class ProductDetail {
     }
     return 'Unable to load this product.';
   }
+}
+
+const WIZARD_ARRAY_KEYS = [
+  'features',
+  'boxContents',
+  'aboutThisItem',
+  'specifications',
+  'attributes',
+  'variants',
+  'galleryImages',
+  'suppliers',
+  'emiPlans',
+] as const;
+
+function mergeWizardData(raw: Partial<ProductWizardData> | null | undefined): ProductWizardData {
+  const merged = { ...initialWizardData(), ...(raw ?? {}) };
+  for (const key of WIZARD_ARRAY_KEYS) {
+    if (!Array.isArray(merged[key])) {
+      merged[key] = [] as never;
+    }
+  }
+  return merged;
 }
 
 function field(label: string, value: unknown): DetailField {

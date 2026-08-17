@@ -17,6 +17,13 @@ import {
   type ProductCreatorScope,
 } from '../utils/product-ownership';
 import { loadEmployeeRecordsForHierarchy } from '../../admin/employee/employee.service';
+import {
+  applyEmployeeEmiCreateDefaults,
+  assertCatalogEmiReadyForPublish,
+  isEmployeeUser,
+  restoreEmployeeEmiFromExisting,
+  stripEmployeeEmiFromPayload,
+} from '../utils/product-emi';
 import type { Product } from '../../../types/database.types';
 type ProductVariant = any;
 
@@ -515,6 +522,7 @@ function mapProduct(
  * (admin often saves plans only inside wizardData).
  */
 function resolveRawEmiPlans(product: any): any[] {
+  if (product?.emiAvailable === false) return [];
   const fromTable = Array.isArray(product?.productEmiPlans) ? product.productEmiPlans : [];
   const fromWizard = Array.isArray(product?.wizardData?.emiPlans)
     ? product.wizardData.emiPlans
@@ -991,8 +999,14 @@ export class ProductService {
     }
     // Creator always from authenticated session — ignore client spoofing.
     mapped.creatorId = creatorId;
+    const actorIsEmployee = isEmployeeUser(actorUserId);
+    if (actorIsEmployee) {
+      applyEmployeeEmiCreateDefaults(mapped);
+    }
     const created = await productRepository.create(mapped);
-    await this.syncEmiPlansFromWizard(created.id, data);
+    if (!actorIsEmployee) {
+      await this.syncEmiPlansFromWizard(created.id, data);
+    }
     return created;
   }
 
@@ -1003,6 +1017,7 @@ export class ProductService {
     }
 
     await this.assertStaffProductAccess(existing, actorUserId, true);
+    const actorIsEmployee = isEmployeeUser(actorUserId);
 
     // Status-only updates (approve / reject) must not re-run the full wizard mapper.
     const providedKeys = Object.keys(data ?? {}).filter((key) => data[key] !== undefined);
@@ -1020,12 +1035,23 @@ export class ProductService {
       if (!allowed.has(nextStatus)) {
         throw new BadRequestError('Invalid product status.');
       }
+      if (nextStatus === 'active') {
+        const withPlans = await productRepository.findByIdWithVariants(id);
+        assertCatalogEmiReadyForPublish(withPlans ?? existing);
+      }
       // Do not change ownership on approve/reject.
       return productRepository.update(id, { status: nextStatus });
     }
 
+    if (actorIsEmployee) {
+      stripEmployeeEmiFromPayload(data);
+    }
+
     data = await persistInlineProductImages(data);
     const mapped = this.mapPayloadToPrisma(data);
+    if (actorIsEmployee) {
+      restoreEmployeeEmiFromExisting(mapped, existing);
+    }
     // Preserve marketing flags when this request didn't explicitly set them
     // (the wizard never sends them, so re-saving a featured product must not
     // silently un-feature it). mapPayloadToPrisma always yields booleans, so
@@ -1111,13 +1137,36 @@ export class ProductService {
       delete mapped.creatorId;
     }
     stripClientOwnershipFields(data);
+
+    const nextStatus = String(mapped.status ?? existing.status ?? '')
+      .trim()
+      .toLowerCase();
+    if (nextStatus === 'active') {
+      const payloadPlans = data.wizardData?.emiPlans ?? data.emiPlans;
+      assertCatalogEmiReadyForPublish({
+        ...existing,
+        ...mapped,
+        emiAvailable: mapped.emiAvailable ?? existing.emiAvailable,
+        wizardData: {
+          ...(existing.wizardData && typeof existing.wizardData === 'object'
+            ? existing.wizardData
+            : {}),
+          ...(mapped.wizardData && typeof mapped.wizardData === 'object' ? mapped.wizardData : {}),
+          emiPlans: Array.isArray(payloadPlans)
+            ? payloadPlans
+            : existing.wizardData?.emiPlans,
+        },
+        productEmiPlans: Array.isArray(payloadPlans) ? payloadPlans : undefined,
+      });
+    }
+
     const updated = await productRepository.update(id, mapped);
     await deleteOrphanedProductImages(existing, updated, id);
     // Only touch the plans collection when the request actually carries plans;
     // partial updates (e.g. a marketing-flag toggle) must not wipe previously
-    // saved plans.
+    // saved plans. Employees never sync EMI — admin-configured plans stay put.
     const plans = data.wizardData?.emiPlans ?? data.emiPlans;
-    if (Array.isArray(plans)) {
+    if (!actorIsEmployee && Array.isArray(plans)) {
       await this.syncEmiPlansFromWizard(id, data);
     }
     return updated;

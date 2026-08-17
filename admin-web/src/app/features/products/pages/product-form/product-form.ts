@@ -31,6 +31,7 @@ import { ConfirmationService, MessageService } from 'primeng/api';
 import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
 import { isStoredImageRef, resolveMediaUrl } from '../../../../core/config/api.config';
+import { AuthService } from '../../../../core/services/auth.service';
 import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
 import { ManageableSelect } from '../../components/manageable-select/manageable-select';
 import { ProductService } from '../../services/product.service';
@@ -128,6 +129,7 @@ export class ProductForm {
   readonly options = inject(WizardOptionsService);
   private readonly dealerService = inject(DealerService);
   private readonly staffUsers = inject(StaffUserService);
+  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly messages = inject(MessageService);
@@ -137,8 +139,30 @@ export class ProductForm {
 
   readonly steps = WIZARD_STEPS;
   readonly stepMeta = WIZARD_STEP_META;
+  readonly emiStepIndex = 6;
   readonly activeStep = signal(0);
   readonly currentStep = computed(() => this.stepMeta[this.activeStep()]);
+  readonly isEmployee = computed(
+    () =>
+      String(this.auth.user()?.roleName ?? '')
+        .trim()
+        .toLowerCase() === 'employee',
+  );
+  readonly hideEmiStep = computed(() => this.isEmployee());
+  readonly visibleStepMeta = computed(() =>
+    this.stepMeta
+      .map((step, index) => ({ ...step, index }))
+      .filter((step) => !(this.hideEmiStep() && step.index === this.emiStepIndex)),
+  );
+  readonly showPublishButton = computed(() => this.isEdit && !this.isEmployee());
+  readonly showSaveForApproval = computed(() => {
+    if (this.isEmployee()) {
+      if (!this.isEdit) return true;
+      const status = String(this.loadedStatus()).toLowerCase();
+      return status === 'draft' || status === 'rejected' || status === 'pending_approval' || !status;
+    }
+    return !this.isEdit;
+  });
 
   readonly productId = this.route.snapshot.paramMap.get('id');
   readonly isEdit = !!this.productId;
@@ -168,6 +192,7 @@ export class ProductForm {
     tooltipStyleClass: 'catalog-tooltip',
   };
   private loadedWizard: Partial<ProductWizardData> = {};
+  private readonly loadedStatus = signal('');
   private readonly pendingUploads = new Map<string, File>();
   private readonly dealerPatchedByIndex = new Map<number, Set<string>>();
 
@@ -536,6 +561,7 @@ export class ProductForm {
       ...(product.wizardData ?? {}),
     } as ProductWizardData;
     this.loadedWizard = { ...wizard };
+    this.loadedStatus.set(String(product.status ?? ''));
 
     const primaryImage = String(product.image || wizard.primaryImage || '').trim();
     const galleryRaw = product.galleryImages ?? wizard.galleryImages ?? product.images ?? [];
@@ -2514,13 +2540,22 @@ export class ProductForm {
   }
 
   goToStep(index: number): void {
+    if (this.hideEmiStep() && index === this.emiStepIndex) return;
     this.activeStep.set(index);
   }
   next(): void {
-    this.activeStep.update((i) => Math.min(i + 1, this.steps.length - 1));
+    this.activeStep.update((i) => {
+      let next = Math.min(i + 1, this.steps.length - 1);
+      if (this.hideEmiStep() && next === this.emiStepIndex) next += 1;
+      return Math.min(next, this.steps.length - 1);
+    });
   }
   back(): void {
-    this.activeStep.update((i) => Math.max(i - 1, 0));
+    this.activeStep.update((i) => {
+      let prev = Math.max(i - 1, 0);
+      if (this.hideEmiStep() && prev === this.emiStepIndex) prev -= 1;
+      return Math.max(prev, 0);
+    });
   }
   backToList(): void {
     this.router.navigate(['/products']);
@@ -2574,6 +2609,7 @@ export class ProductForm {
 
   save(status: 'draft' | 'active' | 'pending_approval'): void {
     if (this.submitting()) return;
+    if (status === 'active' && this.isEmployee()) return;
     if (this.form.get('productName')!.invalid || this.form.get('sellingPrice')!.invalid || this.form.get('mrp')!.invalid) {
       this.form.markAllAsTouched();
       this.activeStep.set(0);
@@ -2662,7 +2698,16 @@ export class ProductForm {
       aboutThisItem: (v.aboutThisItem ?? []).map((item: unknown) => String(item ?? '')),
       variants,
       suppliers: this.serializeSuppliers(),
-      emiPlans: this.serializeEmiPlans(),
+      emiPlans: this.isEmployee()
+        ? this.isEdit
+          ? (this.loadedWizard.emiPlans ?? []).map((plan) => normalizeEmiPlan(plan))
+          : []
+        : this.serializeEmiPlans(),
+      emiEnabled: this.isEmployee()
+        ? this.isEdit
+          ? this.loadedWizard.emiEnabled === true
+          : false
+        : v.emiEnabled,
       primaryImage,
       galleryImages,
       mrp: String(v.mrp ?? ''),
@@ -2684,11 +2729,31 @@ export class ProductForm {
       minimumCustomerAge: String(v.minimumCustomerAge ?? ''),
       deliveryCharges: String(v.deliveryCharges ?? ''),
       installationCharge: String(v.installationCharge ?? ''),
-      defaultDownPaymentPercent: String(v.defaultDownPaymentPercent ?? ''),
-      minCustomerDownPayment: String(v.minCustomerDownPayment ?? ''),
-      maxDownPayment: String(v.maxDownPayment ?? ''),
-      documentationCharge: String(v.documentationCharge ?? ''),
-      verificationCharge: String(v.verificationCharge ?? ''),
+      defaultDownPaymentPercent: String(
+        this.isEmployee()
+          ? (this.loadedWizard.defaultDownPaymentPercent ?? '')
+          : (v.defaultDownPaymentPercent ?? ''),
+      ),
+      minCustomerDownPayment: String(
+        this.isEmployee()
+          ? (this.loadedWizard.minCustomerDownPayment ?? '')
+          : (v.minCustomerDownPayment ?? ''),
+      ),
+      maxDownPayment: String(
+        this.isEmployee()
+          ? (this.loadedWizard.maxDownPayment ?? '')
+          : (v.maxDownPayment ?? ''),
+      ),
+      documentationCharge: String(
+        this.isEmployee()
+          ? (this.loadedWizard.documentationCharge ?? '')
+          : (v.documentationCharge ?? ''),
+      ),
+      verificationCharge: String(
+        this.isEmployee()
+          ? (this.loadedWizard.verificationCharge ?? '')
+          : (v.verificationCharge ?? ''),
+      ),
       replacementWindow,
       replacementDays: replacementWindow,
       replacementWindowDays: replacementWindow,
@@ -2707,7 +2772,11 @@ export class ProductForm {
       mrp: Number(v.mrp) || 0,
       stock: Number(v.availableStock) || 0,
       status,
-      emiAvailable: v.emiEnabled,
+      emiAvailable: this.isEmployee()
+        ? this.isEdit
+          ? this.loadedWizard.emiEnabled === true
+          : false
+        : v.emiEnabled,
       warranty: v.warranty || undefined,
       hsnCode: v.hsnCode || undefined,
       manufacturer: v.manufacturer || undefined,

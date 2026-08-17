@@ -1,0 +1,197 @@
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  min-width: 0;
+
+  > label {
+    font-size: 0.8125rem;
+    font-weight: 650;
+    color: var(--admin-text);
+  }
+}
+
+.grid-2 > .field {
+  margin-bottom: 0;
+}
+
+/*
+  Tailwind v4 preflight sets `* { border: 0 solid }`, which hides PrimeNG
+  input/select chrome on this page. Restore the same visible controls used
+  by the product wizard.
+*/
+:host ::ng-deep {
+  input.p-inputtext,
+  input[pinputtext],
+  .p-inputnumber-input,
+  .p-select {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1.5px solid #64748b;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--admin-text);
+    font: inherit;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    outline: none;
+    box-sizing: border-box;
+    box-shadow: none;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  input.p-inputtext::placeholder,
+  input[pinputtext]::placeholder,
+  .p-inputnumber-input::placeholder {
+    color: #94a3b8;
+    opacity: 1;
+  }
+
+  input.p-inputtext:hover:not(:disabled):not(:focus),
+  input[pinputtext]:hover:not(:disabled):not(:focus),
+  .p-inputnumber-input:hover:not(:disabled):not(:focus),
+  .p-select:hover:not(.p-disabled):not(.p-focus) {
+    border-color: #475569;
+  }
+
+  input.p-inputtext:focus,
+  input[pinputtext]:focus,
+  .p-inputnumber-input:focus,
+  .p-select.p-focus,
+  .p-select.p-select-open {
+    border-color: var(--admin-primary);
+    box-shadow: 0 0 0 3px rgb(79 70 229 / 0.12);
+  }
+
+  .p-select {
+    display: inline-flex;
+    align-items: center;
+    padding-right: 0.35rem;
+  }
+
+  .p-select .p-select-label {
+    padding: 0;
+    color: var(--admin-text);
+  }
+
+  .p-select-dropdown {
+    width: 2rem;
+    color: var(--admin-text-muted);
+  }
+
+  .p-inputnumber {
+    width: 100%;
+    display: flex;
+  }
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.empty-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--admin-surface-border);
+  border-radius: 10px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-text-muted);
+}
+
+.empty-hint--tall {
+  min-height: 5.5rem;
+  align-items: center;
+}
+
+.muted {
+  color: var(--admin-text-muted);
+  font-size: 0.8125rem;
+}
+
+.calc-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+
+.calc-card dt {
+  color: var(--admin-text-muted);
+  font-size: 0.75rem;
+}
+
+.calc-card dd {
+  margin: 0;
+  font-weight: 650;
+}
+
+.is-disabled {
+  opacity: 0.55;
+}
+
+@media (max-width: 720px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+.empty-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--admin-surface-border);
+  border-radius: 10px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-text-muted);
+}
+
+.empty-hint--tall {
+  min-height: 5.5rem;
+  align-items: center;
+}
+
+.muted {
+  color: var(--admin-text-muted);
+  font-size: 0.8125rem;
+}
+
+.calc-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+
+.calc-card dt {
+  color: var(--admin-text-muted);
+  font-size: 0.75rem;
+}
+
+.calc-card dd {
+  margin: 0;
+  font-weight: 650;
+}
+
+.is-disabled {
+  opacity: 0.55;
+}
+
+@media (max-width: 720px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}

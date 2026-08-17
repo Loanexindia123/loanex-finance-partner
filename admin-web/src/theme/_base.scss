@@ -250,6 +250,7 @@ a {
 .p-dialog .p-dialog-content,
 .p-confirmdialog .p-dialog-content {
   padding: 0.9rem 1.25rem 1rem;
+  overflow: visible;
 }
 
 .p-dialog .p-dialog-footer,
@@ -338,6 +339,20 @@ a {
 .p-dialog .p-select.p-select-open {
   border-color: #4f46e5;
   box-shadow: 0 0 0 3px rgb(79 70 229 / 0.12);
+}
+
+.p-dialog .p-password,
+.p-dialog .p-password-input,
+.p-dialog .user-password,
+.p-dialog .user-password-input {
+  width: 100%;
+}
+
+.p-dialog input.p-inputtext:-webkit-autofill,
+.p-dialog input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px #fff inset !important;
+  -webkit-text-fill-color: #0f172a;
+  caret-color: #0f172a;
 }
 
 .p-dialog .grid-2 {

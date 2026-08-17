@@ -19,12 +19,14 @@ export const WIZARD_STEPS = [
 
 interface StepProgressProps {
   currentStep: number;
+  steps?: readonly string[];
 }
 
-export function StepProgress({ currentStep }: StepProgressProps) {
+export function StepProgress({ currentStep, steps = WIZARD_STEPS }: StepProgressProps) {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
-  const isEmiStep = currentStep === 9;
+  const emiIndex = steps.indexOf('EMI');
+  const isEmiStep = emiIndex >= 0 && currentStep === emiIndex + 1;
 
   return (
     <View style={[styles.wrapper, isEmiStep && styles.wrapperFinance]}>
@@ -34,7 +36,7 @@ export function StepProgress({ currentStep }: StepProgressProps) {
         </View>
       )}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {WIZARD_STEPS.map((step, index) => {
+        {steps.map((step, index) => {
           const stepNum = index + 1;
           const isActive = stepNum === currentStep;
           const isCompleted = stepNum < currentStep;

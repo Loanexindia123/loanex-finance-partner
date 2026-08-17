@@ -1,6 +1,6 @@
 /**
- * Mirrors backend/src/modules/rbac/permissions.ts exactly (12 modules x 4 actions).
- * Do NOT trust admin-app's src/types/role.ts copy — it is missing "careers".
+ * Mirrors backend/src/modules/rbac/permissions.ts (modules x view/create/edit/delete,
+ * plus freelancer extra actions: approve, reject, payout).
  */
 export const MODULE_KEYS = [
   'products',
@@ -15,13 +15,15 @@ export const MODULE_KEYS = [
   'settings',
   'notifications',
   'careers',
+  'freelancers',
 ] as const;
 
 export const ACTION_KEYS = ['view', 'create', 'edit', 'delete'] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 export type ActionKey = (typeof ACTION_KEYS)[number];
-export type Permission = `${ModuleKey}.${ActionKey}`;
+export type ExtraPermission = 'freelancers.approve' | 'freelancers.reject' | 'freelancers.payout';
+export type Permission = `${ModuleKey}.${ActionKey}` | ExtraPermission;
 
 export function permission(module: ModuleKey, action: ActionKey): Permission {
   return `${module}.${action}`;
