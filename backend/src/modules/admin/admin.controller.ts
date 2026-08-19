@@ -11,6 +11,7 @@ import {
   ensureOperationalStaffRoles,
   isProtectedStaffUser,
 } from '../rbac/operational-staff-roles';
+import { listStaffPickerOptions } from './staff-picker';
 
 /** EMI statuses that FI Accept/Reject may still move (pre-final-approval). */
 const FI_MUTABLE_EMI_STATUSES = new Set<string>([
@@ -268,6 +269,15 @@ export class AdminController {
       )
       .map(serializeUser);
     return sendSuccess(res, users, 'Users fetched');
+  };
+
+  /**
+   * GET /admin/staff — portal staff for assignment dropdowns.
+   * Does not return customers or full permission payloads.
+   */
+  listStaff = async (_req: Request, res: Response) => {
+    const staff = await listStaffPickerOptions();
+    return sendSuccess(res, staff, 'Staff fetched');
   };
 
   /** POST /admin/users — create a user (staff or customer) with profile. */

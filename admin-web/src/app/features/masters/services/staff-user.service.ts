@@ -20,10 +20,11 @@ export class StaffUserService {
 
   /**
    * Staff members for Reporting Person / manager pickers.
-   * Only admin portal accounts — never customers or generic "authenticated" app users.
+   * GET /admin/staff is allowed for employees creating dealers (masters.view).
+   * GET /admin/users stays Super Admin / users.view only and includes customers.
    */
   listStaff(): Observable<StaffUser[]> {
-    return this.http.get<ApiEnvelope<unknown>>(apiUrl('/admin/users')).pipe(
+    return this.http.get<ApiEnvelope<unknown>>(apiUrl('/admin/staff')).pipe(
       unwrapApi(),
       map((raw) => {
         const rows = Array.isArray(raw) ? raw : [];

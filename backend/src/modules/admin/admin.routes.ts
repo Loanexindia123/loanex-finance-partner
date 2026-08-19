@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../common/middleware/authenticate';
-import { requirePermission } from '../../common/middleware/require-permission';
+import { requireAnyPermission, requirePermission } from '../../common/middleware/require-permission';
 import { validateRequest } from '../../common/middleware/validate';
 import { asyncHandler } from '../../common/utils/async-handler';
 import { adminController } from './admin.controller';
@@ -66,6 +66,18 @@ adminRouter.patch(
 );
 
 adminRouter.get('/users', requirePermission('users.view'), asyncHandler(adminController.listUsers));
+adminRouter.get(
+  '/staff',
+  requireAnyPermission(
+    'users.view',
+    'masters.view',
+    'masters.create',
+    'products.view',
+    'products.create',
+    'freelancers.view',
+  ),
+  asyncHandler(adminController.listStaff),
+);
 adminRouter.post('/users', requirePermission('users.create'), asyncHandler(adminController.createUser));
 adminRouter.patch('/users/:id', requirePermission('users.edit'), asyncHandler(adminController.updateUser));
 adminRouter.delete('/users/:id', requirePermission('users.delete'), asyncHandler(adminController.deleteUser));

@@ -27,7 +27,7 @@ import { MessageService } from 'primeng/api';
 import { AuthService } from '../../../../core/services/auth.service';
 import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
 import { DealerService } from '../../services/dealer.service';
-import { StaffUserService } from '../../services/staff-user.service';
+import { StaffUser, StaffUserService } from '../../services/staff-user.service';
 import {
   BUSINESS_TYPES,
   CREATOR_TYPES,
@@ -73,7 +73,6 @@ const SUBMIT_REQUIRED_FIELDS: ReadonlyArray<{
   { key: 'googleLocation', label: 'Google Location' },
   { key: 'deliveryArea', label: 'Delivery Area' },
   { key: 'panCard', label: 'PAN Card' },
-  { key: 'ownerAadhaar', label: 'Owner Aadhaar' },
   { key: 'shopAddressProof', label: 'Shop Address Proof' },
   { key: 'cancelledCheque', label: 'Cancelled Cheque' },
   { key: 'shopPhotos', label: 'Shop Photos' },
@@ -139,7 +138,7 @@ export class DealerForm {
   readonly documentFields = [
     { key: 'panCard', label: 'PAN Card *', hint: 'PDF / JPG' },
     { key: 'gstCertificate', label: 'GST Certificate', hint: 'Upload or Not Registered' },
-    { key: 'ownerAadhaar', label: 'Owner Aadhaar *', hint: 'Front + Back' },
+    { key: 'ownerAadhaar', label: 'Owner Aadhaar', hint: 'Front + Back (optional)' },
     { key: 'shopAddressProof', label: 'Shop Address Proof *', hint: 'Registration / Bill / Agreement' },
     { key: 'cancelledCheque', label: 'Cancelled Cheque *', hint: 'Cheque image' },
     { key: 'shopPhotos', label: 'Shop Photos *', hint: 'Front + Inside' },
@@ -179,7 +178,7 @@ export class DealerForm {
     warehouseAddress: [''],
     panCard: ['', Validators.required],
     gstCertificate: [''],
-    ownerAadhaar: ['', Validators.required],
+    ownerAadhaar: [''],
     shopAddressProof: ['', Validators.required],
     cancelledCheque: ['', Validators.required],
     shopPhotos: ['', Validators.required],
@@ -204,16 +203,8 @@ export class DealerForm {
     this.destroyRef.onDestroy(() => this.releaseAllPendingDocuments());
 
     this.staffUsers.listStaff().subscribe({
-      next: (users) =>
-        this.staffOptions.set(
-          users.map((u) => ({
-            label: formatStaffLabel(u),
-            value: u.name,
-            userId: u.id,
-            email: u.email ?? '',
-          })),
-        ),
-      error: () => void 0,
+      next: (users) => this.applyStaffOptions(users),
+      error: () => this.applyStaffOptions([]),
     });
 
     this.form
@@ -254,6 +245,46 @@ export class DealerForm {
       });
     } else {
       this.applyCurrentUserAsCreator();
+    }
+  }
+
+  private applyStaffOptions(users: StaffUser[]): void {
+    const options = users.map((u) => ({
+      label: formatStaffLabel(u),
+      value: u.name,
+      userId: u.id,
+      email: u.email ?? '',
+    }));
+    this.staffOptions.set(this.withCurrentUserStaffOption(options));
+    this.defaultAssignedB2BManager();
+  }
+
+  private withCurrentUserStaffOption(
+    options: { label: string; value: string; userId: string; email: string }[],
+  ): { label: string; value: string; userId: string; email: string }[] {
+    const user = this.auth.user();
+    if (!user) return options;
+    if (options.some((option) => option.userId === user.id)) return options;
+    const name = user.fullName || user.email || user.mobile || 'Employee';
+    return [
+      {
+        label: formatStaffLabel({ name, email: user.email }),
+        value: name,
+        userId: user.id,
+        email: user.email ?? '',
+      },
+      ...options,
+    ];
+  }
+
+  private defaultAssignedB2BManager(): void {
+    if (this.isEdit) return;
+    const control = this.form.get('assignedB2BManager');
+    if (control?.value) return;
+    const userId = this.auth.user()?.id;
+    const match = this.staffOptions().find((option) => option.userId === userId);
+    if (match) {
+      control?.setValue(match.value, { emitEvent: false });
     }
   }
 
