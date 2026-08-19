@@ -1,5 +1,8 @@
 import { jsonDb } from '../../config/json-db';
-import { isDealerAuthUser } from './dealer/dealer-account';
+
+function isDealerAppUser(user: any): boolean {
+  return str(user?.role).toLowerCase() === 'dealer';
+}
 
 export interface StaffPickerOption {
   id: string;
@@ -27,7 +30,7 @@ function str(value: unknown): string {
  * Excludes customers, dealer app accounts, and blocked users.
  */
 export function isStaffPickerUser(user: any): boolean {
-  if (!user || isDealerAuthUser(user)) return false;
+  if (!user || isDealerAppUser(user)) return false;
   if (user.blocked === true) return false;
   const status = str(user.status).toLowerCase();
   if (status === 'blocked' || status === 'inactive' || status === 'disabled') return false;
