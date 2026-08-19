@@ -1,0 +1,229 @@
+.role-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding: 1.25rem;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-surface-border);
+  border-radius: 14px;
+  box-shadow: var(--admin-shadow-sm);
+}
+
+.role-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 260px;
+
+  span {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--admin-text-muted);
+  }
+}
+
+.role-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.system-pill {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: var(--admin-primary);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.role-meta__count {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: var(--admin-surface-alt);
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--admin-text-muted);
+}
+
+.module-table {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-surface-border);
+  border-radius: 14px;
+  box-shadow: var(--admin-shadow-sm);
+  overflow: hidden;
+  margin-bottom: 4.5rem; // room for the sticky save bar
+}
+
+.module-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--admin-surface-border);
+  cursor: pointer;
+  transition: background 0.12s ease;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:nth-child(even) {
+    background: #fafbff;
+  }
+
+  &:hover {
+    background: #f1f4ff;
+  }
+
+  &:has(input:checked) {
+    .module-row__icon {
+      background: #eef2ff;
+      color: var(--admin-primary);
+    }
+  }
+
+  input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--admin-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+  }
+}
+
+.module-row__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-text-muted);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  transition: all 0.12s ease;
+}
+
+.module-row__label {
+  font-size: 0.875rem;
+  font-weight: 650;
+  color: var(--admin-text);
+}
+
+.module-row__hint {
+  margin-left: auto;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--admin-surface-alt);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--admin-text-muted);
+  white-space: nowrap;
+}
+
+.save-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  margin-top: -4.5rem;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-surface-border);
+  border-radius: 14px;
+  box-shadow: 0 -4px 12px rgb(15 23 42 / 0.06);
+}
+
+.save-bar__hint {
+  font-size: 0.8rem;
+  color: var(--admin-text-muted);
+  margin-right: auto;
+}
+
+.role-option {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+}
+
+.role-option__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: #eef2ff;
+  color: var(--admin-primary);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.role-option__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--admin-text);
+}
+
+.role-option__system {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: var(--admin-primary);
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.role-option__count {
+  margin-left: auto;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-text-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+:host ::ng-deep .role-select-input {
+  height: 2.75rem;
+  border-radius: 10px;
+
+  .p-select-label {
+    display: flex;
+    align-items: center;
+    padding: 0 0.75rem;
+  }
+}
+
+:host ::ng-deep .role-select-panel {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.12);
+
+  .p-select-option {
+    padding: 0.625rem 0.875rem;
+
+    &:hover {
+      background: #f1f4ff;
+    }
+
+    &.p-select-option-selected {
+      background: #eef2ff;
+    }
+  }
+}

@@ -4,9 +4,7 @@ export const ROLES_ROUTES: Routes = [
   {
     path: '',
     loadComponent: () =>
-      import('../../shared/pages/module-placeholder/module-placeholder').then(
-        (m) => m.ModulePlaceholder,
-      ),
+      import('./pages/role-permissions/role-permissions').then((m) => m.RolePermissions),
     data: { title: 'Roles' },
   },
 ];

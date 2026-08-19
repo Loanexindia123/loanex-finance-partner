@@ -1,0 +1,91 @@
+<app-page-header title="Roles" subtitle="Configure which sections each role can access." />
+
+@if (loading()) {
+  <app-branded-loader message="Loading roles..." />
+} @else if (error()) {
+  <app-error-state [message]="error()!" (retry)="load()" />
+} @else {
+  <div class="role-toolbar">
+    <label class="role-select">
+      <span>Role</span>
+      
+        <p-select
+        [options]="roleOptions()"
+        [ngModel]="selectedRoleId()"
+        (ngModelChange)="selectRole($event)"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="Select a role"
+        appendTo="body"
+        [checkmark]="false"
+        styleClass="role-select-input"
+        panelStyleClass="role-select-panel"
+      >
+        <ng-template let-selected pTemplate="selectedItem">
+          <div class="role-option">
+            <span class="role-option__icon"><i class="pi" [class]="roleIcon(selected.label)" aria-hidden="true"></i></span>
+            <span class="role-option__label">{{ selected.label }}</span>
+          </div>
+        </ng-template>
+        <ng-template let-option pTemplate="item">
+          <div class="role-option">
+            <span class="role-option__icon"><i class="pi" [class]="roleIcon(option.label)" aria-hidden="true"></i></span>
+            <span class="role-option__label">{{ option.label }}</span>
+            @if (option.isSystem) {
+              <span class="role-option__system">System</span>
+            }
+            <span class="role-option__count">{{ option.userCount }}</span>
+          </div>
+        </ng-template>
+      </p-select>
+    </label>
+
+    @if (selectedRole(); as role) {
+      <div class="role-meta">
+        @if (role.isSystem) {
+          <span class="system-pill">System role</span>
+        }
+        <span class="role-meta__count">{{ role.userCount }} user{{ role.userCount === 1 ? '' : 's' }}</span>
+      </div>
+    }
+  </div>
+
+  @if (selectedRole()) {
+    <div class="module-table">
+      @for (item of items; track item.label) {
+        <label class="module-row">
+          <input
+            type="checkbox"
+            [checked]="isChecked(item.permission)"
+            [disabled]="!item.permission"
+            (change)="toggle(item.permission)"
+          />
+        <span class="module-row__icon">
+            <i class="pi" [class]="item.icon" aria-hidden="true"></i>
+          </span>
+          <span class="module-row__label">{{ item.label }}</span>
+          @if (!item.permission) {
+            <span class="module-row__hint">Always visible</span>
+          } @else if (item.sharedWith?.length) {
+            <span class="module-row__hint">Shares access with {{ item.sharedWith?.join(', ') }}</span>
+          }
+        </label>
+      }
+    </div>
+
+        <div class="save-bar">
+      @if (dirty()) {
+        <span class="save-bar__hint">You have unsaved changes</span>
+      }
+      <button
+        pButton
+        type="button"
+        label="Save Changes"
+        icon="pi pi-check"
+        [loading]="saving()"
+        [disabled]="saving() || !dirty()"
+        (click)="save()"
+      ></button>
+    </div>
+  }
+}
