@@ -612,7 +612,7 @@ export class EmployeeOnboard {
               summary: formStatus === 'approved' ? 'Employee onboarded' : 'Draft saved',
               detail:
                 formStatus === 'approved'
-                  ? `${saved.fullName || saved.employeeId} is now marked as onboarded.`
+                  ? `${saved.fullName || saved.employeeId} can sign in with Employee ID, email, or mobile.`
                   : 'You can continue this onboarding later.',
             });
             if (options?.previewAfterSave || formStatus === 'approved') {

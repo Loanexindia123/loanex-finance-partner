@@ -268,6 +268,8 @@
       <section class="section-card calc-card">
         <h3>Auto Calculated Preview</h3>
         <dl>
+          <div><dt>Service Charge</dt><dd>{{ money(plan.serviceCharge) }}</dd></div>
+          <div><dt>Delivery Charge</dt><dd>{{ money(plan.deliveryCharge) }}</dd></div>
           <div><dt>EMI Principal</dt><dd>{{ inr(emiModalCalcs()!.loanAmount) }}</dd></div>
           <div><dt>Monthly EMI</dt><dd>{{ plan.months ? inr(emiModalCalcs()!.monthlyEmi) : '—' }}</dd></div>
           <div><dt>Down Payment (Upfront)</dt><dd>{{ inr(emiModalCalcs()!.upfrontPayment) }}</dd></div>

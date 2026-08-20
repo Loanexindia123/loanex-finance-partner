@@ -20,11 +20,12 @@ import { loadEmployeeRecordsForHierarchy } from '../../admin/employee/employee.s
 import {
   applyEmployeeEmiCreateDefaults,
   assertCatalogEmiReadyForPublish,
-  isEmployeeUser,
+  isRestrictedCatalogUser,
   restoreEmployeeEmiFromExisting,
   stripEmployeeEmiFromPayload,
 } from '../utils/product-emi';
 import type { Product } from '../../../types/database.types';
+import { resolveProductStockForWrite } from '../utils/product-stock';
 type ProductVariant = any;
 
 function slugify(value: string): string {
@@ -985,6 +986,15 @@ export class ProductService {
 
     data = await persistInlineProductImages(data);
     const mapped = this.mapPayloadToPrisma(data);
+    const stockResult = resolveProductStockForWrite(data, 'create');
+    if (stockResult.ok === false) {
+      throw new BadRequestError(stockResult.message);
+    }
+    if (!stockResult.applied) {
+      throw new BadRequestError('Stock quantity is required.');
+    }
+    mapped.stock = stockResult.stock;
+    mapped.availableStock = stockResult.stock;
     if (!mapped.id) {
       mapped.id = data.id && isUuid(String(data.id)) ? String(data.id) : randomUUID();
     }
@@ -999,12 +1009,12 @@ export class ProductService {
     }
     // Creator always from authenticated session — ignore client spoofing.
     mapped.creatorId = creatorId;
-    const actorIsEmployee = isEmployeeUser(actorUserId);
-    if (actorIsEmployee) {
+    const actorIsRestricted = isRestrictedCatalogUser(actorUserId);
+    if (actorIsRestricted) {
       applyEmployeeEmiCreateDefaults(mapped);
     }
     const created = await productRepository.create(mapped);
-    if (!actorIsEmployee) {
+    if (!actorIsRestricted) {
       await this.syncEmiPlansFromWizard(created.id, data);
     }
     return created;
@@ -1017,7 +1027,7 @@ export class ProductService {
     }
 
     await this.assertStaffProductAccess(existing, actorUserId, true);
-    const actorIsEmployee = isEmployeeUser(actorUserId);
+    const actorIsRestricted = isRestrictedCatalogUser(actorUserId);
 
     // Status-only updates (approve / reject) must not re-run the full wizard mapper.
     const providedKeys = Object.keys(data ?? {}).filter((key) => data[key] !== undefined);
@@ -1043,13 +1053,13 @@ export class ProductService {
       return productRepository.update(id, { status: nextStatus });
     }
 
-    if (actorIsEmployee) {
+    if (actorIsRestricted) {
       stripEmployeeEmiFromPayload(data);
     }
 
     data = await persistInlineProductImages(data);
     const mapped = this.mapPayloadToPrisma(data);
-    if (actorIsEmployee) {
+    if (actorIsRestricted) {
       restoreEmployeeEmiFromExisting(mapped, existing);
     }
     // Preserve marketing flags when this request didn't explicitly set them
@@ -1089,6 +1099,9 @@ export class ProductService {
       'price',
       'mrp',
       'stock',
+      'availableStock',
+      'openingStock',
+      'reservedStock',
       'status',
       'emiAvailable',
       'deliveryCharge',
@@ -1118,6 +1131,14 @@ export class ProductService {
       if (source[key] === undefined && mapped[key] !== undefined) {
         mapped[key] = existing[key];
       }
+    }
+    const stockResult = resolveProductStockForWrite(data, 'update');
+    if (stockResult.ok === false) {
+      throw new BadRequestError(stockResult.message);
+    }
+    if (stockResult.applied) {
+      mapped.stock = stockResult.stock;
+      mapped.availableStock = stockResult.stock;
     }
     // Drop undefined mapped keys so repository merge keeps existing values.
     for (const key of Object.keys(mapped)) {
@@ -1166,7 +1187,7 @@ export class ProductService {
     // partial updates (e.g. a marketing-flag toggle) must not wipe previously
     // saved plans. Employees never sync EMI — admin-configured plans stay put.
     const plans = data.wizardData?.emiPlans ?? data.emiPlans;
-    if (!actorIsEmployee && Array.isArray(plans)) {
+    if (!actorIsRestricted && Array.isArray(plans)) {
       await this.syncEmiPlansFromWizard(id, data);
     }
     return updated;

@@ -45,6 +45,7 @@ export function DashboardAppBar({
       </View>
 
       <View style={styles.actions}>
+        {onNotificationsPress ? (
         <TouchableOpacity
           style={styles.iconButton}
           onPress={onNotificationsPress}
@@ -53,6 +54,7 @@ export function DashboardAppBar({
           <Ionicons name="notifications-outline" size={22} color={colors.primary} />
           {unreadCount > 0 ? <View style={styles.badge} /> : null}
         </TouchableOpacity>
+        ) : null}
 
         <TouchableOpacity
           style={styles.avatar}

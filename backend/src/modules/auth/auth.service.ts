@@ -41,6 +41,12 @@ import { authRepository } from './auth.repository';
 import { jsonDb } from '../../config/json-db';
 import { auditLogService } from '../verification/service/audit-log.service';
 import { effectivePermissionsForRole, SUPER_ADMIN_PERMISSIONS } from '../rbac/permissions';
+import {
+  findLinkedDealerByUserId,
+  isDealerApproved,
+  isDealerAuthUser,
+  isDealerRoleName,
+} from '../admin/dealer/dealer-account';
 
 /**
  * Enrich a user row with RBAC role info (roleId / roleName / permissions).
@@ -64,9 +70,10 @@ function resolveRbacInfo(user: any) {
   return { roleId: null, roleName: null, permissions: [] };
 }
 
-/** Staff portal accounts only — excludes customers / app-only users. */
+/** Staff portal accounts only — excludes customers, dealers, and app-only users. */
 function isStaffAccount(user: any): boolean {
   if (!user) return false;
+  if (isDealerAuthUser(user)) return false;
   return String(user.role ?? '') === 'admin' || Boolean(user.role_id ?? user.roleId);
 }
 
@@ -131,7 +138,10 @@ function isMobileVerified(user: any): boolean {
   return resolveStatus(user) === UserStatus.ACTIVE;
 }
 
-function toPublicUser(user: any) {
+function toPublicUser(
+  user: any,
+  rbac: { roleId: string | null; roleName: string | null; permissions: string[] } = resolveRbacInfo(user),
+) {
   const profileName = user.profiles?.fullName?.trim();
   const userName = typeof user.fullName === 'string' ? user.fullName.trim() : '';
   const fullName = profileName || userName || '';
@@ -146,7 +156,6 @@ function toPublicUser(user: any) {
 
   const status = resolveStatus(user);
   const mobileVerified = isMobileVerified(user);
-  const rbac = resolveRbacInfo(user);
 
   return {
     id: user.id,
@@ -172,7 +181,8 @@ export class AuthService {
     if (!user) {
       throw new NotFoundError('User not found.');
     }
-    return { user: toPublicUser(user) };
+    const rbac = await resolveLoginRbacInfo(user);
+    return { user: toPublicUser(user, rbac) };
   }
 
   /**
@@ -250,6 +260,10 @@ export class AuthService {
       );
     }
 
+    if (isDealerAuthUser(user)) {
+      throw new ForbiddenError('Access denied: use the dealer login');
+    }
+
     const tokens = await this.issueTokenPair(user);
 
     return {
@@ -264,7 +278,7 @@ export class AuthService {
     input: AdminLoginBody,
     context: { ipAddress?: string; userAgent?: string } = {},
   ) {
-    const user = await authRepository.findByIdentifier(input.email);
+    const user = await this.findUserByStaffIdentifier(input.email);
 
     if (!user) {
       throw new UnauthorizedError('Invalid credentials');
@@ -274,7 +288,7 @@ export class AuthService {
     const rbac = await resolveLoginRbacInfo(user);
     const isStaff =
       String(user.role ?? '') === 'admin' || Boolean(user.role_id ?? user.roleId ?? rbac.roleId);
-    if (!isStaff) {
+    if (!isStaff || isDealerAuthUser(user) || isDealerRoleName(rbac.roleName)) {
       throw new ForbiddenError('Access denied: only admin users can log in to the admin portal');
     }
 
@@ -307,12 +321,15 @@ export class AuthService {
       throw new ForbiddenError('Your account has been blocked. Contact support.');
     }
 
-    const token = signAccessToken({
-      sub: user.id,
-      uuid: user.id,
-      email: user.email ?? `${user.phone ?? ''}@loanex.in`,
-      mobile: user.phone ?? '',
-    });
+    const token = signAccessToken(
+      {
+        sub: user.id,
+        uuid: user.id,
+        email: user.email ?? `${user.phone ?? ''}@loanex.in`,
+        mobile: user.phone ?? '',
+      },
+      env.JWT_ADMIN_ACCESS_EXPIRES_IN,
+    );
 
     void auditLogService.log({
       userId: user.id,
@@ -340,6 +357,75 @@ export class AuthService {
         updated_at: user.updated_at,
       },
       message: 'Admin login successful',
+    };
+  }
+
+  /**
+   * Dealer APK login. Customer-style access + refresh tokens.
+   * Rejects customers, employees, and admins.
+   */
+  async dealerLogin(input: LoginBody) {
+    const user = await authRepository.findByIdentifier(input.identifier);
+
+    if (!user) {
+      throw new UnauthorizedError('Invalid credentials');
+    }
+
+    const passwordHash = user.encryptedPassword ?? user.password ?? '';
+    if (!passwordHash) {
+      throw new UnauthorizedError('Invalid credentials');
+    }
+
+    let valid = false;
+    try {
+      valid = await comparePassword(input.password, passwordHash);
+    } catch {
+      throw new UnauthorizedError('Invalid credentials');
+    }
+    if (!valid) {
+      throw new UnauthorizedError('Invalid credentials');
+    }
+
+    const status = resolveStatus(user);
+    if (status === UserStatus.BLOCKED) {
+      throw new ForbiddenError('Your account has been blocked. Contact support.');
+    }
+    if (status !== UserStatus.ACTIVE) {
+      throw new ForbiddenError('Dealer account is not active.');
+    }
+
+    const rbac = await resolveLoginRbacInfo(user);
+    if (!isDealerAuthUser(user) && !isDealerRoleName(rbac.roleName)) {
+      if (isStaffAccount(user)) {
+        throw new ForbiddenError('Access denied: use the admin portal login');
+      }
+      throw new UnauthorizedError('Invalid credentials');
+    }
+
+    await jsonDb.ensureCollection('dealers');
+    const dealer = findLinkedDealerByUserId(user.id);
+    const linkedUserId = String(dealer?.userId ?? dealer?.user_id ?? '').trim();
+    if (!dealer || linkedUserId !== String(user.id).trim()) {
+      throw new ForbiddenError('No dealer profile is linked to this account');
+    }
+    if (String(dealer.status ?? '').toLowerCase() === 'inactive') {
+      throw new ForbiddenError('Dealer account is inactive');
+    }
+    if (!isDealerApproved(dealer)) {
+      throw new ForbiddenError('Dealer account is not approved');
+    }
+
+    const tokens = await this.issueTokenPair(user);
+    const publicUser = toPublicUser(user, rbac);
+
+    return {
+      requiresOtp: false as const,
+      user: {
+        ...publicUser,
+        dealerId: String(dealer.id),
+      },
+      ...tokens,
+      message: 'Dealer login successful',
     };
   }
 
@@ -790,6 +876,61 @@ export class AuthService {
   }
 
   /**
+   * Admin portal identifier: 10-digit mobile, email, or Employee ID.
+   * Does not enforce staff-vs-customer; callers apply that check.
+   */
+  private async findUserByStaffIdentifier(identifier: string): Promise<any | null> {
+    const raw = String(identifier ?? '').trim();
+    if (!raw) return null;
+
+    const mobileCandidate = raw.replace(/\D/g, '');
+    if (/^[6-9]\d{9}$/.test(mobileCandidate)) {
+      return authRepository.findByMobile(mobileCandidate);
+    }
+
+    const byEmail = await authRepository.findByEmail(raw);
+    if (byEmail) return byEmail;
+
+    const byCode = await authRepository.findByEmployeeId(raw);
+    if (byCode) return byCode;
+
+    return this.findUserByEmployeeMasterCode(raw);
+  }
+
+  /** Employee Master fallback when the code is not stored on the user row. */
+  private async findUserByEmployeeMasterCode(code: string): Promise<any | null> {
+    await jsonDb.ensureCollection('employees');
+    const codeKey = code.trim().toLowerCase();
+    if (!codeKey) return null;
+    const employees = jsonDb.findMany('employees', {}) as any[];
+    const employee = employees.find(
+      (row) => String(row.employeeId ?? '').trim().toLowerCase() === codeKey,
+    );
+    if (!employee) return null;
+
+    const linkedUserId = String(employee.userId ?? '').trim();
+    if (linkedUserId) {
+      const linked = await authRepository.findById(linkedUserId);
+      if (linked) return linked;
+    }
+    const empMobile = String(employee.mobile ?? '')
+      .replace(/\D/g, '')
+      .trim();
+    if (/^[6-9]\d{9}$/.test(empMobile)) {
+      const byMobile = await authRepository.findByMobile(empMobile);
+      if (byMobile) return byMobile;
+    }
+    const empEmail = String(employee.email ?? '')
+      .trim()
+      .toLowerCase();
+    if (empEmail) {
+      const byEmail = await authRepository.findByEmail(empEmail);
+      if (byEmail) return byEmail;
+    }
+    return null;
+  }
+
+  /**
    * Resolve a staff portal user from Employee ID or registered mobile.
    * Customers / non-staff matches return null (caller uses generic messaging).
    */
@@ -799,46 +940,12 @@ export class AuthService {
     const raw = String(identifier ?? '').trim();
     if (!raw) return null;
 
-    const mobileCandidate = raw.replace(/\D/g, '');
-    if (/^[6-9]\d{9}$/.test(mobileCandidate)) {
-      const user = await authRepository.findByMobile(mobileCandidate);
-      if (!user || !isStaffAccount(user)) return null;
-      const mobile = String(user.phone ?? mobileCandidate).trim();
-      return mobile ? { user, mobile } : null;
-    }
-
-    // Employee ID path — Employee Master → linked user / mobile.
-    await jsonDb.ensureCollection('employees');
-    const codeKey = raw.toLowerCase();
-    const employees = jsonDb.findMany('employees', {}) as any[];
-    const employee = employees.find(
-      (row) => String(row.employeeId ?? '').trim().toLowerCase() === codeKey,
-    );
-    if (!employee) return null;
-
-    let user: any = null;
-    const linkedUserId = String(employee.userId ?? '').trim();
-    if (linkedUserId) {
-      user = await authRepository.findById(linkedUserId);
-    }
-    const empMobile = String(employee.mobile ?? '')
-      .replace(/\D/g, '')
-      .trim();
-    if (!user && /^[6-9]\d{9}$/.test(empMobile)) {
-      user = await authRepository.findByMobile(empMobile);
-    }
-    const empEmail = String(employee.email ?? '')
-      .trim()
-      .toLowerCase();
-    if (!user && empEmail) {
-      user = await authRepository.findByEmail(empEmail);
-    }
+    const user = await this.findUserByStaffIdentifier(raw);
     if (!user || !isStaffAccount(user)) return null;
 
-    const mobile =
-      String(user.phone ?? '')
-        .replace(/\D/g, '')
-        .trim() || empMobile;
+    const mobile = String(user.phone ?? '')
+      .replace(/\D/g, '')
+      .trim();
     if (!/^[6-9]\d{9}$/.test(mobile)) return null;
     return { user, mobile };
   }

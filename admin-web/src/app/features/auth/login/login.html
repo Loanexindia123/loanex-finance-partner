@@ -38,9 +38,9 @@
             placeholder=" "
             [class.login__input--invalid]="showFieldError('email')"
           />
-          <label for="email">Email</label>
+          <label for="email">Email / Mobile / Employee ID</label>
           @if (showFieldError('email')) {
-            <span class="login__field-error">Email or mobile is required.</span>
+            <span class="login__field-error">Email, mobile, or Employee ID is required.</span>
           }
         </div>
 

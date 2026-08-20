@@ -105,4 +105,5 @@ export function stripClientOwnershipFields(data: Record<string, any>): void {
   delete data.ownerId;
   delete data.userId;
   delete data.employeeId;
+  delete data.dealerId;
 }

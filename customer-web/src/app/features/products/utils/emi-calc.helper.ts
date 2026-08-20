@@ -138,6 +138,8 @@ export function buildEmiPlans(
         months: plan.months,
         monthlyEmi: roundMoney(plan.monthlyEmi as number),
         processingFee: fee,
+        serviceCharge: roundMoney(Math.max(0, plan.serviceCharge || 0)),
+        deliveryCharge: roundMoney(Math.max(0, plan.deliveryCharge || 0)),
         downPayment: roundMoney(plan.downPayment),
         loanAmount: roundMoney(plan.loanAmount as number),
         upfrontPayment: roundMoney(
@@ -161,7 +163,13 @@ export function buildEmiPlans(
       tenureMonths: plan.months,
     });
 
-    return toPlanCard(calc, plan.months, plan.isRecommended);
+    return toPlanCard(
+      calc,
+      plan.months,
+      plan.isRecommended,
+      roundMoney(Math.max(0, plan.serviceCharge || 0)),
+      roundMoney(Math.max(0, plan.deliveryCharge || 0)),
+    );
   });
 }
 
@@ -169,11 +177,15 @@ function toPlanCard(
   calc: EmiCalcResult,
   months: number,
   recommended: boolean,
+  serviceCharge: number,
+  deliveryCharge: number,
 ): EmiPlanCard {
   return {
     months,
     monthlyEmi: calc.monthlyEmi,
     processingFee: calc.processingFee,
+    serviceCharge,
+    deliveryCharge,
     downPayment: calc.downPayment,
     loanAmount: calc.loanAmount,
     upfrontPayment: calc.upfrontPayment,
@@ -193,6 +205,8 @@ export function buildPlanSummary(
     productPrice: roundMoney(productPrice),
     downPayment: plan.downPayment,
     processingFee: plan.processingFee,
+    serviceCharge: plan.serviceCharge,
+    deliveryCharge: plan.deliveryCharge,
     loanAmount: plan.loanAmount,
     monthlyEmi: plan.monthlyEmi,
     upfrontPayment: plan.upfrontPayment,

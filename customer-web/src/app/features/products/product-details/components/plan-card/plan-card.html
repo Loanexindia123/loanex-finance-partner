@@ -17,6 +17,7 @@
     {{ formatInr(item.monthlyEmi) }}
     <small>/month</small>
   </span>
-  <span class="lx-plan__fee">Processing Fee {{ formatInr(item.processingFee) }}</span>
+  <span class="lx-plan__fee">Service Charge {{ formatInr(item.serviceCharge) }}</span>
+  <span class="lx-plan__fee">Delivery Charge {{ formatInr(item.deliveryCharge) }}</span>
   <span class="lx-plan__total">Total Payable {{ formatInr(item.totalPayable) }}</span>
 </button>

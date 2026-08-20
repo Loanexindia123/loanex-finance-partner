@@ -1150,7 +1150,7 @@ export class EmiApplicationService {
       approvedDownPayment,
       monthlyEmi,
       interestRate,
-      processingFee: Number(overrides.processingFee ?? app.processingFee ?? 499),
+      processingFee: Number(overrides.processingFee ?? app.processingFee ?? 0),
       adminRemarks: overrides.adminRemarks ?? 'Approved.',
     };
   }

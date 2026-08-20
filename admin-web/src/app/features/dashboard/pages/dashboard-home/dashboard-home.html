@@ -25,6 +25,7 @@
   <app-branded-loader message="Loading Dashboard..." />
 } @else {
 <section class="kpi-grid" aria-label="Key metrics">
+  @if (canViewProducts()) {
   <article class="kpi-card">
     <div class="kpi-card__top">
       <span class="kpi-card__label">Products</span>
@@ -42,7 +43,9 @@
       <span class="kpi-card__hint">Total products</span>
     }
   </article>
+  }
 
+  @if (canViewCustomers()) {
   <article class="kpi-card">
     <div class="kpi-card__top">
       <span class="kpi-card__label">Customers</span>
@@ -60,7 +63,9 @@
       <span class="kpi-card__hint">Registered customers</span>
     }
   </article>
+  }
 
+  @if (canViewOrders()) {
   <article class="kpi-card">
     <div class="kpi-card__top">
       <span class="kpi-card__label">Orders</span>
@@ -78,7 +83,9 @@
       <span class="kpi-card__hint">Total orders</span>
     }
   </article>
+  }
 
+  @if (canViewEmi()) {
   <article class="kpi-card">
     <div class="kpi-card__top">
       <span class="kpi-card__label">EMI applications</span>
@@ -96,7 +103,9 @@
       <span class="kpi-card__hint">{{ data.pending | number }} pending review</span>
     }
   </article>
+  }
 
+  @if (canViewEmi()) {
   <article class="kpi-card">
     <div class="kpi-card__top">
       <span class="kpi-card__label">Loans</span>
@@ -114,7 +123,9 @@
       <span class="kpi-card__hint">{{ data.active | number }} active</span>
     }
   </article>
+  }
 
+  @if (canViewFi()) {
   <article class="kpi-card">
     <div class="kpi-card__top">
       <span class="kpi-card__label">FI cases</span>
@@ -132,8 +143,10 @@
       <span class="kpi-card__hint">{{ data.pending | number }} pending</span>
     }
   </article>
+  }
 </section>
 
+@if (canViewOrders()) {
 <section class="panel-grid panel-grid--primary">
   <article class="panel">
     <header class="panel__head">
@@ -216,8 +229,11 @@
     }
   </article>
 </section>
+}
 
+@if (canViewEmi() || canViewFi()) {
 <section class="panel-grid panel-grid--donuts" aria-label="Lending and investigation status">
+  @if (canViewEmi()) {
   <article class="panel">
     <header class="panel__head">
       <div>
@@ -239,7 +255,9 @@
       />
     }
   </article>
+  }
 
+  @if (canViewEmi()) {
   <article class="panel">
     <header class="panel__head">
       <div>
@@ -261,7 +279,9 @@
       />
     }
   </article>
+  }
 
+  @if (canViewFi()) {
   <article class="panel">
     <header class="panel__head">
       <div>
@@ -283,9 +303,12 @@
       />
     }
   </article>
+  }
 </section>
+}
 
 <section class="panel-grid panel-grid--secondary">
+  @if (canViewProducts()) {
   <article class="panel">
     <header class="panel__head">
       <div>
@@ -351,7 +374,9 @@
       }
     }
   </article>
+  }
 
+  @if (canViewOrders()) {
   <article class="panel">
     <header class="panel__head">
       <div>
@@ -372,5 +397,6 @@
       />
     }
   </article>
+  }
 </section>
 }

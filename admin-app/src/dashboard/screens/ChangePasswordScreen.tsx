@@ -28,9 +28,10 @@ import { typography } from '../../theme/typography';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChangePassword'>;
 
-export function ChangePasswordScreen({ navigation }: Props) {
+export function ChangePasswordScreen({ navigation, route }: Props) {
   const colors = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const forced = Boolean(route.params?.forced);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -39,12 +40,15 @@ export function ChangePasswordScreen({ navigation }: Props) {
   const [submitting, setSubmitting] = useState(false);
 
   const handleGoBack = useCallback(() => {
+    if (forced) {
+      return;
+    }
     if (navigation.canGoBack()) {
       navigation.goBack();
       return;
     }
     navigation.navigate('Dashboard');
-  }, [navigation]);
+  }, [forced, navigation]);
 
   useFocusEffect(
     useCallback(() => {
@@ -100,9 +104,13 @@ export function ChangePasswordScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
+        {forced ? (
+          <View style={styles.backButton} />
+        ) : (
         <TouchableOpacity onPress={handleGoBack} style={styles.backButton} accessibilityLabel="Back">
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
+        )}
         <Text style={styles.headerTitle}>Change Password</Text>
         <View style={styles.backButton} />
       </View>

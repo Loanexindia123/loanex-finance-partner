@@ -310,6 +310,8 @@ function FilterModal({
     { label: 'All Products', value: 'all' },
     { label: 'Active', value: 'active' },
     { label: 'Draft', value: 'draft' },
+    { label: 'Pending Approval', value: 'pending_approval' },
+    { label: 'Rejected', value: 'rejected' },
     { label: 'Out of Stock', value: 'out_of_stock' },
     { label: 'Archived', value: 'archived' },
   ];

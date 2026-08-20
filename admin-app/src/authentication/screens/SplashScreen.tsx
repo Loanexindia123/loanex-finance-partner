@@ -35,7 +35,11 @@ export function SplashScreen({ navigation }: Props) {
                 ? fresh.permissions
                 : storedUser.permissions ?? [],
           });
-          navigation.replace('Dashboard');
+          if (fresh.mustChangePassword) {
+            navigation.replace('ChangePassword', { forced: true });
+          } else {
+            navigation.replace('Dashboard');
+          }
           return;
         } catch {
           if (cancelled) return;

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { resolveProductStockForWrite } from '../utils/product-stock';
 
 export const listProductsQuerySchema = z.object({
   search: z.string().trim().optional(),
@@ -71,7 +72,7 @@ export const createProductBodySchema = z
     galleryImages: z.array(z.string()).optional(),
     price: z.coerce.number().min(0),
     mrp: z.coerce.number().min(0).optional(),
-    stock: z.coerce.number().int().min(0).optional(),
+    stock: z.union([z.number(), z.string(), z.null()]).optional(),
     status: z
       .enum([
         'active',
@@ -98,6 +99,16 @@ export const createProductBodySchema = z
     keywords: z.union([z.string(), z.array(z.string())]).optional(),
     wizardData: z.any().optional(),
   })
-  .passthrough();
+  .passthrough()
+  .superRefine((data, ctx) => {
+    const result = resolveProductStockForWrite(data, 'create');
+    if (result.ok === false) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: result.message,
+        path: ['stock'],
+      });
+    }
+  });
 
 export type CreateProductBody = z.infer<typeof createProductBodySchema>;

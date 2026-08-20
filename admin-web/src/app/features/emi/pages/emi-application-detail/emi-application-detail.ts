@@ -353,7 +353,7 @@ export class EmiApplicationDetail {
       approvedTenure: String(application.tenure ?? ''),
       approvedDownPayment: String(application.downPayment ?? ''),
       interestRate: String(application.interestRate ?? 18),
-      processingFee: String(application.processingFee ?? 499),
+      processingFee: String(application.processingFee ?? 0),
       adminRemarks: prev.adminRemarks || '',
     }));
   }

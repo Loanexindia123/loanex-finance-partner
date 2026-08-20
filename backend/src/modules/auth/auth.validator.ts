@@ -1,6 +1,7 @@
 export {
   registerBodySchema,
   loginBodySchema,
+  dealerLoginBodySchema,
   adminLoginBodySchema,
   sendOtpBodySchema,
   verifyOtpBodySchema,

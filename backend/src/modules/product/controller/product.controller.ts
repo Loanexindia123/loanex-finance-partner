@@ -14,11 +14,12 @@ import type {
 
 import { productService } from '../service/product.service';
 import { storeProductImage, streamProductImage } from '../service/product-image.service';
-import { isEmployeeUser } from '../utils/product-emi';
+import { isDealerUser, isEmployeeUser, isRestrictedCatalogUser } from '../utils/product-emi';
 
 async function canViewHiddenProducts(req: AuthenticatedRequest): Promise<boolean> {
   const userId = req.user?.sub;
   if (!userId) return false;
+  if (isDealerUser(userId) || isEmployeeUser(userId)) return true;
   try {
     const permissions = await rolesService.resolveUserPermissions(userId);
     return permissions.some(
@@ -33,14 +34,14 @@ async function canViewHiddenProducts(req: AuthenticatedRequest): Promise<boolean
   }
 }
 
-/** Employees may save for approval but cannot publish/approve products. */
+/** Employees and Dealers may save for approval but cannot publish/approve products. */
 function assertEmployeeCannotPublish(userId: string | undefined, status: unknown): void {
   if (!userId) return;
   const next = String(status ?? '').trim().toLowerCase();
   if (next !== 'active') return;
-  if (isEmployeeUser(userId)) {
+  if (isRestrictedCatalogUser(userId)) {
     throw new ForbiddenError(
-      'Employees cannot publish products. Save for approval and wait for an admin to approve.',
+      'You cannot publish products. Save for approval and wait for an admin to approve.',
     );
   }
 }
@@ -119,13 +120,15 @@ export class ProductController {
       throw new ForbiddenError('Not authorized for this action');
     }
     const permissions = await rolesService.resolveUserPermissions(userId);
-    const canUpload = permissions.some(
-      (p) =>
-        p === 'products.create' ||
-        p === 'products.edit' ||
-        p === 'masters.create' ||
-        p === 'masters.edit',
-    );
+    const canUpload =
+      isDealerUser(userId) ||
+      permissions.some(
+        (p) =>
+          p === 'products.create' ||
+          p === 'products.edit' ||
+          p === 'masters.create' ||
+          p === 'masters.edit',
+      );
     if (!canUpload) {
       throw new ForbiddenError('You do not have permission to perform this action');
     }

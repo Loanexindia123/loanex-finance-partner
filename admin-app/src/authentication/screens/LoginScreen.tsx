@@ -30,18 +30,22 @@ export function LoginScreen({ navigation }: Props) {
   const handleLogin = async () => {
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
-      setError('Please enter both Email/Mobile and Password');
+      setError('Please enter Email, Mobile, or Employee ID and Password');
       return;
     }
 
     try {
-      const { loginAsAdmin } = require('../../services/authService');
-      const user = await loginAsAdmin(trimmedEmail, password);
+      const { loginAsStaff } = require('../../services/authService');
+      const user = await loginAsStaff(trimmedEmail, password);
       const { setRbacUser } = require('../../auth/rbacStore');
       setRbacUser(user);
 
       setError('');
-      navigation.replace('Dashboard');
+      if (user.mustChangePassword) {
+        navigation.replace('ChangePassword', { forced: true });
+      } else {
+        navigation.replace('Dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Invalid Credentials');
     }
@@ -70,13 +74,13 @@ export function LoginScreen({ navigation }: Props) {
               </Text>
 
               <AuthInput
-                label="Email / Mobile Number"
+                label="Email / Mobile / Employee ID"
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
                   if (error) setError('');
                 }}
-                placeholder="admin@loanex.com"
+                placeholder="email, mobile, or EMP-…"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}

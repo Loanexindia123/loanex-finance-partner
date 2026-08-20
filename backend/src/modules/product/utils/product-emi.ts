@@ -1,5 +1,6 @@
 import { BadRequestError } from '../../../common/errors/app-error';
 import { jsonDb } from '../../../config/json-db';
+import { isDealerUserId } from '../../admin/dealer/dealer-account';
 
 /** Catalog EMI columns on `products`. Not loan/application EMI. */
 export const PRODUCT_EMI_COLUMN_KEYS = [
@@ -40,6 +41,15 @@ export function isEmployeeUser(userId: string | undefined): boolean {
   if (!roleId) return false;
   const role = jsonDb.findOne('roles', { id: roleId }) as any;
   return String(role?.name ?? '').trim().toLowerCase() === 'employee';
+}
+
+export function isDealerUser(userId: string | undefined): boolean {
+  return isDealerUserId(userId);
+}
+
+/** Employee and Dealer share catalog restrictions: no EMI config, no publish. */
+export function isRestrictedCatalogUser(userId: string | undefined): boolean {
+  return isEmployeeUser(userId) || isDealerUser(userId);
 }
 
 function isUsableCatalogEmiPlan(plan: any): boolean {

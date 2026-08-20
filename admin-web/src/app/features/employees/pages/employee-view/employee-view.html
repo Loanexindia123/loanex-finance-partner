@@ -35,6 +35,12 @@
         <div><dt>Onboarded By</dt><dd>{{ display(emp.onboardedBy) }}</dd></div>
         <div><dt>Employee ID</dt><dd>{{ display(emp.employeeId) }}</dd></div>
         <div><dt>Onboarding Date</dt><dd>{{ display(emp.onboardingDate) }}</dd></div>
+        @if (emp.formStatus === 'approved') {
+          <div>
+            <dt>Portal login</dt>
+            <dd>Admin portal — Employee ID, email, or 10-digit mobile. First sign-in requires a password change.</dd>
+          </div>
+        }
       </dl>
     </section>
 

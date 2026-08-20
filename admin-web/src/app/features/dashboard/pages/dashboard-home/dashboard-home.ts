@@ -14,6 +14,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable } from 'rxjs';
 import { ButtonModule } from 'primeng/button';
 import { SkeletonModule } from 'primeng/skeleton';
+import { RbacService } from '../../../../core/services/rbac.service';
 import { StatusBadge } from '../../../../shared/components/status-badge/status-badge';
 import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
 import {
@@ -51,8 +52,15 @@ const COLORS = {
 })
 export class DashboardHome {
   private readonly dashboard = inject(DashboardService);
+  private readonly rbac = inject(RbacService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+
+  readonly canViewProducts = computed(() => this.rbac.can('products.view'));
+  readonly canViewOrders = computed(() => this.rbac.can('orders.view'));
+  readonly canViewCustomers = computed(() => this.rbac.canAny('users.view', 'customers.view'));
+  readonly canViewEmi = computed(() => this.rbac.can('emi.view'));
+  readonly canViewFi = computed(() => this.rbac.can('fi.view'));
 
   readonly today = new Date();
   readonly refreshing = signal(false);
@@ -78,14 +86,19 @@ export class DashboardHome {
 
   load(): void {
     const requestId = ++this.requestId;
-    this.pending = 6;
+    this.pending = 0;
     this.refreshing.set(true);
-    this.bind(requestId, this.dashboard.loadProducts(), this.products);
-    this.bind(requestId, this.dashboard.loadOrders(), this.orders);
-    this.bind(requestId, this.dashboard.loadCustomers(), this.customers);
-    this.bind(requestId, this.dashboard.loadEmi(), this.emi);
-    this.bind(requestId, this.dashboard.loadLoans(), this.loans);
-    this.bind(requestId, this.dashboard.loadFi(), this.fi);
+
+    this.loadWidget(requestId, this.canViewProducts(), this.dashboard.loadProducts(), this.products);
+    this.loadWidget(requestId, this.canViewOrders(), this.dashboard.loadOrders(), this.orders);
+    this.loadWidget(requestId, this.canViewCustomers(), this.dashboard.loadCustomers(), this.customers);
+    this.loadWidget(requestId, this.canViewEmi(), this.dashboard.loadEmi(), this.emi);
+    this.loadWidget(requestId, this.canViewEmi(), this.dashboard.loadLoans(), this.loans);
+    this.loadWidget(requestId, this.canViewFi(), this.dashboard.loadFi(), this.fi);
+
+    if (this.pending === 0) {
+      this.refreshing.set(false);
+    }
   }
 
   goTo(path: string): void {
@@ -151,6 +164,20 @@ export class DashboardHome {
 
   private optionalSlices(slices: DonutSlice[]): DonutSlice[] {
     return slices.filter((slice) => slice.key !== 'other' || slice.count > 0);
+  }
+
+  private loadWidget<T>(
+    requestId: number,
+    allowed: boolean,
+    source: Observable<T>,
+    target: WritableSignal<WidgetState<T>>,
+  ): void {
+    if (!allowed) {
+      target.set({ loading: false, error: null, data: null });
+      return;
+    }
+    this.pending += 1;
+    this.bind(requestId, source, target);
   }
 
   private bind<T>(

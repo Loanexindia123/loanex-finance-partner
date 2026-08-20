@@ -16,11 +16,11 @@ import {
 } from '../components/GlobalSearchResults';
 import { ProfileMenu } from '../components/ProfileMenu';
 import { quickActions } from '../data/quickActions';
-import { getDashboardStats, DashboardStats } from '../../services/dashboardService';
+import { getDashboardStats, getDealerDashboardStats, DashboardStats } from '../../services/dashboardService';
 import { loadNotifications } from '../data/notificationStore';
 import { useTheme } from '../../theme/useTheme';
 import { authCardStyle, spacing } from '../../theme/spacing';
-import { useRbac, can, clearRbac } from '../../auth/rbacStore';
+import { useRbac, can, clearRbac, isDealer } from '../../auth/rbacStore';
 import { logout as apiLogout } from '../../services/authService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
@@ -29,6 +29,7 @@ export function DashboardScreen({ navigation }: Props) {
   const colors = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   useRbac();
+  const dealerMode = isDealer();
   const [searchQuery, setSearchQuery] = useState('');
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -38,7 +39,7 @@ export function DashboardScreen({ navigation }: Props) {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        const data = await getDashboardStats();
+        const data = isDealer() ? await getDealerDashboardStats() : await getDashboardStats();
         setStats(data);
       } catch (err) {
         console.warn('Dashboard fetch error', err);
@@ -97,16 +98,18 @@ export function DashboardScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <DashboardAppBar
-        onNotificationsPress={() => navigation.navigate('Notifications')}
+        onNotificationsPress={dealerMode ? undefined : () => navigation.navigate('Notifications')}
         onProfilePress={() => setProfileMenuVisible(true)}
       />
 
       <View style={styles.body}>
+        {!dealerMode ? (
         <View style={styles.searchWrap}>
           <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
         </View>
+        ) : null}
 
-        {isSearching ? (
+        {isSearching && !dealerMode ? (
           <View style={styles.searchResults}>
             <GlobalSearchResults query={searchQuery} onSelect={handleSearchSelect} />
           </View>
@@ -118,10 +121,22 @@ export function DashboardScreen({ navigation }: Props) {
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.summaryGrid}>
-              <SummaryCard title="Total Revenue" value={`₹${stats?.totalRevenue?.toLocaleString('en-IN') || 0}`} icon="cash-outline" />
-              <SummaryCard title="Pending Orders" value={String(stats?.pendingOrders || 0)} icon="cart-outline" />
-              <SummaryCard title="Pending EMI" value={String(stats?.pendingEmiApplications || 0)} icon="document-text-outline" />
-              <SummaryCard title="Total Products" value={String(stats?.totalProducts || 0)} icon="cube-outline" />
+              {dealerMode ? (
+                <>
+                  <SummaryCard title="Total Products" value={String(stats?.totalProducts || 0)} icon="cube-outline" />
+                  <SummaryCard title="Draft" value={String(stats?.draftProducts || 0)} icon="document-outline" />
+                  <SummaryCard title="Pending Approval" value={String(stats?.pendingApprovalProducts || 0)} icon="time-outline" />
+                  <SummaryCard title="Approved" value={String(stats?.approvedProducts || 0)} icon="checkmark-circle-outline" />
+                  <SummaryCard title="Rejected" value={String(stats?.rejectedProducts || 0)} icon="close-circle-outline" />
+                </>
+              ) : (
+                <>
+                  <SummaryCard title="Total Revenue" value={`₹${stats?.totalRevenue?.toLocaleString('en-IN') || 0}`} icon="cash-outline" />
+                  <SummaryCard title="Pending Orders" value={String(stats?.pendingOrders || 0)} icon="cart-outline" />
+                  <SummaryCard title="Pending EMI" value={String(stats?.pendingEmiApplications || 0)} icon="document-text-outline" />
+                  <SummaryCard title="Total Products" value={String(stats?.totalProducts || 0)} icon="cube-outline" />
+                </>
+              )}
             </View>
 
             <View style={styles.section}>
@@ -182,6 +197,7 @@ export function DashboardScreen({ navigation }: Props) {
               </View>
             </View>
 
+            {dealerMode ? null : (
             <View style={styles.sectionCard}>
               <SectionHeader title="Recent Activity" />
               {stats?.recentOrders?.length ? (
@@ -199,6 +215,7 @@ export function DashboardScreen({ navigation }: Props) {
                 <Text style={{ color: colors.textSecondary, marginTop: spacing.sm }}>No recent activity.</Text>
               )}
             </View>
+            )}
           </ScrollView>
         )}
       </View>

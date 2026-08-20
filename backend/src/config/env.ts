@@ -47,6 +47,12 @@ const envSchema = z.object({
   JWT_ACCESS_SECRET: z.string().min(16),
   JWT_REFRESH_SECRET: z.string().min(16),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
+  /**
+   * Admin-portal access tokens only (admin-login). Customer tokens keep
+   * JWT_ACCESS_EXPIRES_IN. Admin has no refresh token, and product create
+   * is a long wizard — 15m is too short and 401s the interceptor logout.
+   */
+  JWT_ADMIN_ACCESS_EXPIRES_IN: z.string().default('8h'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   CORS_ORIGINS: z
     .string()

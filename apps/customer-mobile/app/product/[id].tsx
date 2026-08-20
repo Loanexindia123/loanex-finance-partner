@@ -445,8 +445,12 @@ export default function ProductDetailScreen() {
                   <Text style={[s.sumVal, { color: Colors.primary, fontWeight: Fonts.bold }]}>₹{(activePlan.downPaymentAmount ?? activePlan.downPayment).toLocaleString('en-IN')}</Text>
                 </View>
                 <View style={s.sumRow}>
-                  <Text style={s.sumLabel}>Processing Fee (Upfront)</Text>
-                  <Text style={s.sumVal}>₹{(activePlan.processingFee ?? ((activePlan.serviceCharge || 0) + (activePlan.deliveryCharge || 0))).toLocaleString('en-IN')}</Text>
+                  <Text style={s.sumLabel}>Service Charge</Text>
+                  <Text style={s.sumVal}>₹{Number(activePlan.serviceCharge || 0).toLocaleString('en-IN')}</Text>
+                </View>
+                <View style={s.sumRow}>
+                  <Text style={s.sumLabel}>Delivery Charge</Text>
+                  <Text style={s.sumVal}>₹{Number(activePlan.deliveryCharge || 0).toLocaleString('en-IN')}</Text>
                 </View>
                 <View style={s.sumRow}>
                   <Text style={s.sumLabel}>Loan Amount</Text>

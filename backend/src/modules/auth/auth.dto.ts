@@ -54,8 +54,14 @@ export const loginBodySchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+export const dealerLoginBodySchema = loginBodySchema;
+
 export const adminLoginBodySchema = z.object({
-  email: z.string().trim().min(1, 'Email or mobile is required').max(255),
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Email, mobile, or Employee ID is required')
+    .max(255),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -128,6 +134,7 @@ export const logoutBodySchema = z.object({
 
 export type RegisterBody = z.infer<typeof registerBodySchema>;
 export type LoginBody = z.infer<typeof loginBodySchema>;
+export type DealerLoginBody = z.infer<typeof dealerLoginBodySchema>;
 export type AdminLoginBody = z.infer<typeof adminLoginBodySchema>;
 export type SendOtpBody = z.infer<typeof sendOtpBodySchema>;
 export type VerifyOtpBody = z.infer<typeof verifyOtpBodySchema>;

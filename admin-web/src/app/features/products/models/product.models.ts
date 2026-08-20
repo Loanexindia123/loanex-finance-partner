@@ -106,7 +106,7 @@ export function createEmptyVariant(
     mrp: defaults.mrp || '',
     sellingPrice: defaults.sellingPrice || '',
     purchasePrice: defaults.purchasePrice || '',
-    stock: defaults.stock || '0',
+    stock: defaults.stock ?? '',
     description: '',
     specifications: [],
     features: [],

@@ -128,7 +128,7 @@ export function EmiApplicationDetailsScreen({ navigation, route }: Props) {
         approvedTenure: String(application.tenure ?? ''),
         approvedDownPayment: String(application.downPayment ?? ''),
         interestRate: String((application as any).interestRate ?? 18),
-        processingFee: String((application as any).processingFee ?? 499),
+        processingFee: String((application as any).processingFee ?? 0),
         adminRemarks: prev.adminRemarks || '',
       }));
     }

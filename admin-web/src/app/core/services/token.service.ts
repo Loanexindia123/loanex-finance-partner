@@ -49,7 +49,9 @@ export class TokenService {
     if (!token) return false;
     const exp = this.readJwtExp(token);
     if (exp == null) return true;
-    return exp * 1000 > Date.now() + 30_000;
+    // 2s skew only — a 30s buffer was kicking staff to /login after a
+    // successful Save for Approval when the 15m access token was nearly expired.
+    return exp * 1000 > Date.now() + 2_000;
   }
 
   private readJwtExp(token: string): number | null {

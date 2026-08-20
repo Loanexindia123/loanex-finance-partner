@@ -38,6 +38,18 @@ import { BranchMasterScreen } from '../settings/screens/BranchMasterScreen';
 import { PincodeMasterScreen } from '../settings/screens/PincodeMasterScreen';
 import { CodSettingsScreen } from '../settings/screens/CodSettingsScreen';
 import { RootStackParamList } from './types';
+import { isDealer } from '../auth/rbacStore';
+
+const DEALER_ALLOWED_ROUTES = new Set<keyof RootStackParamList>([
+  'Splash',
+  'Login',
+  'Dashboard',
+  'ProductList',
+  'AddProduct',
+  'ProductDetails',
+  'ChangePassword',
+  'MyProfile',
+]);
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -50,6 +62,17 @@ export function AppNavigator() {
     const unsubscribe = onSessionExpired(() => {
       if (navigationRef.isReady()) {
         navigationRef.reset({ index: 0, routes: [{ name: 'Login' }] });
+      }
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = navigationRef.addListener('state', () => {
+      if (!navigationRef.isReady() || !isDealer()) return;
+      const routeName = navigationRef.getCurrentRoute()?.name as keyof RootStackParamList | undefined;
+      if (routeName && !DEALER_ALLOWED_ROUTES.has(routeName)) {
+        navigationRef.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
       }
     });
     return unsubscribe;

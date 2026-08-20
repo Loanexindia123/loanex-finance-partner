@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { jsonDb } from '../../../config/json-db';
 import { hasOrgWideEmployeeAccess } from '../employee/employee-hierarchy';
 import type { CreateDealerBody, UpdateDealerBody } from './dealer.validator';
+import { isDealerApproved, isDealerAuthUser, provisionDealerAccount } from './dealer-account';
 
 const COLLECTION = 'dealers';
 
@@ -60,6 +61,8 @@ export interface DealerRecord {
   commission: number;
   dealerBranch: string;
   paymentSettlementTerms: string;
+  /** Linked dealer login user id. Distinct from creatorId (staff owner). */
+  userId: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -157,6 +160,7 @@ function buildRecord(row: any): DealerRecord {
     commission,
     dealerBranch: branch,
     paymentSettlementTerms,
+    userId: String(row.userId ?? row.user_id ?? '').trim(),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -225,6 +229,7 @@ function bodyToPayload(body: CreateDealerBody | UpdateDealerBody): Omit<DealerRe
     commission: body.commission ?? 0,
     dealerBranch: branch,
     paymentSettlementTerms,
+    userId: '',
   };
 }
 
@@ -321,6 +326,10 @@ export class DealerService {
 
   async create(body: CreateDealerBody, actorUserId: string): Promise<DealerRecord> {
     await ensureReady();
+    const actorUser = jsonDb.findOne('users', { id: actorUserId }) as any;
+    if (isDealerAuthUser(actorUser)) {
+      throw new ForbiddenError('Dealers cannot create dealer accounts');
+    }
     if (findDuplicateCode(body.dealerCode)) {
       throw new ConflictError('Dealer Code already exists');
     }
@@ -340,7 +349,7 @@ export class DealerService {
     }
 
     const created = jsonDb.insert(COLLECTION, payload);
-    return buildRecord(created);
+    return this.afterPersist(buildRecord(created));
   }
 
   async update(id: string, body: UpdateDealerBody, actorUserId: string): Promise<DealerRecord> {
@@ -368,12 +377,30 @@ export class DealerService {
     updates.creatorId = existingRecord.creatorId;
     updates.creatorName = existingRecord.creatorName;
     updates.creatorType = existingRecord.creatorType || updates.creatorType;
+    // Never trust client userId — only provisioner may set it.
+    updates.userId = existingRecord.userId;
 
     const updated = jsonDb.update(COLLECTION, { id: trimmed }, updates);
     if (!updated) {
       throw new NotFoundError('Dealer not found');
     }
-    return buildRecord(updated);
+    return this.afterPersist(buildRecord(updated));
+  }
+
+  /** After save: when approved, create/link dealer login and persist userId. */
+  private async afterPersist(record: DealerRecord): Promise<DealerRecord> {
+    if (!isDealerApproved(record)) {
+      return record;
+    }
+    const result = await provisionDealerAccount(record);
+    if (!result?.userId) {
+      throw new BadRequestError('Dealer login account could not be created');
+    }
+    if (record.userId === result.userId) {
+      return record;
+    }
+    const linked = jsonDb.update(COLLECTION, { id: record.id }, { userId: result.userId });
+    return linked ? buildRecord(linked) : { ...record, userId: result.userId };
   }
 
   async delete(id: string, actorUserId: string): Promise<{ deleted: true; id: string }> {

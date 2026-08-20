@@ -7,6 +7,8 @@ import { radius, spacing } from '../../theme/spacing';
 const STATUS_CONFIG: Record<ProductStatus, { label: string; bg: string; text: string }> = {
   active: { label: 'Active', bg: colors.successLight, text: colors.success },
   draft: { label: 'Draft', bg: colors.warningLight, text: colors.warning },
+  pending_approval: { label: 'Pending Approval', bg: colors.warningLight, text: colors.warning },
+  rejected: { label: 'Rejected', bg: colors.dangerLight, text: colors.danger },
   out_of_stock: { label: 'Out of Stock', bg: colors.dangerLight, text: colors.danger },
   archived: { label: 'Archived', bg: colors.borderLight, text: colors.textSecondary },
 };

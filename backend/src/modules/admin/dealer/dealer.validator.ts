@@ -71,7 +71,6 @@ const requiredWhenNotDraft = [
   ['googleLocation', 'Google Location'],
   ['deliveryArea', 'Delivery Area'],
   ['panCard', 'PAN Card'],
-  ['ownerAadhaar', 'Owner Aadhaar'],
   ['shopAddressProof', 'Shop Address Proof'],
   ['cancelledCheque', 'Cancelled Cheque'],
   ['shopPhotos', 'Shop Photos'],

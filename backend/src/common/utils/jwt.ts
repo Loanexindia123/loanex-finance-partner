@@ -32,9 +32,12 @@ export interface OtpChallengePayload {
   lastSentAt: number;
 }
 
-export function signAccessToken(payload: Omit<AccessTokenPayload, 'type'>): string {
+export function signAccessToken(
+  payload: Omit<AccessTokenPayload, 'type'>,
+  expiresIn: string = env.JWT_ACCESS_EXPIRES_IN,
+): string {
   const options: SignOptions = {
-    expiresIn: env.JWT_ACCESS_EXPIRES_IN as SignOptions['expiresIn'],
+    expiresIn: expiresIn as SignOptions['expiresIn'],
   };
 
   return jwt.sign(

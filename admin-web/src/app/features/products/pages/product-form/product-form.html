@@ -257,14 +257,32 @@
                   scrollHeight="240px"
                 />
               </div>
+              <div class="field" [class.field--invalid]="invalid('availableStock')">
+                <label for="availableStock">Stock Quantity <span class="req">*</span></label>
+                <p-inputNumber
+                  inputId="availableStock"
+                  formControlName="availableStock"
+                  [min]="0"
+                  [maxFractionDigits]="0"
+                  [useGrouping]="false"
+                  [showClear]="true"
+                  placeholder="10"
+                />
+                <small class="field-hint">Enter the quantity currently available for sale.</small>
+                @if (invalid('availableStock')) {
+                  <small class="field-error">
+                    {{ form.get('availableStock')!.hasError('required') ? 'Stock quantity is required.' : 'Stock quantity must be an integer of 0 or more.' }}
+                  </small>
+                }
+              </div>
             </div>
             <div class="field">
               <label for="shortDescription">Short Description</label>
               <input id="shortDescription" pInputText formControlName="shortDescription" maxlength="160" placeholder="Brief product summary (max 160 chars)" />
             </div>
             <div class="field">
-              <label for="description">Description</label>
-              <textarea id="description" pTextarea formControlName="description" rows="5" placeholder="Detailed product description..."></textarea>
+              <label for="description">Overview</label>
+              <textarea id="description" pTextarea formControlName="description" rows="5" placeholder="Enter product overview..."></textarea>
             </div>
 
             <div class="grid-2">
@@ -583,7 +601,10 @@
                         </div>
                         <div class="field">
                           <label>Stock</label>
-                          <input pInputText formControlName="stock" placeholder="0" />
+                          <input pInputText formControlName="stock" placeholder="0" inputmode="numeric" />
+                          @if (asGroup(ctrl).get('stock')!.invalid && (asGroup(ctrl).get('stock')!.touched || asGroup(ctrl).get('stock')!.dirty)) {
+                            <small class="field-error">Enter a whole number of 0 or more.</small>
+                          }
                         </div>
                         <div class="entity-row__actions">
                           <span class="pill" [class.pill--ok]="asGroup(ctrl).get('saved')!.value" [class.pill--draft]="!asGroup(ctrl).get('saved')!.value">
@@ -1543,6 +1564,8 @@
                   <section class="section-card calc-card">
                     <h3>Auto Calculated Preview</h3>
                     <dl>
+                      <div><dt>Service Charge</dt><dd>{{ inr(plan.serviceCharge || 0) }}</dd></div>
+                      <div><dt>Delivery Charge</dt><dd>{{ inr(plan.deliveryCharge || 0) }}</dd></div>
                       <div><dt>EMI Principal</dt><dd>{{ inr(emiModalCalcs()!.loanAmount) }}</dd></div>
                       <div><dt>Monthly EMI</dt><dd>{{ plan.months ? inr(emiModalCalcs()!.monthlyEmi) : '—' }}</dd></div>
                       <div><dt>Down Payment (Upfront)</dt><dd>{{ inr(emiModalCalcs()!.upfrontPayment) }}</dd></div>
@@ -1617,6 +1640,8 @@
                     <dl>
                       <div><dt>Plan</dt><dd>{{ selectedEmi()!.planName || selectedEmi()!.months + ' months' }}</dd></div>
                       <div><dt>Down Payment</dt><dd>{{ money(selectedEmi()!.downPayment) }}</dd></div>
+                      <div><dt>Service Charge</dt><dd>{{ inr(selectedEmi()!.serviceCharge || 0) }}</dd></div>
+                      <div><dt>Delivery Charge</dt><dd>{{ inr(selectedEmi()!.deliveryCharge || 0) }}</dd></div>
                       <div><dt>EMI Principal</dt><dd>{{ inr(emi.loanAmount) }}</dd></div>
                       <div><dt>Monthly EMI</dt><dd>{{ inr(emi.monthlyEmi) }}</dd></div>
                       <div><dt>Total Payable</dt><dd>{{ inr(emi.totalPayable) }}</dd></div>
@@ -1658,6 +1683,7 @@
                   <div><dt>Dealer</dt><dd>{{ display(selectedDealer(0)?.dealerName) }}</dd></div>
                   <div><dt>Colour / Size / Variant</dt><dd>{{ display(form.get('colourSizeVariant')!.value) }}</dd></div>
                   <div><dt>Product Video URL</dt><dd>{{ display(form.get('productVideoUrl')!.value) }}</dd></div>
+                  <div><dt>Stock Quantity</dt><dd>{{ display(form.get('availableStock')!.value) }}</dd></div>
                   <div><dt>Serial/IMEI Tracking</dt><dd>{{ display(form.get('serialImeiTracking')!.value) }}</dd></div>
                   <div><dt>Specifications</dt><dd>{{ specificationsArr.length }} items</dd></div>
                   <div><dt>About this item</dt><dd>{{ aboutThisItemArr.length }} items</dd></div>
@@ -1968,7 +1994,7 @@
         <header><h3>Descriptions</h3></header>
         <dl>
           <div><dt>Short description</dt><dd>{{ display(form.get('shortDescription')!.value) }}</dd></div>
-          <div><dt>Description</dt><dd>{{ display(form.get('description')!.value) }}</dd></div>
+          <div><dt>Overview</dt><dd>{{ display(form.get('description')!.value) }}</dd></div>
           <div><dt>Product video</dt><dd>{{ display(form.get('productVideoUrl')!.value) }}</dd></div>
         </dl>
       </section>

@@ -178,6 +178,10 @@ export interface EmiPlanCard {
   monthlyEmi: number;
   /** Service/convenience (+ delivery); included in EMI principal */
   processingFee: number;
+  /** Plan service charge only — do not display delivery under this label. */
+  serviceCharge: number;
+  /** Plan delivery charge only. */
+  deliveryCharge: number;
   downPayment: number;
   /** Sale − DP + Processing Fee (Amount Converted into EMI) */
   loanAmount: number;
@@ -196,6 +200,8 @@ export interface EmiPlanSummary {
   productPrice: number;
   downPayment: number;
   processingFee: number;
+  serviceCharge: number;
+  deliveryCharge: number;
   loanAmount: number;
   monthlyEmi: number;
   upfrontPayment: number;

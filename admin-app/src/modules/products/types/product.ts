@@ -1,4 +1,4 @@
-export type ProductStatus = 'active' | 'draft' | 'out_of_stock' | 'archived';
+export type ProductStatus = 'active' | 'draft' | 'pending_approval' | 'rejected' | 'out_of_stock' | 'archived';
 export type CustomerVisibility = 'visible' | 'hidden';
 
 export interface EMIPlan {

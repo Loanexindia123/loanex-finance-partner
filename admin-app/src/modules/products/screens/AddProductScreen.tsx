@@ -57,7 +57,9 @@ const STEP_COMPONENTS = [
 function AddProductContent({ navigation, route }: Props) {
   const { currentStep, setCurrentStep, resetForm, formData, updateForm } = useWizard();
   const { roleName } = useRbac();
-  const isEmployee = String(roleName ?? '').trim().toLowerCase() === 'employee';
+  const roleKey = String(roleName ?? '').trim().toLowerCase();
+  const isEmployee = roleKey === 'employee';
+  const isRestrictedCreator = isEmployee || roleKey === 'dealer';
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const isEditMode = route.params?.mode === 'edit';
   const productId = route.params?.productId;
@@ -65,11 +67,11 @@ function AddProductContent({ navigation, route }: Props) {
   const [savingDraft, setSavingDraft] = useState(false);
   const [productStatus, setProductStatus] = useState('');
   const EMI_STEP = 9;
-  const visibleSteps = isEmployee ? WIZARD_STEPS.filter((step) => step !== 'EMI') : WIZARD_STEPS;
+  const visibleSteps = isRestrictedCreator ? WIZARD_STEPS.filter((step) => step !== 'EMI') : WIZARD_STEPS;
   const displayStep =
-    isEmployee && currentStep > EMI_STEP ? currentStep - 1 : currentStep;
+    isRestrictedCreator && currentStep > EMI_STEP ? currentStep - 1 : currentStep;
   const showSaveForApproval =
-    isEmployee &&
+    isRestrictedCreator &&
     (!isEditMode ||
       ['draft', 'rejected', 'pending_approval', ''].includes(String(productStatus).toLowerCase()));
 
@@ -179,14 +181,14 @@ function AddProductContent({ navigation, route }: Props) {
   const goNext = () => {
     if (currentStep >= WIZARD_STEPS.length) return;
     let next = currentStep + 1;
-    if (isEmployee && next === EMI_STEP) next += 1;
+    if (isRestrictedCreator && next === EMI_STEP) next += 1;
     if (next <= WIZARD_STEPS.length) animateStep(next);
   };
 
   const goPrev = () => {
     if (currentStep <= 1) return;
     let prev = currentStep - 1;
-    if (isEmployee && prev === EMI_STEP) prev -= 1;
+    if (isRestrictedCreator && prev === EMI_STEP) prev -= 1;
     if (prev >= 1) animateStep(prev);
   };
 
@@ -222,12 +224,12 @@ function AddProductContent({ navigation, route }: Props) {
     price: parseFloat(formData.sellingPrice) || 0,
     mrp: parseFloat(formData.mrp) || 0,
     stock: parseInt(formData.availableStock, 10) || 0,
-    status: isEmployee && status === 'active' ? 'pending_approval' : status,
-    emiAvailable: isEmployee ? false : formData.emiEnabled,
+    status: isRestrictedCreator && status === 'active' ? 'pending_approval' : status,
+    emiAvailable: isRestrictedCreator ? false : formData.emiEnabled,
     warranty: formData.warranty,
     hsnCode: formData.hsnCode,
     manufacturer: formData.manufacturer,
-    wizardData: isEmployee
+    wizardData: isRestrictedCreator
       ? {
           ...formData,
           emiEnabled: isEditMode ? formData.emiEnabled : false,
@@ -254,7 +256,7 @@ function AddProductContent({ navigation, route }: Props) {
     }
 
     try {
-      const payload = buildPayload(isEmployee ? 'pending_approval' : 'active');
+      const payload = buildPayload(isRestrictedCreator ? 'pending_approval' : 'active');
 
       if (isEditMode && productId) {
         await updateProduct(productId, payload);
@@ -264,7 +266,7 @@ function AddProductContent({ navigation, route }: Props) {
 
       Alert.alert(
         'Success',
-        isEmployee
+        isRestrictedCreator
           ? 'Product submitted for approval.'
           : `Product ${isEditMode ? 'updated' : 'published'} successfully`,
       );
@@ -274,7 +276,7 @@ function AddProductContent({ navigation, route }: Props) {
       console.error(error);
       Alert.alert(
         'Error',
-        isEmployee
+        isRestrictedCreator
           ? 'Failed to submit product for approval'
           : `Failed to ${isEditMode ? 'update' : 'publish'} product`,
       );
@@ -326,7 +328,7 @@ function AddProductContent({ navigation, route }: Props) {
             <View style={styles.reviewActions}>
               <Button title="Back" onPress={goPrev} variant="outline" style={{ flex: 1 }} />
               <Button title="Save Draft" onPress={handleSaveDraft} variant="secondary" style={{ flex: 1 }} />
-              {!isEmployee ? (
+              {!isRestrictedCreator ? (
                 <Button title={isEditMode ? 'Update Product' : 'Publish Product'} onPress={handlePublish} variant="accent" style={{ flex: 1 }} />
               ) : showSaveForApproval ? (
                 <Button title="Save for Approval" onPress={handlePublish} variant="accent" style={{ flex: 1 }} />

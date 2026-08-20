@@ -180,6 +180,18 @@ const DEFAULT_INITIAL_DATA: LocalDatabaseSchema = {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
+    {
+      id: '00000000-0000-4000-8000-000000000008',
+      name: 'Dealer',
+      description: 'Dealer app login: no Admin Web permissions',
+      permissions: [],
+      is_system: false,
+      isSystem: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
   ],
   profiles: [],
   categories: [

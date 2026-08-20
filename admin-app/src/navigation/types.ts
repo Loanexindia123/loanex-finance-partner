@@ -6,7 +6,7 @@ export type RootStackParamList = {
   Dashboard: undefined;
   Notifications: undefined;
   MyProfile: undefined;
-  ChangePassword: undefined;
+  ChangePassword: { forced?: boolean } | undefined;
   ModulePlaceholder: { title: string };
   ProductList: undefined;
   AddProduct: { mode?: 'add' | 'edit'; productId?: string } | undefined;

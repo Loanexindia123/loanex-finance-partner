@@ -13,6 +13,7 @@ import {
   completeRegistrationBodySchema,
   forgotPasswordBodySchema,
   loginBodySchema,
+  dealerLoginBodySchema,
   logoutBodySchema,
   refreshTokenBodySchema,
   registerBodySchema,
@@ -58,6 +59,12 @@ authRouter.post(
   '/admin-login',
   validateRequest(adminLoginBodySchema),
   asyncHandler(authController.adminLogin),
+);
+
+authRouter.post(
+  '/dealer-login',
+  validateRequest(dealerLoginBodySchema),
+  asyncHandler(authController.dealerLogin),
 );
 
 authRouter.post(

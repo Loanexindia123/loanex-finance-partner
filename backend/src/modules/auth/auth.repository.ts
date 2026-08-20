@@ -124,6 +124,21 @@ export class AuthRepository {
     return this.findByEmail(identifier.trim().toLowerCase());
   }
 
+  /** Staff login code stored on the user row (Employee ID). Not used for customer login. */
+  async findByEmployeeId(employeeId: string) {
+    const code = employeeId.trim();
+    if (!code) return null;
+    const escaped = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rows = await this.findUsersInMongo({
+      $or: [
+        { employeeId: { $regex: `^${escaped}$`, $options: 'i' } },
+        { employee_code: { $regex: `^${escaped}$`, $options: 'i' } },
+      ],
+    } as any);
+    const user = this.pickBestUserMatch(rows);
+    return this.formatUserWithProfile(user);
+  }
+
   async createUser(data: {
     fullName: string;
     email: string;

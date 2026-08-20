@@ -10,6 +10,7 @@ import {
   CompleteRegistrationBody,
   ForgotPasswordBody,
   LoginBody,
+  DealerLoginBody,
   RegisterBody,
   ResetPasswordBody,
   SendOtpBody,
@@ -52,6 +53,12 @@ export class AuthController {
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
     });
+    maybeSetRefreshCookie(res, data as unknown as Record<string, unknown>);
+    sendSuccess(res, data, data.message);
+  };
+
+  dealerLogin = async (req: Request, res: Response): Promise<void> => {
+    const data = await authService.dealerLogin(req.body as DealerLoginBody);
     maybeSetRefreshCookie(res, data as unknown as Record<string, unknown>);
     sendSuccess(res, data, data.message);
   };

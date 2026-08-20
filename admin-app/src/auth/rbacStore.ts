@@ -32,12 +32,22 @@ export function getRbacState(): RbacState {
   return state;
 }
 
+export function isDealer(): boolean {
+  const roleName = String(state.roleName ?? state.user?.roleName ?? '').trim().toLowerCase();
+  const role = String(state.user?.role ?? '').trim().toLowerCase();
+  return roleName === 'dealer' || role === 'dealer';
+}
+
+/** Dealer APK can manage own products without Admin Web RBAC keys. */
+const DEALER_PRODUCT_PERMISSIONS = new Set(['products.view', 'products.create', 'products.edit']);
+
 export function can(permission: string): boolean {
+  if (isDealer() && DEALER_PRODUCT_PERMISSIONS.has(permission)) return true;
   return state.permissions.includes(permission);
 }
 
 export function canAny(...permissions: string[]): boolean {
-  return permissions.some((permission) => state.permissions.includes(permission));
+  return permissions.some((permission) => can(permission));
 }
 
 export function subscribeRbac(listener: () => void): () => void {

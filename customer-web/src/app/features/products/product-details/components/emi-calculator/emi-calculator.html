@@ -31,8 +31,12 @@
         <strong class="is-neg">- {{ formatInr(plan.downPayment) }}</strong>
       </div>
       <div>
-        <span>Processing Fee</span>
-        <strong class="is-pos">+ {{ formatInr(plan.processingFee) }}</strong>
+        <span>Service Charge</span>
+        <strong class="is-pos">+ {{ formatInr(plan.serviceCharge) }}</strong>
+      </div>
+      <div>
+        <span>Delivery Charge</span>
+        <strong class="is-pos">+ {{ formatInr(plan.deliveryCharge) }}</strong>
       </div>
       <div>
         <span>EMI Principal</span>

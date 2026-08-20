@@ -16,6 +16,7 @@ export const API_CONFIG = {
   STORAGE_KEYS: {
     AUTH_TOKEN: 'adminToken',
     USER_DATA: 'adminUser',
+    REFRESH_TOKEN: 'adminRefreshToken',
   },
 
   // Development OTP (always 111111 in dev mode)

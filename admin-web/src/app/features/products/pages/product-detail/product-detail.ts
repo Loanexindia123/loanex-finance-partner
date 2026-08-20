@@ -199,7 +199,7 @@ export class ProductDetail {
 
     push('Description', [
       field('Short description', product.shortDescription ?? wizard.shortDescription),
-      field('Description', product.description ?? wizard.description),
+      field('Overview', product.description ?? wizard.description),
       field('Video URL', wizard.productVideoUrl),
     ]);
 

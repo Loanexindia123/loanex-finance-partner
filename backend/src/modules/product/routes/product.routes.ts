@@ -4,7 +4,8 @@ import multer from 'multer';
 import { createRateLimiter } from '../../../common/middleware/rate-limiter';
 import { authenticate } from '../../../common/middleware/authenticate';
 import { optionalAuthenticate } from '../../../common/middleware/optional-authenticate';
-import { requirePermission } from '../../../common/middleware/require-permission';
+import { requirePermission, requirePermissionOrDealer } from '../../../common/middleware/require-permission';
+import { awaitDeferredHydration } from '../../../common/middleware/await-deferred-hydration';
 import { BadRequestError } from '../../../common/errors/app-error';
 
 import { validateRequest } from '../../../common/middleware/validate';
@@ -81,7 +82,8 @@ productRouter.get(
 productRouter.post(
   '/',
   authenticate,
-  requirePermission('products.create'),
+  awaitDeferredHydration,
+  requirePermissionOrDealer('products.create'),
   validateRequest(createProductBodySchema, 'body'),
   asyncHandler(productController.create),
 );
@@ -89,6 +91,7 @@ productRouter.post(
 productRouter.post(
   '/images',
   authenticate,
+  awaitDeferredHydration,
   uploadProductImage,
   asyncHandler(productController.uploadImage),
 );
@@ -116,7 +119,8 @@ productRouter.get(
 productRouter.put(
   '/:productId',
   authenticate,
-  requirePermission('products.edit'),
+  awaitDeferredHydration,
+  requirePermissionOrDealer('products.edit'),
   validateRequest(productIdParamSchema, 'params'),
   asyncHandler(productController.update),
 );

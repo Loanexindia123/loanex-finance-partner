@@ -1,6 +1,7 @@
 import { NextFunction, Response } from 'express';
 import { ForbiddenError } from '../errors/app-error';
 import { rolesService } from '../../modules/rbac/roles.service';
+import { isDealerUserId } from '../../modules/admin/dealer/dealer-account';
 import type { AuthenticatedRequest } from './authenticate';
 
 /**
@@ -25,6 +26,28 @@ export function requireAnyPermission(...needed: string[]) {
         return;
       }
       next();
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+/**
+ * Product write access for Dealer APK without granting Admin Web permissions.
+ * Dealers keep an empty role permission set; this only opens create/edit.
+ */
+export function requirePermissionOrDealer(permission: string) {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user?.sub) {
+        next(new ForbiddenError('Not authorized for this action'));
+        return;
+      }
+      if (isDealerUserId(req.user.sub)) {
+        next();
+        return;
+      }
+      await requirePermission(permission)(req, res, next);
     } catch (err) {
       next(err);
     }

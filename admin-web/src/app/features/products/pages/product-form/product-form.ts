@@ -16,6 +16,7 @@ import {
   FormGroup,
   FormsModule,
   ReactiveFormsModule,
+  ValidationErrors,
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -388,9 +389,9 @@ export class ProductForm {
 
     // Step 6
     warehouse: [''],
-    openingStock: [null as number | null],
-    availableStock: [null as number | null],
-    reservedStock: [null as number | null],
+    openingStock: [null as number | null, [nonNegativeIntegerValidator]],
+    availableStock: [null as number | null, [Validators.required, nonNegativeIntegerValidator]],
+    reservedStock: [null as number | null, [nonNegativeIntegerValidator]],
     minimumQuantity: [null as number | null],
     maximumQuantity: [null as number | null],
     minOrderQuantity: [null as number | null],
@@ -491,6 +492,7 @@ export class ProductForm {
       .get('openingStock')
       ?.valueChanges.pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((value) => {
+        if (value === null || value === undefined || value === '') return;
         this.form.patchValue({ availableStock: value }, { emitEvent: false });
       });
     this.form
@@ -1910,7 +1912,7 @@ export class ProductForm {
       mrp: [variant.mrp],
       sellingPrice: [variant.sellingPrice],
       purchasePrice: [variant.purchasePrice],
-      stock: [variant.stock],
+      stock: [variant.stock, [Validators.required, nonNegativeIntegerValidator]],
       description: [variant.description],
       specifications: this.fb.array(
         variant.specifications.map((item) =>
@@ -2544,6 +2546,11 @@ export class ProductForm {
     this.activeStep.set(index);
   }
   next(): void {
+    if (this.activeStep() === 0) {
+      const stockCtrl = this.form.get('availableStock');
+      stockCtrl?.markAsTouched();
+      if (stockCtrl?.invalid) return;
+    }
     this.activeStep.update((i) => {
       let next = Math.min(i + 1, this.steps.length - 1);
       if (this.hideEmiStep() && next === this.emiStepIndex) next += 1;
@@ -2617,6 +2624,37 @@ export class ProductForm {
         severity: 'warn',
         summary: 'Missing required fields',
         detail: 'Product name, MRP and selling price are required.',
+      });
+      return;
+    }
+    const variantsOn = this.form.get('variantsEnabled')?.value === true && this.variantsArr.length > 0;
+    if (variantsOn) {
+      let variantStockInvalid = false;
+      this.variantsArr.controls.forEach((ctrl) => {
+        const stockCtrl = this.asGroup(ctrl).get('stock');
+        stockCtrl?.markAsTouched();
+        if (stockCtrl?.invalid) variantStockInvalid = true;
+      });
+      if (variantStockInvalid) {
+        this.activeStep.set(2);
+        this.messages.add({
+          severity: 'warn',
+          summary: 'Variant stock required',
+          detail: 'Each variant needs a stock quantity (integer 0 or more).',
+        });
+        return;
+      }
+    }
+    const stockCtrl = this.form.get('availableStock')!;
+    stockCtrl.markAsTouched();
+    if (stockCtrl.invalid) {
+      this.activeStep.set(0);
+      this.messages.add({
+        severity: 'warn',
+        summary: 'Stock quantity required',
+        detail: stockCtrl.hasError('required')
+          ? 'Stock quantity is required.'
+          : 'Stock quantity must be an integer of 0 or more.',
       });
       return;
     }
@@ -2720,7 +2758,10 @@ export class ProductForm {
       marketLowestPrice: String(v.marketLowestPrice ?? ''),
       maximumDiscountAllowed: String(v.maximumDiscountAllowed ?? ''),
       openingStock: String(v.openingStock ?? ''),
-      availableStock: String(v.availableStock ?? ''),
+      availableStock:
+        this.resolvePayloadStock(v.availableStock, variants) === undefined
+          ? ''
+          : String(this.resolvePayloadStock(v.availableStock, variants)),
       reservedStock: String(v.reservedStock ?? ''),
       minimumQuantity: String(v.minimumQuantity ?? ''),
       maximumQuantity: String(v.maximumQuantity ?? ''),
@@ -2770,7 +2811,7 @@ export class ProductForm {
       galleryImages,
       price: Number(v.sellingPrice) || 0,
       mrp: Number(v.mrp) || 0,
-      stock: Number(v.availableStock) || 0,
+      stock: this.resolvePayloadStock(v.availableStock, variants),
       status,
       emiAvailable: this.isEmployee()
         ? this.isEdit
@@ -2784,6 +2825,19 @@ export class ProductForm {
     };
   }
 
+  private resolvePayloadStock(availableStock: unknown, variants: ProductVariant[]): number | undefined {
+    if (variants.length > 0) {
+      let sum = 0;
+      for (const variant of variants) {
+        const parsed = parseNonNegativeIntValue(variant.stock);
+        if (parsed === null) return undefined;
+        sum += parsed;
+      }
+      return sum;
+    }
+    return parseNonNegativeIntValue(availableStock) ?? undefined;
+  }
+
   private extractMessage(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
       const body = err.error as { message?: string } | undefined;
@@ -2791,6 +2845,22 @@ export class ProductForm {
     }
     return 'Something went wrong.';
   }
+}
+
+function parseNonNegativeIntValue(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') {
+    return Number.isInteger(value) && value >= 0 ? value : null;
+  }
+  const s = String(value).trim();
+  if (!/^\d+$/.test(s)) return null;
+  return Number(s);
+}
+
+function nonNegativeIntegerValidator(control: AbstractControl): ValidationErrors | null {
+  const value = control.value;
+  if (value === null || value === undefined || value === '') return null;
+  return parseNonNegativeIntValue(value) === null ? { nonNegativeInteger: true } : null;
 }
 
 function numOrNull(value: unknown): number | null {

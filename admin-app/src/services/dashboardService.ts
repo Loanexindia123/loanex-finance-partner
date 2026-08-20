@@ -11,7 +11,29 @@ export interface DashboardStats {
   pendingEmiApplications: number;
   totalRevenue: number;
   recentOrders: any[];
+  draftProducts?: number;
+  pendingApprovalProducts?: number;
+  approvedProducts?: number;
+  rejectedProducts?: number;
 }
+
+export const getDealerDashboardStats = async (): Promise<DashboardStats> => {
+  const productList = await getProducts({ limit: 1000, status: 'all' }).catch(() => []);
+  const statusOf = (p: any) => String(p.status ?? '').toLowerCase();
+  return {
+    totalProducts: productList.length,
+    totalOrders: 0,
+    pendingOrders: 0,
+    totalEmiApplications: 0,
+    pendingEmiApplications: 0,
+    totalRevenue: 0,
+    recentOrders: [],
+    draftProducts: productList.filter((p: any) => statusOf(p) === 'draft').length,
+    pendingApprovalProducts: productList.filter((p: any) => statusOf(p) === 'pending_approval').length,
+    approvedProducts: productList.filter((p: any) => statusOf(p) === 'active').length,
+    rejectedProducts: productList.filter((p: any) => statusOf(p) === 'rejected').length,
+  };
+};
 
 /**
  * Fetch dashboard statistics by aggregating data from multiple endpoints

@@ -146,6 +146,12 @@ export const SEED_ROLES: SeedRole[] = [
     permissions: ['careers.view', 'careers.create', 'careers.edit', 'careers.delete'],
     isSystem: false,
   },
+  {
+    name: 'Dealer',
+    description: 'Dealer app login: no Admin Web permissions',
+    permissions: [],
+    isSystem: false,
+  },
 ];
 
 /** Coerce a role's permissions field (jsonb array or JSON string) into a string[]. */

@@ -6,108 +6,152 @@ export interface User {
   id: string;
   phone: string;
   email?: string;
-  role: 'customer' | 'admin';
+  role: 'customer' | 'admin' | 'dealer';
   roleId?: string | null;
   roleName?: string | null;
   permissions?: string[];
+  mustChangePassword?: boolean;
+  dealerId?: string;
   created_at: string;
   updated_at: string;
 }
 
-/**
- * Logout — clear local auth data.
- * Note: admin login issues an access token only (no refresh token),
- * so there is nothing to revoke server-side.
- */
+function isDealerPayload(raw: any): boolean {
+  const roleName = String(raw?.roleName ?? '').trim().toLowerCase();
+  const role = String(raw?.role ?? '').trim().toLowerCase();
+  return roleName === 'dealer' || role === 'dealer';
+}
+
+function normalizeUser(raw: any, stored?: User | null): User {
+  const permissions = Array.isArray(raw?.permissions)
+    ? raw.permissions
+    : stored?.permissions ?? [];
+  const dealer = isDealerPayload(raw) || isDealerPayload(stored);
+  const role: User['role'] = dealer
+    ? 'dealer'
+    : raw?.role === 'customer' || raw?.role === 'admin'
+      ? raw.role
+      : stored?.role ?? 'admin';
+
+  return {
+    id: String(raw?.id ?? stored?.id ?? ''),
+    phone: String(raw?.phone ?? raw?.mobile ?? stored?.phone ?? ''),
+    email: raw?.email ?? stored?.email,
+    role,
+    roleId: raw?.roleId ?? stored?.roleId ?? null,
+    roleName: raw?.roleName ?? stored?.roleName ?? (dealer ? 'Dealer' : null),
+    permissions,
+    mustChangePassword: Boolean(
+      raw?.mustChangePassword ?? raw?.mustChangePassword ?? stored?.mustChangePassword,
+    ),
+    dealerId: raw?.dealerId != null ? String(raw.dealerId) : stored?.dealerId,
+    created_at: String(
+      raw?.created_at ?? raw?.createdAt ?? stored?.created_at ?? new Date().toISOString(),
+    ),
+    updated_at: String(
+      raw?.updated_at ?? raw?.updatedAt ?? stored?.updated_at ?? new Date().toISOString(),
+    ),
+  };
+}
+
 export const logout = async (): Promise<void> => {
   await clearAuth();
 };
 
-/**
- * Store the JWT token in AsyncStorage
- */
 export const storeToken = async (token: string): Promise<void> => {
   await AsyncStorage.setItem(API_CONFIG.STORAGE_KEYS.AUTH_TOKEN, token);
 };
 
-/**
- * Get the stored JWT token
- */
+export const storeRefreshToken = async (token: string): Promise<void> => {
+  await AsyncStorage.setItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN, token);
+};
+
 export const getToken = async (): Promise<string | null> => {
   return AsyncStorage.getItem(API_CONFIG.STORAGE_KEYS.AUTH_TOKEN);
 };
 
-/**
- * Store user data in AsyncStorage
- */
+export const getRefreshToken = async (): Promise<string | null> => {
+  return AsyncStorage.getItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN);
+};
+
 export const storeUser = async (user: User): Promise<void> => {
   await AsyncStorage.setItem(API_CONFIG.STORAGE_KEYS.USER_DATA, JSON.stringify(user));
 };
 
-/**
- * Get stored user data
- */
 export const getStoredUser = async (): Promise<User | null> => {
   const userData = await AsyncStorage.getItem(API_CONFIG.STORAGE_KEYS.USER_DATA);
   return userData ? JSON.parse(userData) : null;
 };
 
-/**
- * Clear all auth data (token + user)
- */
+export const persistSession = async (
+  accessToken: string,
+  user: User,
+  refreshToken?: string,
+): Promise<void> => {
+  await storeToken(accessToken);
+  await storeUser(user);
+  if (refreshToken) {
+    await storeRefreshToken(refreshToken);
+  } else {
+    await AsyncStorage.removeItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN);
+  }
+};
+
 export const clearAuth = async (): Promise<void> => {
   await AsyncStorage.multiRemove([
     API_CONFIG.STORAGE_KEYS.AUTH_TOKEN,
     API_CONFIG.STORAGE_KEYS.USER_DATA,
+    API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN,
   ]);
 };
 
-/**
- * Get current logged-in user from the API
- */
 export const getMe = async (): Promise<User> => {
   const response = await api.get('/auth/me');
   const data = response.data?.data;
-  // Backend returns { user: toPublicUser(...) }, not a flat User
   const raw = data?.user ?? data ?? {};
   const stored = await getStoredUser();
-
-  const permissions = Array.isArray(raw.permissions)
-    ? raw.permissions
-    : stored?.permissions ?? [];
-
-  return {
-    id: String(raw.id ?? stored?.id ?? ''),
-    phone: String(raw.phone ?? raw.mobile ?? stored?.phone ?? ''),
-    email: raw.email ?? stored?.email,
-    role: raw.role === 'customer' || raw.role === 'admin'
-      ? raw.role
-      : stored?.role ?? 'admin',
-    roleId: raw.roleId ?? stored?.roleId ?? null,
-    roleName: raw.roleName ?? stored?.roleName ?? null,
-    permissions,
-    created_at: String(raw.created_at ?? raw.createdAt ?? stored?.created_at ?? new Date().toISOString()),
-    updated_at: String(raw.updated_at ?? raw.updatedAt ?? stored?.updated_at ?? new Date().toISOString()),
-  };
+  return normalizeUser(raw, stored);
 };
 
-/**
- * Full login flow for admin using email/phone and password
- * Throws if user is not an admin or credentials are invalid.
- */
 export const loginAsAdmin = async (emailOrPhone: string, password: string): Promise<User> => {
   const response = await api.post('/auth/admin-login', { email: emailOrPhone, password });
   const { token, user } = response.data.data;
+  const normalized = normalizeUser(user);
 
-  if (user.role !== 'admin') {
+  if (normalized.role !== 'admin') {
     throw new Error('Access Denied: Only admin users can log in to this app.');
   }
 
-  await storeToken(token);
-  await storeUser({
-    ...user,
-    permissions: Array.isArray(user.permissions) ? user.permissions : [],
-  });
+  await persistSession(token, normalized);
+  return normalized;
+};
 
-  return user;
+export const loginAsDealer = async (identifier: string, password: string): Promise<User> => {
+  const response = await api.post('/auth/dealer-login', { identifier, password });
+  const payload = response.data?.data ?? {};
+  const accessToken = payload.accessToken ?? payload.token;
+  if (!accessToken) {
+    throw new Error('Dealer login did not return an access token.');
+  }
+  const normalized = normalizeUser(payload.user ?? {});
+  if (normalized.role !== 'dealer') {
+    throw new Error('Access Denied: This login is for dealer accounts only.');
+  }
+  await persistSession(accessToken, normalized, payload.refreshToken);
+  return normalized;
+};
+
+/**
+ * Unified staff/dealer login for the existing admin-app.
+ * Admin/Employee use admin-login; Dealer falls back to dealer-login on 403.
+ */
+export const loginAsStaff = async (identifier: string, password: string): Promise<User> => {
+  try {
+    return await loginAsAdmin(identifier, password);
+  } catch (err: any) {
+    if (err?.status === 403) {
+      return await loginAsDealer(identifier, password);
+    }
+    throw err;
+  }
 };

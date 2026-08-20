@@ -18,6 +18,7 @@ import { Card } from '../../../components/ui/Card';
 import { colors } from '../../../theme/colors';
 import { radius, spacing } from '../../../theme/spacing';
 import { RootStackParamList } from '../../../navigation/types';
+import { isDealer } from '../../../auth/rbacStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProductDetails'>;
 
@@ -164,6 +165,7 @@ export function ProductDetailsScreen({ navigation, route }: Props) {
           />
         </Card>
 
+        {isDealer() ? null : (
         <Card style={styles.section}>
           <SectionTitle title="Marketing & Visibility" />
           <DetailRow label="EMI Available" value={product.emiAvailable ? 'Yes' : 'No'} />
@@ -201,6 +203,7 @@ export function ProductDetailsScreen({ navigation, route }: Props) {
             </TouchableOpacity>
           </View>
         </Card>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>

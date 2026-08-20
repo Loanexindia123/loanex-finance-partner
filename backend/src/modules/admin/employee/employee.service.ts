@@ -466,20 +466,17 @@ export class EmployeeService {
     if (record.formStatus !== 'approved') {
       return record;
     }
-    try {
-      const result = await provisionEmployeeAccount(record);
-      if (!result?.userId) return record;
-      if (record.userId === result.userId) return record;
-      const linked = jsonDb.update(COLLECTION, { id: record.id }, { userId: result.userId });
-      return linked ? buildRecord(linked) : { ...record, userId: result.userId };
-    } catch (err) {
-      console.error(
-        '[employee] portal account provision failed for',
-        record.id,
-        err instanceof Error ? err.message : 'unknown error',
+    const result = await provisionEmployeeAccount(record);
+    if (!result?.userId) {
+      throw new BadRequestError(
+        'Employee portal account could not be created. Add a mobile or email and try again.',
       );
-      return record;
     }
+    if (record.userId === result.userId) return record;
+    const linked = await jsonDb.updateAwaited(COLLECTION, { id: record.id }, {
+      userId: result.userId,
+    });
+    return linked ? buildRecord(linked) : { ...record, userId: result.userId };
   }
 
   async delete(id: string, actorUserId: string): Promise<{ deleted: true; id: string }> {

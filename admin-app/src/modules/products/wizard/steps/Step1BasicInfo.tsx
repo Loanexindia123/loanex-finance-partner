@@ -105,7 +105,7 @@ export function Step1BasicInfo() {
       </View>
 
       <Input label="Short Description" placeholder="Brief product summary (max 160 chars)" value={formData.shortDescription} onChangeText={(v) => updateForm({ shortDescription: v })} maxLength={160} />
-      <Input label="Description" placeholder="Detailed product description..." value={formData.description} onChangeText={(v) => updateForm({ description: v })} multiline numberOfLines={5} />
+      <Input label="Overview" placeholder="Enter product overview..." value={formData.description} onChangeText={(v) => updateForm({ description: v })} multiline numberOfLines={5} />
 
       <View style={styles.row}>
         <View style={styles.half}>

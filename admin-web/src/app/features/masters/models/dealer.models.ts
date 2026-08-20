@@ -40,6 +40,8 @@ export interface Dealer {
   creatorType: string;
   creatorId: string;
   creatorName: string;
+  /** Linked dealer login user. Distinct from creatorId. */
+  userId: string;
   status: DealerCatalogStatus;
   formStatus: DealerFormStatus;
   dealer_address: string;
@@ -129,6 +131,7 @@ export function emptyDealer(): DealerPayload {
     creatorType: '',
     creatorId: '',
     creatorName: '',
+    userId: '',
     status: 'active',
     formStatus: 'draft',
     dealer_address: '',
@@ -187,6 +190,7 @@ export function normalizeDealer(raw: unknown): Dealer {
     creatorType: pick('creatorType'),
     creatorId: pick('creatorId'),
     creatorName: pick('creatorName'),
+    userId: pick('userId'),
     status: pick('status') === 'inactive' ? 'inactive' : 'active',
     formStatus: (pick('formStatus') as DealerFormStatus) || 'pending',
     dealer_address: pick('shopAddress') || pick('dealer_address'),
