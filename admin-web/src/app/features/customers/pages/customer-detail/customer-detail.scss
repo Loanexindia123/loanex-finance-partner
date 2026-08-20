@@ -541,3 +541,86 @@
     white-space: nowrap;
   }
 }
+
+
+.kyc-head-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+
+  :host ::ng-deep & .p-button {
+    height: 2.25rem;
+    padding: 0 0.875rem;
+    border-radius: 8px;
+    font-size: 0.8125rem;
+    font-weight: 650;
+  }
+
+  :host ::ng-deep & .p-button-success.p-button-outlined {
+    color: var(--admin-success);
+    border: 1px solid var(--admin-success);
+    background: transparent;
+
+    &:hover {
+      background: rgba(22, 163, 74, 0.08);
+    }
+  }
+
+  :host ::ng-deep & .p-button-danger.p-button-outlined {
+    color: var(--admin-danger);
+    border: 1px solid var(--admin-danger);
+    background: transparent;
+
+    &:hover {
+      background: rgba(220, 38, 38, 0.08);
+    }
+  }
+}
+
+.kyc-check-list {
+  list-style: none;
+  margin: 0.875rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+
+    i {
+      font-size: 0.9rem;
+    }
+
+    &[data-ok='true'] {
+      color: var(--admin-success);
+    }
+
+    &[data-ok='false'] {
+      color: var(--admin-danger);
+    }
+  }
+}
+
+.kyc-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: 8px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+
+  i {
+    margin-top: 0.15rem;
+    flex-shrink: 0;
+  }
+}

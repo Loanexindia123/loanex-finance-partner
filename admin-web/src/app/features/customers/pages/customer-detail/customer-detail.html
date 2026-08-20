@@ -181,14 +181,46 @@
           </dl>
         </section>
 
-        <section class="card">
+                <section class="card">
           <div class="card__head">
             <h3>KYC information</h3>
-            @if (kycStatus() === 'Not Available') {
-              <span class="muted-pill">Not Available</span>
-            } @else {
-              <app-status-badge [status]="kycStatus()" />
-            }
+            <div class="kyc-head-right">
+              @if (kycStatus() === 'Not Available') {
+                <span class="muted-pill">Not Available</span>
+              } @else {
+                <app-status-badge [status]="kycStatus()" />
+              }
+              @if (c.kyc) {
+                @if (kycStatus() !== 'Approved') {
+                  <button
+                    *appCan="'users.edit'"
+                    pButton
+                    type="button"
+                    label="Approve"
+                    icon="pi pi-check"
+                    severity="success"
+                    [outlined]="true"
+                    [loading]="savingKyc()"
+                    [disabled]="savingKyc()"
+                    (click)="askUpdateKyc('Approved')"
+                  ></button>
+                }
+                @if (kycStatus() !== 'Rejected') {
+                  <button
+                    *appCan="'users.edit'"
+                    pButton
+                    type="button"
+                    label="Reject"
+                    icon="pi pi-times"
+                    severity="danger"
+                    [outlined]="true"
+                    [loading]="savingKyc()"
+                    [disabled]="savingKyc()"
+                    (click)="askUpdateKyc('Rejected')"
+                  ></button>
+                }
+              }
+            </div>
           </div>
 
           @if (!c.kyc) {
@@ -571,3 +603,71 @@
     </div>
   </div>
 }
+
+
+<p-dialog
+  [visible]="!!kycConfirmTarget()"
+  [modal]="true"
+  [draggable]="false"
+  [closable]="!savingKyc()"
+  [closeOnEscape]="!savingKyc()"
+  [dismissableMask]="!savingKyc()"
+  appendTo="body"
+  styleClass="admin-dialog"
+  [style]="{ width: 'min(440px, calc(100vw - 2rem))' }"
+  (visibleChange)="!$event && cancelUpdateKyc()"
+>
+  <ng-template pTemplate="header">
+    <span>{{ kycConfirmTarget() === 'Approved' ? 'Approve KYC?' : 'Reject KYC?' }}</span>
+  </ng-template>
+
+  <p>
+    Are you sure you want to mark
+    <strong>{{ title() }}</strong>'s KYC as
+    <strong>{{ kycConfirmTarget() === 'Approved' ? 'Approved' : 'Rejected' }}</strong>?
+  </p>
+
+  <ul class="kyc-check-list">
+    <li [attr.data-ok]="aadhaarVerified()">
+      <i class="pi" [class]="aadhaarVerified() ? 'pi-check-circle' : 'pi-times-circle'" aria-hidden="true"></i>
+      Aadhaar {{ aadhaarVerified() ? 'verified' : 'not verified' }}
+    </li>
+    <li [attr.data-ok]="panVerified()">
+      <i class="pi" [class]="panVerified() ? 'pi-check-circle' : 'pi-times-circle'" aria-hidden="true"></i>
+      PAN {{ panVerified() ? 'verified' : 'not verified' }}
+    </li>
+    <li [attr.data-ok]="faceVerified()">
+      <i class="pi" [class]="faceVerified() ? 'pi-check-circle' : 'pi-times-circle'" aria-hidden="true"></i>
+      Face match {{ faceVerified() ? 'verified' : 'not verified' }}
+    </li>
+  </ul>
+
+  @if (kycConfirmTarget() === 'Approved' && (!aadhaarVerified() || !panVerified() || !faceVerified())) {
+    <div class="kyc-warning">
+      <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+      Not all checks have passed. Approving now overrides the automatic verification —
+      only do this if you've confirmed the customer's identity through another method.
+    </div>
+  }
+
+  <ng-template pTemplate="footer">
+    <button
+      pButton
+      type="button"
+      label="Cancel"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="savingKyc()"
+      (click)="cancelUpdateKyc()"
+    ></button>
+    <button
+      pButton
+      type="button"
+      [label]="kycConfirmTarget() === 'Approved' ? 'Approve' : 'Reject'"
+      [severity]="kycConfirmTarget() === 'Approved' ? 'success' : 'danger'"
+      [loading]="savingKyc()"
+      [disabled]="savingKyc()"
+      (click)="confirmUpdateKyc()"
+    ></button>
+  </ng-template>
+</p-dialog>

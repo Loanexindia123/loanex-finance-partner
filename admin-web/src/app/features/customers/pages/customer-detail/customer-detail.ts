@@ -14,6 +14,8 @@ import { StatusBadge } from '../../../../shared/components/status-badge/status-b
 import { CustomerService } from '../../services/customer.service';
 import { OrderService } from '../../../orders/services/order.service';
 import { Order, orderDisplayId, paymentMethodLabel } from '../../../orders/models/order.models';
+import { DialogModule } from 'primeng/dialog';
+import { CanDirective } from '../../../../shared/directives/can.directive';
 import {
   Customer,
   CustomerActivity,
@@ -43,10 +45,12 @@ import {
     DecimalPipe,
     ButtonModule,
     TooltipModule,
+    DialogModule,
     PageHeader,
     BrandedLoader,
     ErrorState,
     StatusBadge,
+    CanDirective,
   ],
   templateUrl: './customer-detail.html',
   styleUrl: './customer-detail.scss',
@@ -205,6 +209,62 @@ export class CustomerDetail {
     } catch {
       this.messages.add({ severity: 'warn', summary: 'Could not copy customer ID' });
     }
+  }
+
+    readonly savingKyc = signal(false);
+  readonly kycConfirmTarget = signal<'Approved' | 'Rejected' | null>(null);
+
+  askUpdateKyc(status: 'Approved' | 'Rejected'): void {
+    if (this.savingKyc()) return;
+    this.kycConfirmTarget.set(status);
+  }
+
+  cancelUpdateKyc(): void {
+    if (this.savingKyc()) return;
+    this.kycConfirmTarget.set(null);
+  }
+
+  confirmUpdateKyc(): void {
+    const status = this.kycConfirmTarget();
+    if (!status || this.savingKyc()) return;
+
+    this.savingKyc.set(true);
+    this.customers.updateKycStatus(this.customerId, status).subscribe({
+      next: () => {
+        this.savingKyc.set(false);
+        this.kycConfirmTarget.set(null);
+        this.customer.update((c) => {
+          if (!c) return c;
+          const profile = c.profile
+            ? { ...c.profile, kyc_status: status }
+            : {
+                id: c.id,
+                mobile_number: '',
+                fullName: '',
+                email: '',
+                dob: '',
+                gender: '',
+                kyc_status: status,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              };
+          return { ...c, profile };
+        });
+        this.messages.add({
+          severity: 'success',
+          summary: status === 'Approved' ? 'KYC approved' : 'KYC rejected',
+          detail: this.title(),
+        });
+      },
+      error: (err: unknown) => {
+        this.savingKyc.set(false);
+        this.messages.add({
+          severity: 'error',
+          summary: 'Could not update KYC status',
+          detail: this.extractMessage(err),
+        });
+      },
+    });
   }
 
   private extractMessage(err: unknown): string {

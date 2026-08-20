@@ -40,6 +40,11 @@ export class DealerService {
       .delete<ApiEnvelope<void>>(apiUrl(`/admin/dealers/${id}`))
       .pipe(unwrapApi());
   }
+
+    updateVerificationStatus(dealer: Dealer, status: 'approved' | 'rejected'): Observable<Dealer> {
+    const payload: DealerPayload = { ...dealer, verificationStatus: status };
+    return this.update(dealer.id, payload);
+  }
 }
 
 function unwrapDealerList(raw: unknown): Dealer[] {

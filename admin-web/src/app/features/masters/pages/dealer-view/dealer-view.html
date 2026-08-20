@@ -41,9 +41,39 @@
               <span class="status-chip__label">Form</span>
               <app-status-badge [status]="d.formStatus || 'draft'" />
             </span>
-            <span class="status-chip">
+                        <span class="status-chip">
               <span class="status-chip__label">Verification</span>
               <app-status-badge [status]="d.verificationStatus || 'pending'" />
+              @if (hasKycSubmission()) {
+                @if (d.verificationStatus !== 'approved') {
+                  <button
+                    *appCan="'masters.edit'"
+                    pButton
+                    type="button"
+                    label="Approve"
+                    icon="pi pi-check"
+                    severity="success"
+                    [outlined]="true"
+                    [loading]="savingVerification()"
+                    [disabled]="savingVerification()"
+                    (click)="askUpdateVerification('approved')"
+                  ></button>
+                }
+                @if (d.verificationStatus !== 'rejected') {
+                  <button
+                    *appCan="'masters.edit'"
+                    pButton
+                    type="button"
+                    label="Reject"
+                    icon="pi pi-times"
+                    severity="danger"
+                    [outlined]="true"
+                    [loading]="savingVerification()"
+                    [disabled]="savingVerification()"
+                    (click)="askUpdateVerification('rejected')"
+                  ></button>
+                }
+              }
             </span>
             <span class="status-chip">
               <span class="status-chip__label">Catalog</span>
@@ -331,3 +361,73 @@
     </div>
   </div>
 }
+
+
+<p-dialog
+  [visible]="!!verificationConfirmTarget()"
+  [modal]="true"
+  [draggable]="false"
+  [closable]="!savingVerification()"
+  [closeOnEscape]="!savingVerification()"
+  [dismissableMask]="!savingVerification()"
+  appendTo="body"
+  styleClass="admin-dialog"
+  [style]="{ width: 'min(440px, calc(100vw - 2rem))' }"
+  (visibleChange)="!$event && cancelUpdateVerification()"
+>
+  <ng-template pTemplate="header">
+    <span>{{ verificationConfirmTarget() === 'approved' ? 'Approve Dealer KYC?' : 'Reject Dealer KYC?' }}</span>
+  </ng-template>
+
+  @if (dealer(); as d) {
+    <p>
+      Are you sure you want to mark
+      <strong>{{ d.dealerName || d.dealerCode }}</strong>'s KYC as
+      <strong>{{ verificationConfirmTarget() === 'approved' ? 'Approved' : 'Rejected' }}</strong>?
+    </p>
+
+    <ul class="kyc-check-list">
+      <li [attr.data-ok]="hasValue(d.panCard)">
+        <i class="pi" [class]="hasValue(d.panCard) ? 'pi-check-circle' : 'pi-times-circle'" aria-hidden="true"></i>
+        PAN Card {{ hasValue(d.panCard) ? 'uploaded' : 'not uploaded' }}
+      </li>
+      <li [attr.data-ok]="hasValue(d.ownerAadhaar)">
+        <i class="pi" [class]="hasValue(d.ownerAadhaar) ? 'pi-check-circle' : 'pi-times-circle'" aria-hidden="true"></i>
+        Owner Aadhaar {{ hasValue(d.ownerAadhaar) ? 'uploaded' : 'not uploaded' }}
+      </li>
+      <li [attr.data-ok]="hasValue(d.gstCertificate)">
+        <i class="pi" [class]="hasValue(d.gstCertificate) ? 'pi-check-circle' : 'pi-times-circle'" aria-hidden="true"></i>
+        GST Certificate {{ hasValue(d.gstCertificate) ? 'uploaded' : 'not uploaded' }}
+      </li>
+    </ul>
+
+    @if (verificationConfirmTarget() === 'approved' && completion().percent < 100) {
+      <div class="kyc-warning">
+        <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+        Profile is only {{ completion().percent }}% complete. Review the remaining fields before approving
+        if they're relevant to this dealer.
+      </div>
+    }
+  }
+
+  <ng-template pTemplate="footer">
+    <button
+      pButton
+      type="button"
+      label="Cancel"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="savingVerification()"
+      (click)="cancelUpdateVerification()"
+    ></button>
+    <button
+      pButton
+      type="button"
+      [label]="verificationConfirmTarget() === 'approved' ? 'Approve' : 'Reject'"
+      [severity]="verificationConfirmTarget() === 'approved' ? 'success' : 'danger'"
+      [loading]="savingVerification()"
+      [disabled]="savingVerification()"
+      (click)="confirmUpdateVerification()"
+    ></button>
+  </ng-template>
+</p-dialog>

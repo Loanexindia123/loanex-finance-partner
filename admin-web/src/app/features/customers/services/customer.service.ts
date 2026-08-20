@@ -144,6 +144,12 @@ export class CustomerService {
       );
   }
 
+  updateKycStatus(customerId: string, kycStatus: 'Approved' | 'Rejected'): Observable<void> {
+    return this.http
+      .patch<ApiEnvelope<unknown>>(apiUrl(`/admin/users/${customerId}`), { kyc_status: kycStatus })
+      .pipe(unwrapApi(), map(() => undefined));
+  }
+
   private findKycForUser(records: KycRecord[], userId: string): KycRecord | null {
     return (
       records.find((k) => k.userId === userId) ??

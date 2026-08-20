@@ -9,6 +9,7 @@ import { StatusBadge } from '../../../../shared/components/status-badge/status-b
 import { CanDirective } from '../../../../shared/directives/can.directive';
 import { DealerService } from '../../services/dealer.service';
 import { Dealer } from '../../models/dealer.models';
+import { DialogModule } from 'primeng/dialog';
 
 const AVATAR_TONES = [
   { bg: '#eef2ff', color: '#4338ca' },
@@ -82,7 +83,7 @@ const DOCUMENT_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
 @Component({
   selector: 'app-dealer-view',
   standalone: true,
-  imports: [DatePipe, ButtonModule, PageHeader, BrandedLoader, StatusBadge, CanDirective],
+  imports: [DatePipe, ButtonModule, DialogModule, PageHeader, BrandedLoader, StatusBadge, CanDirective],
   templateUrl: './dealer-view.html',
   styleUrl: './dealer-view.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -169,6 +170,55 @@ export class DealerView {
 
   filledCount(dealer: Dealer, fields: Array<{ key: keyof Dealer }>): number {
     return fields.filter((f) => this.hasValue(dealer[f.key])).length;
+  }
+
+    readonly hasKycSubmission = computed(() => {
+    const d = this.dealer();
+    if (!d) return false;
+    return (
+      this.hasValue(d.panCard) && this.hasValue(d.ownerAadhaar) && this.hasValue(d.gstCertificate)
+    );
+  });
+
+  readonly savingVerification = signal(false);
+  readonly verificationConfirmTarget = signal<'approved' | 'rejected' | null>(null);
+
+  askUpdateVerification(status: 'approved' | 'rejected'): void {
+    if (this.savingVerification()) return;
+    this.verificationConfirmTarget.set(status);
+  }
+
+  cancelUpdateVerification(): void {
+    if (this.savingVerification()) return;
+    this.verificationConfirmTarget.set(null);
+  }
+
+  confirmUpdateVerification(): void {
+    const status = this.verificationConfirmTarget();
+    const d = this.dealer();
+    if (!status || !d || this.savingVerification()) return;
+
+    this.savingVerification.set(true);
+    this.dealers.updateVerificationStatus(d, status).subscribe({
+      next: (updated) => {
+        this.savingVerification.set(false);
+        this.verificationConfirmTarget.set(null);
+        this.dealer.set(updated);
+        this.messages.add({
+          severity: 'success',
+          summary: status === 'approved' ? 'Dealer KYC approved' : 'Dealer KYC rejected',
+          detail: d.dealerName || d.dealerCode,
+        });
+      },
+      error: () => {
+        this.savingVerification.set(false);
+        this.messages.add({
+          severity: 'error',
+          summary: 'Could not update verification status',
+          detail: d.dealerName || d.dealerCode,
+        });
+      },
+    });
   }
 
   edit(): void {
