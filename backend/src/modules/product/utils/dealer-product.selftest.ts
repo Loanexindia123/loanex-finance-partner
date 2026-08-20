@@ -4,7 +4,7 @@
  */
 import { DEALER_ROLE_PERMISSIONS, isDealerAuthUser, isDealerRoleName } from '../../admin/dealer/dealer-account';
 import { canAccessProductByCreator, type ProductCreatorScope } from './product-ownership';
-import { stripEmployeeEmiFromPayload } from './product-emi';
+import { stripEmployeeDeliveryFromPayload, stripEmployeeEmiFromPayload } from './product-emi';
 
 function assert(cond: boolean, label: string): void {
   if (!cond) throw new Error(label);
@@ -52,6 +52,24 @@ assert(emiPayload.emiEnabled === undefined, 'Dealer EMI emiEnabled stripped');
 assert(emiPayload.emiPlans === undefined, 'Dealer EMI plans stripped');
 assert(!Array.isArray(emiPayload.wizardData?.emiPlans), 'Dealer wizard EMI plans stripped');
 assert(emiPayload.wizardData?.emiEnabled === undefined, 'Dealer wizard emiEnabled stripped');
+
+const deliveryPayload: any = {
+  deliveryCharges: 99,
+  deliveryPartner: 'BlueDart',
+  deliveryZone: 'Zone 1',
+  expressDelivery: true,
+  wizardData: {
+    deliveryCharges: '120',
+    deliveryDays: '3-5',
+    deliveryPartner: 'Delhivery',
+    expressDelivery: true,
+  },
+};
+stripEmployeeDeliveryFromPayload(deliveryPayload);
+assert(deliveryPayload.deliveryCharges === undefined, 'Dealer deliveryCharges stripped');
+assert(deliveryPayload.deliveryPartner === undefined, 'Dealer deliveryPartner stripped');
+assert(deliveryPayload.wizardData?.deliveryDays === undefined, 'Dealer wizard deliveryDays stripped');
+assert(deliveryPayload.wizardData?.expressDelivery === undefined, 'Dealer wizard expressDelivery stripped');
 
 console.log('dealer-product.selftest: all assertions passed');
 process.exit(0);

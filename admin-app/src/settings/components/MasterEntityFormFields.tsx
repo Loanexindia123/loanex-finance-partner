@@ -19,11 +19,24 @@ import {
   WholesalerMaster,
 } from '../types/masterData';
 import { PAYMENT_TERMS, SETTLEMENT_CYCLES } from '../../modules/products/data/constants';
+import { pickProductImage } from '../../modules/products/utils/pickProductImage';
+import {
+  clearPendingImage,
+  isLocalPendingImageUri,
+} from '../../modules/products/utils/pendingImages';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
-function mockUploadUri(seed: string): string {
-  return `https://picsum.photos/seed/${seed}-${Date.now()}/200`;
+async function pickAndReplaceImage(
+  previousUri: string | undefined,
+  onPicked: (uri: string) => void,
+): Promise<void> {
+  const file = await pickProductImage();
+  if (!file) return;
+  if (previousUri && isLocalPendingImageUri(previousUri)) {
+    clearPendingImage(previousUri);
+  }
+  onPicked(file.uri);
 }
 
 function StatusToggle({
@@ -81,10 +94,17 @@ export function BrandFormFields({
       <ImagePlaceholder
         size="md"
         label="Logo"
-        imageUri={value.logoUri || null}
-        onPress={() =>
-          onChange({ ...value, logoUri: mockUploadUri(value.name || 'brand') })
+        subtitle={
+          value.logoUri && isLocalPendingImageUri(value.logoUri)
+            ? 'Selected — uploads on save'
+            : 'Tap to upload'
         }
+        imageUri={value.logoUri || null}
+        onPress={() => {
+          void pickAndReplaceImage(value.logoUri, (logoUri) =>
+            onChange({ ...value, logoUri }),
+          );
+        }}
         style={styles.image}
       />
       <Input
@@ -509,10 +529,17 @@ export function CategoryFormFields({
       <ImagePlaceholder
         size="md"
         label="Icon"
-        imageUri={value.imageUri || null}
-        onPress={() =>
-          onChange({ ...value, imageUri: mockUploadUri(value.name || 'category') })
+        subtitle={
+          value.imageUri && isLocalPendingImageUri(value.imageUri)
+            ? 'Selected — uploads on save'
+            : 'Tap to upload'
         }
+        imageUri={value.imageUri || null}
+        onPress={() => {
+          void pickAndReplaceImage(value.imageUri, (imageUri) =>
+            onChange({ ...value, imageUri }),
+          );
+        }}
         style={styles.image}
       />
       <Input

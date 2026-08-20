@@ -10,9 +10,10 @@ import { Dealer, DealerPayload, normalizeDealer } from '../models/dealer.models'
 export class DealerService {
   private readonly http = inject(HttpClient);
 
-  list(): Observable<Dealer[]> {
+  list(options?: { approvedOnly?: boolean }): Observable<Dealer[]> {
+    const params = options?.approvedOnly ? { approvedOnly: 'true' } : undefined;
     return this.http
-      .get<ApiEnvelope<unknown>>(apiUrl('/admin/dealers'))
+      .get<ApiEnvelope<unknown>>(apiUrl('/admin/dealers'), { params })
       .pipe(unwrapApi(), map(unwrapDealerList));
   }
 

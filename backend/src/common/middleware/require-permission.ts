@@ -1,7 +1,7 @@
 import { NextFunction, Response } from 'express';
 import { ForbiddenError } from '../errors/app-error';
 import { rolesService } from '../../modules/rbac/roles.service';
-import { isDealerUserId } from '../../modules/admin/dealer/dealer-account';
+import { resolveIsDealerUserId } from '../../modules/admin/dealer/dealer-account';
 import type { AuthenticatedRequest } from './authenticate';
 
 /**
@@ -37,17 +37,25 @@ export function requireAnyPermission(...needed: string[]) {
  * Dealers keep an empty role permission set; this only opens create/edit.
  */
 export function requirePermissionOrDealer(permission: string) {
-  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  return requireAnyPermissionOrDealer(permission);
+}
+
+/**
+ * Same as requireAnyPermission, but Dealers (empty role permissions) are allowed
+ * through so dealer-app catalogue masters can call admin master APIs.
+ */
+export function requireAnyPermissionOrDealer(...needed: string[]) {
+  return async (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
     try {
       if (!req.user?.sub) {
         next(new ForbiddenError('Not authorized for this action'));
         return;
       }
-      if (isDealerUserId(req.user.sub)) {
+      if (await resolveIsDealerUserId(req.user.sub)) {
         next();
         return;
       }
-      await requirePermission(permission)(req, res, next);
+      await requireAnyPermission(...needed)(req, _res, next);
     } catch (err) {
       next(err);
     }

@@ -3,14 +3,13 @@ import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-n
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 
+/** Matches Admin Web `WIZARD_STEPS` (product-form). */
 export const WIZARD_STEPS = [
   'Basic Info',
   'Category',
   'Variants',
   'Images',
   'Pricing',
-  'Inventory',
-  'Supplier',
   'Delivery',
   'EMI',
   'SEO',
@@ -78,7 +77,7 @@ export function StepProgress({ currentStep, steps = WIZARD_STEPS }: StepProgress
                   {step}
                 </Text>
               )}
-              {index < WIZARD_STEPS.length - 1 && (
+              {index < steps.length - 1 && (
                 <View style={[styles.connector, isCompleted && styles.connectorCompleted]} />
               )}
             </View>
@@ -86,7 +85,7 @@ export function StepProgress({ currentStep, steps = WIZARD_STEPS }: StepProgress
         })}
       </ScrollView>
       <Text style={[styles.currentLabel, isEmiStep && styles.currentLabelFinance]}>
-        Step {currentStep} of {WIZARD_STEPS.length}: {WIZARD_STEPS[currentStep - 1]}
+        Step {currentStep} of {steps.length}: {steps[currentStep - 1]}
       </Text>
     </View>
   );

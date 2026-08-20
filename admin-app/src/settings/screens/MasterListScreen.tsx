@@ -5,6 +5,7 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  TextInput,
   BackHandler,
   Alert,
 } from 'react-native';
@@ -17,6 +18,7 @@ import { useMasterData } from '../context/MasterDataContext';
 import { MasterStatus } from '../types/masterData';
 import { MasterFormModal } from '../components/MasterFormModal';
 import { MasterStatusBadge } from '../components/MasterStatusBadge';
+import { isDealer } from '../../auth/rbacStore';
 import {
   BrandFormFields,
   BrandFormState,
@@ -43,8 +45,9 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
+import { radius, spacing } from '../../theme/spacing';
 import { RootStackParamList } from '../../navigation/types';
+import { resolveMasterImageUri } from '../utils/resolveMasterImage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MasterList'>;
 
@@ -74,6 +77,8 @@ export function MasterListScreen({ navigation, route }: Props) {
 
   const [form, setForm] = useState<FormState | null>(null);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const zoneOptions = useMemo(
     () => master.deliveryZones.filter((z) => z.status === 'active').map((z) => z.name),
@@ -148,9 +153,24 @@ export function MasterListScreen({ navigation, route }: Props) {
     }
   }, [entity, master]);
 
+  const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (item) =>
+        item.name.toLowerCase().includes(q) ||
+        (item.secondary || '').toLowerCase().includes(q) ||
+        (item.tertiary || '').toLowerCase().includes(q),
+    );
+  }, [items, search]);
+
   const handleGoBack = useCallback(() => {
     if (navigation.canGoBack()) {
       navigation.goBack();
+      return;
+    }
+    if (isDealer()) {
+      navigation.navigate('DealerTabs', { screen: 'Masters' });
       return;
     }
     navigation.navigate('MastersHome');
@@ -244,37 +264,49 @@ export function MasterListScreen({ navigation, route }: Props) {
     setError('');
   };
 
-  const handleSave = () => {
-    if (!form) return;
+  const handleSave = async () => {
+    if (!form || saving) return;
     if (!form.data.name?.trim()) {
       setError(`${entityName} name is required`);
       return;
     }
 
+    setSaving(true);
+    setError('');
     let ok = false;
-    switch (form.entity) {
-      case 'brands':
-        ok = master.saveBrand(form.data);
-        break;
-      case 'suppliers':
-        ok = master.saveSupplier(form.data);
-        break;
-      case 'dealers':
-        ok = master.saveDealer(form.data);
-        break;
-      case 'wholesalers':
-        ok = master.saveWholesaler(form.data);
-        break;
-      case 'warehouses':
-        ok = master.saveWarehouse(form.data);
-        break;
-      case 'deliveryPartners':
-        ok = master.saveDeliveryPartner(form.data);
-        break;
-      case 'deliveryZones':
-        ok = master.saveDeliveryZone(form.data);
-        break;
+    try {
+      switch (form.entity) {
+        case 'brands': {
+          const logoUri = await resolveMasterImageUri(form.data.logoUri);
+          ok = master.saveBrand({ ...form.data, logoUri });
+          break;
+        }
+        case 'suppliers':
+          ok = master.saveSupplier(form.data);
+          break;
+        case 'dealers':
+          ok = master.saveDealer(form.data);
+          break;
+        case 'wholesalers':
+          ok = master.saveWholesaler(form.data);
+          break;
+        case 'warehouses':
+          ok = master.saveWarehouse(form.data);
+          break;
+        case 'deliveryPartners':
+          ok = master.saveDeliveryPartner(form.data);
+          break;
+        case 'deliveryZones':
+          ok = master.saveDeliveryZone(form.data);
+          break;
+      }
+    } catch (err) {
+      console.warn('Failed to save master item:', err);
+      setError('Failed to upload image. Please try again.');
+      setSaving(false);
+      return;
     }
+    setSaving(false);
 
     if (!ok) {
       setError(`This ${entityName.toLowerCase()} already exists or is invalid`);
@@ -331,20 +363,36 @@ export function MasterListScreen({ navigation, route }: Props) {
       </View>
 
       <FlatList
-        data={items}
+        data={filteredItems}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListHeaderComponent={
-          <View style={styles.listHeader}>
-            <Text style={styles.subtitle}>
-              {items.length} {title.toLowerCase()}
-            </Text>
-            <Button title={`+ Add ${entityName}`} onPress={openAdd} variant="accent" size="sm" />
+          <View style={styles.listHeaderBlock}>
+            <View style={styles.searchWrap}>
+              <Ionicons name="search-outline" size={18} color={colors.textMuted} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder={`Search ${title.toLowerCase()}`}
+                placeholderTextColor={colors.textMuted}
+                value={search}
+                onChangeText={setSearch}
+              />
+            </View>
+            <View style={styles.listHeader}>
+              <Text style={styles.subtitle}>
+                {filteredItems.length} {title.toLowerCase()}
+              </Text>
+              <Button title={`+ Add ${entityName}`} onPress={openAdd} variant="accent" size="sm" />
+            </View>
           </View>
         }
         ListEmptyComponent={
           <Card style={styles.emptyCard}>
-            <Text style={styles.empty}>No {title.toLowerCase()} yet. Add one to get started.</Text>
+            <Text style={styles.empty}>
+              {search.trim()
+                ? `No ${title.toLowerCase()} match your search.`
+                : `No ${title.toLowerCase()} yet. Add one to get started.`}
+            </Text>
           </Card>
         }
         renderItem={({ item }) => (
@@ -389,6 +437,7 @@ export function MasterListScreen({ navigation, route }: Props) {
         title={formTitle}
         onClose={closeForm}
         onSave={handleSave}
+        saveDisabled={saving}
       >
         {form?.entity === 'brands' && (
           <BrandFormFields
@@ -486,11 +535,29 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.textHeading },
   list: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  listHeaderBlock: { marginBottom: spacing.md },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    minHeight: 44,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: colors.text,
+    paddingVertical: spacing.sm,
+  },
   listHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
     gap: spacing.md,
   },
   subtitle: {

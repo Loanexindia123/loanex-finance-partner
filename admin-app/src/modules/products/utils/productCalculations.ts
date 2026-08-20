@@ -127,8 +127,6 @@ export function computeCompleteness(formData: ProductFormData): CompletenessSect
     formData.shortDescription || formData.description,
   ];
   const pricingFields = [formData.mrp, formData.sellingPrice, formData.purchasePrice, formData.gst];
-  const inventoryFields = [formData.warehouse, formData.availableStock || formData.openingStock];
-  const supplierFields = formData.suppliers.flatMap((s) => [s.supplier, s.paymentTerms]);
   const deliveryFields = [formData.weight, formData.deliveryDays, formData.dispatchSla];
   const seoFields = [formData.slug, formData.metaTitle, formData.metaDescription];
 
@@ -154,8 +152,6 @@ export function computeCompleteness(formData: ProductFormData): CompletenessSect
     { key: 'pricing', label: 'Pricing', percent: score(pricingFields.filter(Boolean).length, pricingFields.length) },
     { key: 'variants', label: 'Variants', percent: variantsPercent },
     { key: 'images', label: 'Images', percent: imageCount > 0 ? 100 : 0 },
-    { key: 'inventory', label: 'Inventory', percent: score(inventoryFields.filter(Boolean).length, inventoryFields.length) },
-    { key: 'supplier', label: 'Supplier', percent: supplierFields.filter(Boolean).length ? score(supplierFields.filter(Boolean).length, Math.max(supplierFields.length, 2)) : 0 },
     { key: 'delivery', label: 'Delivery', percent: score(deliveryFields.filter(Boolean).length, deliveryFields.length) },
     { key: 'emi', label: 'EMI', percent: emiPercent },
     { key: 'seo', label: 'SEO', percent: score(seoFields.filter(Boolean).length, seoFields.length) },

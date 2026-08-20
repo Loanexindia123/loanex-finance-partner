@@ -18,8 +18,12 @@ export function optionalAuthenticate(
 
   try {
     req.user = verifyAccessToken(token);
+    req.authFailed = false;
   } catch {
-    // Optional auth — invalid tokens are ignored
+    // Caller sent a Bearer token but it is invalid/expired.
+    // Do NOT silently treat as anonymous — product list would leak the public catalog.
+    req.user = undefined;
+    req.authFailed = true;
   }
 
   next();

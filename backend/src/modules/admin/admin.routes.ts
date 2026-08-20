@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import { authenticate } from '../../common/middleware/authenticate';
-import { requireAnyPermission, requirePermission } from '../../common/middleware/require-permission';
+import {
+  requireAnyPermission,
+  requireAnyPermissionOrDealer,
+  requirePermission,
+} from '../../common/middleware/require-permission';
 import { validateRequest } from '../../common/middleware/validate';
 import { asyncHandler } from '../../common/utils/async-handler';
 import { adminController } from './admin.controller';
@@ -258,36 +262,37 @@ adminRouter.delete(
 );
 
 // —— Product Types (dedicated: name uniqueness + seed defaults) ——
+// Dealers use these from admin-app Masters; staff need masters.* or products.* .
 adminRouter.get(
   '/product_types',
-  requirePermission('masters.view'),
+  requireAnyPermissionOrDealer('masters.view', 'products.view'),
   asyncHandler(productTypeController.list),
 );
 adminRouter.get(
   '/product_types/active',
-  requirePermission('masters.view'),
+  requireAnyPermissionOrDealer('masters.view', 'products.view'),
   asyncHandler(productTypeController.listActive),
 );
 adminRouter.post(
   '/product_types',
-  requirePermission('masters.create'),
+  requireAnyPermissionOrDealer('masters.create', 'products.create'),
   validateRequest(createProductTypeBodySchema),
   asyncHandler(productTypeController.create),
 );
 adminRouter.get(
   '/product_types/:id',
-  requirePermission('masters.view'),
+  requireAnyPermissionOrDealer('masters.view', 'products.view'),
   asyncHandler(productTypeController.getById),
 );
 adminRouter.put(
   '/product_types/:id',
-  requirePermission('masters.edit'),
+  requireAnyPermissionOrDealer('masters.edit', 'products.edit'),
   validateRequest(updateProductTypeBodySchema),
   asyncHandler(productTypeController.update),
 );
 adminRouter.delete(
   '/product_types/:id',
-  requirePermission('masters.delete'),
+  requireAnyPermissionOrDealer('masters.delete', 'products.edit'),
   asyncHandler(productTypeController.remove),
 );
 

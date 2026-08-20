@@ -101,13 +101,53 @@ export function useOptionsRegistry(): OptionsRegistryContextType {
       renameDeliveryZone: master.renameDeliveryZone,
       deleteDeliveryZone: master.deleteDeliveryZoneByName,
 
-      addCategory: master.addCategory,
-      renameCategory: master.renameCategory,
-      deleteCategory: master.deleteCategoryByName,
+      addCategory: (name) =>
+        master.saveCategory({
+          name,
+          parentId: null,
+          status: 'active',
+          displayOrder: 0,
+        }),
+      renameCategory: (from, to) => {
+        const target = master.categories.find((c) => !c.parentId && c.name === from);
+        if (!target) return false;
+        return master.saveCategory({
+          ...target,
+          name: to,
+        });
+      },
+      deleteCategory: (name) => {
+        const target = master.categories.find((c) => !c.parentId && c.name === name);
+        if (target) master.deleteCategory(target.id);
+      },
 
-      addSubCategory: master.addSubCategory,
-      renameSubCategory: master.renameSubCategory,
-      deleteSubCategory: master.deleteSubCategory,
+      addSubCategory: (category, name) => {
+        const parent = master.categories.find((c) => !c.parentId && c.name === category);
+        if (!parent) return false;
+        return master.saveCategory({
+          name,
+          parentId: parent.id,
+          status: 'active',
+          displayOrder: 0,
+        });
+      },
+      renameSubCategory: (category, from, to) => {
+        const parent = master.categories.find((c) => !c.parentId && c.name === category);
+        if (!parent) return false;
+        const target = master.categories.find(
+          (c) => c.parentId === parent.id && c.name === from,
+        );
+        if (!target) return false;
+        return master.saveCategory({ ...target, name: to });
+      },
+      deleteSubCategory: (category, name) => {
+        const parent = master.categories.find((c) => !c.parentId && c.name === category);
+        if (!parent) return;
+        const target = master.categories.find(
+          (c) => c.parentId === parent.id && c.name === name,
+        );
+        if (target) master.deleteCategory(target.id);
+      },
     }),
     [master],
   );

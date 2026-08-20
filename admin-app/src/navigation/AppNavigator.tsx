@@ -34,21 +34,30 @@ import { SettingsHomeScreen } from '../settings/screens/SettingsHomeScreen';
 import { MastersHomeScreen } from '../settings/screens/MastersHomeScreen';
 import { MasterListScreen } from '../settings/screens/MasterListScreen';
 import { CategoriesMasterScreen } from '../settings/screens/CategoriesMasterScreen';
+import { ProductTypesMasterScreen } from '../modules/masters/screens/ProductTypesMasterScreen';
 import { BranchMasterScreen } from '../settings/screens/BranchMasterScreen';
 import { PincodeMasterScreen } from '../settings/screens/PincodeMasterScreen';
 import { CodSettingsScreen } from '../settings/screens/CodSettingsScreen';
+import { DealerTabNavigator } from './DealerTabNavigator';
 import { RootStackParamList } from './types';
 import { isDealer } from '../auth/rbacStore';
 
-const DEALER_ALLOWED_ROUTES = new Set<keyof RootStackParamList>([
+const DEALER_ALLOWED_ROUTES = new Set<keyof RootStackParamList | string>([
   'Splash',
   'Login',
+  'DealerTabs',
   'Dashboard',
+  'Products',
+  'Masters',
+  'Profile',
   'ProductList',
   'AddProduct',
   'ProductDetails',
   'ChangePassword',
   'MyProfile',
+  'CategoriesMaster',
+  'MasterList',
+  'ProductTypesMaster',
 ]);
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -70,9 +79,9 @@ export function AppNavigator() {
   useEffect(() => {
     const unsubscribe = navigationRef.addListener('state', () => {
       if (!navigationRef.isReady() || !isDealer()) return;
-      const routeName = navigationRef.getCurrentRoute()?.name as keyof RootStackParamList | undefined;
+      const routeName = navigationRef.getCurrentRoute()?.name;
       if (routeName && !DEALER_ALLOWED_ROUTES.has(routeName)) {
-        navigationRef.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
+        navigationRef.reset({ index: 0, routes: [{ name: 'DealerTabs' }] });
       }
     });
     return unsubscribe;
@@ -90,6 +99,7 @@ export function AppNavigator() {
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="DealerTabs" component={DealerTabNavigator} />
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="MyProfile" component={MyProfileScreen} />
@@ -131,6 +141,7 @@ export function AppNavigator() {
         <Stack.Screen name="MastersHome" component={MastersHomeScreen} />
         <Stack.Screen name="MasterList" component={MasterListScreen} />
         <Stack.Screen name="CategoriesMaster" component={CategoriesMasterScreen} />
+        <Stack.Screen name="ProductTypesMaster" component={ProductTypesMasterScreen} />
         <Stack.Screen name="BranchMaster" component={BranchMasterScreen} />
         <Stack.Screen name="PincodeMaster" component={PincodeMasterScreen} />
       </Stack.Navigator>

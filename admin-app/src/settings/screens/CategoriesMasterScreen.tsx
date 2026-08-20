@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TextInput,
   BackHandler,
   Alert,
 } from 'react-native';
@@ -24,8 +25,10 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
+import { radius, spacing } from '../../theme/spacing';
 import { RootStackParamList } from '../../navigation/types';
+import { isDealer } from '../../auth/rbacStore';
+import { resolveMasterImageUri } from '../utils/resolveMasterImage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CategoriesMaster'>;
 
@@ -34,6 +37,8 @@ export function CategoriesMasterScreen({ navigation }: Props) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [form, setForm] = useState<CategoryFormState | null>(null);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const topLevel = useMemo(() => {
     return categories
@@ -55,6 +60,15 @@ export function CategoriesMasterScreen({ navigation }: Props) {
     [categories],
   );
 
+  const filteredTopLevel = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return topLevel;
+    return topLevel.filter((category) => {
+      if (category.name.toLowerCase().includes(q)) return true;
+      return childrenOf(category.id).some((sub) => sub.name.toLowerCase().includes(q));
+    });
+  }, [topLevel, search, childrenOf]);
+
   const parentOptions = useMemo(() => {
     return topLevel
       .filter((c) => c.id !== form?.id)
@@ -64,6 +78,10 @@ export function CategoriesMasterScreen({ navigation }: Props) {
   const handleGoBack = useCallback(() => {
     if (navigation.canGoBack()) {
       navigation.goBack();
+      return;
+    }
+    if (isDealer()) {
+      navigation.navigate('DealerTabs', { screen: 'Masters' });
       return;
     }
     navigation.navigate('MastersHome');
@@ -99,18 +117,30 @@ export function CategoriesMasterScreen({ navigation }: Props) {
     setError('');
   };
 
-  const handleSave = () => {
-    if (!form) return;
+  const handleSave = async () => {
+    if (!form || saving) return;
     if (!form.name.trim()) {
       setError('Category name is required');
       return;
     }
-    const ok = saveCategory(form);
-    if (!ok) {
-      setError('This category already exists under the selected parent, or is invalid');
-      return;
+
+    setSaving(true);
+    setError('');
+    try {
+      const imageUri = await resolveMasterImageUri(form.imageUri);
+      const ok = saveCategory({ ...form, imageUri });
+      if (!ok) {
+        setError('This category already exists under the selected parent, or is invalid');
+        setSaving(false);
+        return;
+      }
+      closeForm();
+    } catch (err) {
+      console.warn('Failed to save category:', err);
+      setError('Failed to upload image. Please try again.');
+    } finally {
+      setSaving(false);
     }
-    closeForm();
   };
 
   const confirmDelete = (item: CategoryMaster) => {
@@ -138,21 +168,36 @@ export function CategoriesMasterScreen({ navigation }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.searchWrap}>
+          <Ionicons name="search-outline" size={18} color={colors.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search categories"
+            placeholderTextColor={colors.textMuted}
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
+
         <View style={styles.listHeader}>
           <Text style={styles.subtitle}>
-            {topLevel.length} categor{topLevel.length === 1 ? 'y' : 'ies'}
+            {filteredTopLevel.length} categor{filteredTopLevel.length === 1 ? 'y' : 'ies'}
           </Text>
           <Button title="+ Add Category" onPress={() => openAdd(null)} variant="accent" size="sm" />
         </View>
 
-        {topLevel.length === 0 ? (
+        {filteredTopLevel.length === 0 ? (
           <Card style={styles.emptyCard}>
-            <Text style={styles.empty}>No categories yet. Add one to get started.</Text>
+            <Text style={styles.empty}>
+              {search.trim()
+                ? 'No categories match your search.'
+                : 'No categories yet. Add one to get started.'}
+            </Text>
           </Card>
         ) : (
-          topLevel.map((category) => {
+          filteredTopLevel.map((category) => {
             const subs = childrenOf(category.id);
-            const isOpen = !!expanded[category.id];
+            const isOpen = !!expanded[category.id] || !!search.trim();
 
             return (
               <Card key={category.id} style={styles.categoryCard}>
@@ -247,6 +292,7 @@ export function CategoriesMasterScreen({ navigation }: Props) {
         title={form?.id ? 'Edit Category' : 'Add Category'}
         onClose={closeForm}
         onSave={handleSave}
+        saveDisabled={saving}
       >
         {form && (
           <CategoryFormFields
@@ -284,6 +330,24 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.textHeading },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    minHeight: 44,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: colors.text,
+    paddingVertical: spacing.sm,
+  },
   listHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -297,31 +361,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
   },
-  emptyCard: { marginTop: spacing.sm },
-  empty: { fontSize: 14, color: colors.textMuted, fontStyle: 'italic' },
+  emptyCard: { marginBottom: spacing.md },
+  empty: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
   categoryCard: { marginBottom: spacing.md },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  categoryMain: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
+  categoryRow: { flexDirection: 'row', alignItems: 'center' },
+  categoryMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   categoryText: { flex: 1 },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   categoryTitle: { fontSize: 16, fontWeight: '700', color: colors.textHeading },
-  categoryMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  rowActions: { flexDirection: 'row', gap: spacing.xs },
-  iconBtn: { padding: spacing.sm },
+  categoryMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  rowActions: { flexDirection: 'row', alignItems: 'center' },
+  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   subList: {
     marginTop: spacing.md,
     paddingTop: spacing.md,
@@ -332,20 +382,12 @@ const styles = StyleSheet.create({
   subRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   subText: { flex: 1 },
-  subLabel: { fontSize: 14, fontWeight: '600', color: colors.text, flexShrink: 1 },
-  subMeta: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  emptySub: {
-    fontSize: 13,
-    color: colors.textMuted,
-    fontStyle: 'italic',
-    paddingVertical: spacing.sm,
-  },
-  addSubBtn: { paddingVertical: spacing.md },
-  addSubText: { fontSize: 14, fontWeight: '700', color: colors.accentDark },
+  subLabel: { fontSize: 14, fontWeight: '600', color: colors.text },
+  subMeta: { fontSize: 11, color: colors.textMuted },
+  emptySub: { fontSize: 13, color: colors.textMuted, fontStyle: 'italic', marginBottom: spacing.sm },
+  addSubBtn: { paddingVertical: spacing.sm },
+  addSubText: { fontSize: 13, fontWeight: '700', color: colors.secondary },
 });

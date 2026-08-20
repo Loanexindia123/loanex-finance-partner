@@ -141,6 +141,7 @@ export class ProductForm {
   readonly steps = WIZARD_STEPS;
   readonly stepMeta = WIZARD_STEP_META;
   readonly emiStepIndex = 6;
+  readonly deliveryStepIndex = 5;
   readonly activeStep = signal(0);
   readonly currentStep = computed(() => this.stepMeta[this.activeStep()]);
   readonly isEmployee = computed(
@@ -149,11 +150,12 @@ export class ProductForm {
         .trim()
         .toLowerCase() === 'employee',
   );
+  /** Same gate as EMI — Employee (and Dealer on admin-app) must not configure delivery. */
   readonly hideEmiStep = computed(() => this.isEmployee());
   readonly visibleStepMeta = computed(() =>
     this.stepMeta
       .map((step, index) => ({ ...step, index }))
-      .filter((step) => !(this.hideEmiStep() && step.index === this.emiStepIndex)),
+      .filter((step) => !this.isHiddenWizardStep(step.index)),
   );
   readonly showPublishButton = computed(() => this.isEdit && !this.isEmployee());
   readonly showSaveForApproval = computed(() => {
@@ -286,7 +288,7 @@ export class ProductForm {
   reloadDealers(): void {
     this.dealersLoading.set(true);
     this.dealersError.set('');
-    this.dealerService.list().subscribe({
+    this.dealerService.list({ approvedOnly: true }).subscribe({
       next: (dealers) => {
         this.dealerCatalog.set(dealers);
         this.dealersLoading.set(false);
@@ -2542,7 +2544,7 @@ export class ProductForm {
   }
 
   goToStep(index: number): void {
-    if (this.hideEmiStep() && index === this.emiStepIndex) return;
+    if (this.isHiddenWizardStep(index)) return;
     this.activeStep.set(index);
   }
   next(): void {
@@ -2552,15 +2554,19 @@ export class ProductForm {
       if (stockCtrl?.invalid) return;
     }
     this.activeStep.update((i) => {
-      let next = Math.min(i + 1, this.steps.length - 1);
-      if (this.hideEmiStep() && next === this.emiStepIndex) next += 1;
+      let next = i + 1;
+      while (next < this.steps.length && this.isHiddenWizardStep(next)) {
+        next += 1;
+      }
       return Math.min(next, this.steps.length - 1);
     });
   }
   back(): void {
     this.activeStep.update((i) => {
-      let prev = Math.max(i - 1, 0);
-      if (this.hideEmiStep() && prev === this.emiStepIndex) prev -= 1;
+      let prev = i - 1;
+      while (prev >= 0 && this.isHiddenWizardStep(prev)) {
+        prev -= 1;
+      }
       return Math.max(prev, 0);
     });
   }
@@ -2722,7 +2728,10 @@ export class ProductForm {
       .map((uri: unknown) => String(uri ?? '').trim())
       .filter((uri: string) => !!uri);
 
-    const replacementWindow = String(v.replacementWindow || v.replacementWindowDays || '');
+    const replacementWindow = this.restrictedWizardField(
+      'replacementWindow',
+      v.replacementWindow || v.replacementWindowDays || '',
+    );
     const wizardData: ProductWizardData = {
       ...initialWizardData(),
       ...this.loadedWizard,
@@ -2768,8 +2777,8 @@ export class ProductForm {
       minOrderQuantity: String(v.minOrderQuantity ?? ''),
       maxQuantityPerCustomer: String(v.maxQuantityPerCustomer ?? ''),
       minimumCustomerAge: String(v.minimumCustomerAge ?? ''),
-      deliveryCharges: String(v.deliveryCharges ?? ''),
-      installationCharge: String(v.installationCharge ?? ''),
+      deliveryCharges: this.restrictedWizardField('deliveryCharges', v.deliveryCharges),
+      installationCharge: this.restrictedWizardField('installationCharge', v.installationCharge),
       defaultDownPaymentPercent: String(
         this.isEmployee()
           ? (this.loadedWizard.defaultDownPaymentPercent ?? '')
@@ -2798,6 +2807,36 @@ export class ProductForm {
       replacementWindow,
       replacementDays: replacementWindow,
       replacementWindowDays: replacementWindow,
+      weight: this.restrictedWizardField('weight', v.weight),
+      length: this.restrictedWizardField('length', v.length),
+      width: this.restrictedWizardField('width', v.width),
+      height: this.restrictedWizardField('height', v.height),
+      dispatchSla: this.restrictedWizardField('dispatchSla', v.dispatchSla),
+      deliveryDays: this.restrictedWizardField('deliveryDays', v.deliveryDays),
+      deliveryCode: this.restrictedWizardField('deliveryCode', v.deliveryCode),
+      deliveryPartner: this.restrictedWizardField('deliveryPartner', v.deliveryPartner),
+      deliveryZone: this.restrictedWizardField('deliveryZone', v.deliveryZone),
+      deliveryChargeMethod: this.restrictedWizardField('deliveryChargeMethod', v.deliveryChargeMethod),
+      expressDelivery: this.hideEmiStep()
+        ? this.isEdit
+          ? this.loadedWizard.expressDelivery === true
+          : false
+        : v.expressDelivery,
+      deliveryConfirmationOtp: this.hideEmiStep()
+        ? this.isEdit
+          ? this.loadedWizard.deliveryConfirmationOtp === true
+          : false
+        : v.deliveryConfirmationOtp,
+      serialImeiCaptureAtDelivery: this.hideEmiStep()
+        ? this.isEdit
+          ? this.loadedWizard.serialImeiCaptureAtDelivery === true
+          : false
+        : v.serialImeiCaptureAtDelivery,
+      installationRequired: this.hideEmiStep()
+        ? this.isEdit
+          ? this.loadedWizard.installationRequired === true
+          : false
+        : v.installationRequired,
     };
 
     return {
@@ -2836,6 +2875,25 @@ export class ProductForm {
       return sum;
     }
     return parseNonNegativeIntValue(availableStock) ?? undefined;
+  }
+
+  private isHiddenWizardStep(index: number): boolean {
+    return (
+      this.hideEmiStep() &&
+      (index === this.emiStepIndex || index === this.deliveryStepIndex)
+    );
+  }
+
+  /** Preserve admin-configured wizard fields when Employee saves (same pattern as EMI). */
+  private restrictedWizardField(field: keyof ProductWizardData, formValue: unknown): string {
+    if (!this.hideEmiStep()) {
+      return String(formValue ?? '');
+    }
+    if (this.isEdit) {
+      const loaded = this.loadedWizard[field];
+      return loaded === undefined || loaded === null ? '' : String(loaded);
+    }
+    return '';
   }
 
   private extractMessage(err: unknown): string {

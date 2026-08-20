@@ -301,12 +301,20 @@ function assertCanAccess(dealer: DealerRecord, actor: DealerActor): void {
 }
 
 export class DealerService {
-  async list(actorUserId: string): Promise<DealerRecord[]> {
+  async list(
+    actorUserId: string,
+    options?: { approvedOnly?: boolean },
+  ): Promise<DealerRecord[]> {
     await ensureReady();
     const actor = resolveActor(actorUserId);
     const all = (jsonDb.findMany(COLLECTION, {}) as any[]).map(buildRecord);
-    if (actor.orgWide) return all;
-    return all.filter((d) => canAccessDealer(d, actor));
+    const scoped = actor.orgWide ? all : all.filter((d) => canAccessDealer(d, actor));
+    // Product catalog / pickers: only dealers that passed approval (formStatus or
+    // verificationStatus). Masters list omits this flag so pending stays visible.
+    if (options?.approvedOnly) {
+      return scoped.filter(isDealerApproved);
+    }
+    return scoped;
   }
 
   async getById(id: string, actorUserId: string): Promise<DealerRecord> {
@@ -399,7 +407,10 @@ export class DealerService {
     if (record.userId === result.userId) {
       return record;
     }
-    const linked = jsonDb.update(COLLECTION, { id: record.id }, { userId: result.userId });
+    // Await Mongo mirror so dealers.userId survives process restart / other instances.
+    const linked = await jsonDb.updateAwaited(COLLECTION, { id: record.id }, {
+      userId: result.userId,
+    });
     return linked ? buildRecord(linked) : { ...record, userId: result.userId };
   }
 

@@ -33,6 +33,51 @@ const WIZARD_EMI_KEYS = [
   'gracePeriod',
 ] as const;
 
+/** Catalog delivery columns on `products`. */
+export const PRODUCT_DELIVERY_COLUMN_KEYS = [
+  'weight',
+  'length',
+  'width',
+  'height',
+  'dispatchSla',
+  'deliveryCharges',
+  'deliveryDays',
+  'deliveryCode',
+  'deliveryPartner',
+  'deliveryZone',
+  'expressDelivery',
+  'deliveryChargeMethod',
+  'deliveryConfirmationOtp',
+  'serialImeiCaptureAtDelivery',
+  'replacementWindow',
+  'replacementDays',
+  'installationRequired',
+  'installationCharge',
+  'deliveryCharge',
+] as const;
+
+const WIZARD_DELIVERY_KEYS = [
+  'weight',
+  'length',
+  'width',
+  'height',
+  'dispatchSla',
+  'deliveryCharges',
+  'deliveryDays',
+  'replacementWindow',
+  'replacementDays',
+  'replacementWindowDays',
+  'deliveryCode',
+  'deliveryChargeMethod',
+  'installationCharge',
+  'installationRequired',
+  'deliveryPartner',
+  'deliveryZone',
+  'expressDelivery',
+  'deliveryConfirmationOtp',
+  'serialImeiCaptureAtDelivery',
+] as const;
+
 export function isEmployeeUser(userId: string | undefined): boolean {
   if (!userId) return false;
   const user = jsonDb.findOne('users', { id: userId }) as any;
@@ -167,4 +212,46 @@ export function restoreEmployeeEmiFromExisting(
     }
   }
   mapped.wizardData = preserveWizardEmi(mapped.wizardData, existing.wizardData);
+}
+
+/** Employees/Dealers must not create or edit catalog delivery. Strip from request body. */
+export function stripEmployeeDeliveryFromPayload(data: any): void {
+  if (!data || typeof data !== 'object') return;
+  for (const key of PRODUCT_DELIVERY_COLUMN_KEYS) {
+    delete data[key];
+  }
+  if (data.wizardData && typeof data.wizardData === 'object') {
+    for (const key of WIZARD_DELIVERY_KEYS) {
+      delete data.wizardData[key];
+    }
+  }
+}
+
+function preserveWizardDelivery(mappedWizard: any, existingWizard: any): any {
+  const next =
+    mappedWizard && typeof mappedWizard === 'object' ? { ...mappedWizard } : {};
+  const prev = existingWizard && typeof existingWizard === 'object' ? existingWizard : {};
+  for (const key of WIZARD_DELIVERY_KEYS) {
+    if (prev[key] !== undefined) {
+      next[key] = prev[key];
+    } else {
+      delete next[key];
+    }
+  }
+  return next;
+}
+
+/** Employee/Dealer product edits must not wipe admin-configured delivery. */
+export function restoreEmployeeDeliveryFromExisting(
+  mapped: Record<string, any>,
+  existing: Record<string, any>,
+): void {
+  for (const key of PRODUCT_DELIVERY_COLUMN_KEYS) {
+    if (existing[key] !== undefined) {
+      mapped[key] = existing[key];
+    } else {
+      delete mapped[key];
+    }
+  }
+  mapped.wizardData = preserveWizardDelivery(mapped.wizardData, existing.wizardData);
 }

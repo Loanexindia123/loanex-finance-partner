@@ -2,8 +2,10 @@ import { Response } from 'express';
 
 import { sendSuccess } from '../../../common/utils/api-response';
 import type { AuthenticatedRequest } from '../../../common/middleware/authenticate';
-import { ForbiddenError } from '../../../common/errors/app-error';
+import { ForbiddenError, UnauthorizedError } from '../../../common/errors/app-error';
 import { rolesService } from '../../rbac/roles.service';
+import { resolveIsDealerUserId } from '../../admin/dealer/dealer-account';
+import { jsonDb } from '../../../config/json-db';
 
 import type {
   ListProductsQuery,
@@ -16,10 +18,29 @@ import { productService } from '../service/product.service';
 import { storeProductImage, streamProductImage } from '../service/product-image.service';
 import { isDealerUser, isEmployeeUser, isRestrictedCatalogUser } from '../utils/product-emi';
 
+async function resolveIsEmployeeUserId(userId: string): Promise<boolean> {
+  if (isEmployeeUser(userId)) return true;
+  try {
+    const { authRepository } = await import('../../auth/auth.repository');
+    const fromMongo = await authRepository.findById(userId);
+    if (!fromMongo) return false;
+    const collection = jsonDb.getCollection('users');
+    if (!collection.some((u: any) => u.id === fromMongo.id)) {
+      const { profiles: _profiles, ...row } = fromMongo as any;
+      collection.push(row);
+    }
+    return isEmployeeUser(userId);
+  } catch {
+    return false;
+  }
+}
+
 async function canViewHiddenProducts(req: AuthenticatedRequest): Promise<boolean> {
   const userId = req.user?.sub;
   if (!userId) return false;
-  if (isDealerUser(userId) || isEmployeeUser(userId)) return true;
+  if ((await resolveIsDealerUserId(userId)) || (await resolveIsEmployeeUserId(userId))) {
+    return true;
+  }
   try {
     const permissions = await rolesService.resolveUserPermissions(userId);
     return permissions.some(
@@ -31,6 +52,13 @@ async function canViewHiddenProducts(req: AuthenticatedRequest): Promise<boolean
     );
   } catch {
     return false;
+  }
+}
+
+/** Reject expired/invalid Bearer tokens so we never fall through to the public catalog. */
+function assertOptionalAuth(req: AuthenticatedRequest): void {
+  if (req.authFailed) {
+    throw new UnauthorizedError('Invalid or expired access token');
   }
 }
 
@@ -52,6 +80,7 @@ function actorId(req: AuthenticatedRequest): string {
 
 export class ProductController {
   list = async (req: AuthenticatedRequest, res: Response) => {
+    assertOptionalAuth(req);
     const allowHidden = await canViewHiddenProducts(req);
     const data = await productService.list(req.validatedQuery as ListProductsQuery, {
       forceCustomerVisible: !allowHidden,
@@ -62,6 +91,7 @@ export class ProductController {
   };
 
   getById = async (req: AuthenticatedRequest, res: Response) => {
+    assertOptionalAuth(req);
     const { productId } = req.validatedParams as ProductIdParam;
     const allowHidden = await canViewHiddenProducts(req);
     const data = await productService.getById(productId, {
@@ -72,6 +102,7 @@ export class ProductController {
   };
 
   getBySlug = async (req: AuthenticatedRequest, res: Response) => {
+    assertOptionalAuth(req);
     const { slug } = req.validatedParams as ProductSlugParam;
     const allowHidden = await canViewHiddenProducts(req);
     const data = await productService.getBySlug(slug, {

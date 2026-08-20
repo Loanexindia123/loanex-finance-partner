@@ -51,6 +51,28 @@ export function isDealerUserId(userId: string | undefined): boolean {
   return isDealerAuthUser(user);
 }
 
+/**
+ * Same as isDealerUserId, but loads the user from Mongo when the local
+ * jsonDb cache is cold (common right after API restart).
+ */
+export async function resolveIsDealerUserId(userId: string | undefined): Promise<boolean> {
+  if (!userId) return false;
+  if (isDealerUserId(userId)) return true;
+  try {
+    const { authRepository } = await import('../../auth/auth.repository');
+    const fromMongo = await authRepository.findById(userId);
+    if (!fromMongo || !isDealerAuthUser(fromMongo)) return false;
+    const collection = jsonDb.getCollection('users');
+    if (!collection.some((u: any) => u.id === fromMongo.id)) {
+      const { profiles: _profiles, ...row } = fromMongo as any;
+      collection.push(row);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function isEmployeeOrAdminAccount(user: any): boolean {
   if (!user || isDealerAuthUser(user)) return false;
   return String(user.role ?? '') === 'admin' || Boolean(user.role_id ?? user.roleId);

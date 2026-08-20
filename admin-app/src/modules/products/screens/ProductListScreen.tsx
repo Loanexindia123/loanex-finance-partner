@@ -23,7 +23,7 @@ import { colors } from '../../../theme/colors';
 import { radius, shadow, spacing } from '../../../theme/spacing';
 import { RootStackParamList } from '../../../navigation/types';
 import { getProducts, deleteProduct } from '../../../services/productService';
-import { useRbac, can } from '../../../auth/rbacStore';
+import { useRbac, can, isDealer } from '../../../auth/rbacStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProductList'>;
 
@@ -43,6 +43,7 @@ export function ProductListScreen({ navigation }: Props) {
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const rbac = useRbac();
+  const dealerTabRoot = isDealer() && !navigation.canGoBack();
 
   const fetchProducts = async () => {
     try {
@@ -64,6 +65,8 @@ export function ProductListScreen({ navigation }: Props) {
       setProducts(mappedProducts);
     } catch (e) {
       console.warn('Failed to fetch products', e);
+      // Avoid showing a stale / public-catalog list after auth failures.
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -133,12 +136,19 @@ export function ProductListScreen({ navigation }: Props) {
       navigation.goBack();
       return;
     }
+    if (isDealer()) {
+      navigation.navigate('DealerTabs', { screen: 'Dashboard' });
+      return;
+    }
     navigation.navigate('Dashboard');
   }, [navigation]);
 
   useFocusEffect(
     useCallback(() => {
       const onHardwareBackPress = () => {
+        if (isDealer() && !navigation.canGoBack()) {
+          return true;
+        }
         if (navigation.canGoBack()) {
           return false;
         }
@@ -156,14 +166,18 @@ export function ProductListScreen({ navigation }: Props) {
       <View style={styles.container}>
         <View style={styles.header}>
           <View style={styles.headerRow}>
-            <TouchableOpacity
-              style={styles.backBtn}
-              onPress={handleGoBack}
-              accessibilityLabel="Go back"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="arrow-back" size={24} color={colors.primary} />
-            </TouchableOpacity>
+            {dealerTabRoot ? (
+              <View style={styles.backBtn} />
+            ) : (
+              <TouchableOpacity
+                style={styles.backBtn}
+                onPress={handleGoBack}
+                accessibilityLabel="Go back"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="arrow-back" size={24} color={colors.primary} />
+              </TouchableOpacity>
+            )}
             <View style={styles.titleBlock}>
               <Text style={styles.title}>Products</Text>
               <Text style={styles.subtitle}>{filteredProducts.length} products in catalog</Text>

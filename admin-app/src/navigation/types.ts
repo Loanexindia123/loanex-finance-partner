@@ -1,8 +1,17 @@
+import { NavigatorScreenParams } from '@react-navigation/native';
 import { MasterListEntityKey } from '../settings/data/masterEntities';
+
+export type DealerTabParamList = {
+  Dashboard: undefined;
+  Products: undefined;
+  Masters: undefined;
+  Profile: undefined;
+};
 
 export type RootStackParamList = {
   Splash: undefined;
   Login: undefined;
+  DealerTabs: NavigatorScreenParams<DealerTabParamList> | undefined;
   Dashboard: undefined;
   Notifications: undefined;
   MyProfile: undefined;
@@ -33,6 +42,7 @@ export type RootStackParamList = {
   MastersHome: undefined;
   MasterList: { entity: MasterListEntityKey };
   CategoriesMaster: undefined;
+  ProductTypesMaster: undefined;
   BranchMaster: undefined;
   PincodeMaster: undefined;
 };

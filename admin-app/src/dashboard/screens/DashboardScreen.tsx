@@ -48,7 +48,10 @@ export function DashboardScreen({ navigation }: Props) {
       }
     };
     fetchStats();
-    loadNotifications();
+    // Dealers have no notifications UI/permission — skip admin notifications fetch (avoids 403).
+    if (!isDealer()) {
+      loadNotifications();
+    }
   }, []);
 
   const isSearching = searchQuery.trim().length > 0;
@@ -151,7 +154,11 @@ export function DashboardScreen({ navigation }: Props) {
                       icon={action.icon}
                       onPress={() => {
                         if (action.title === 'Products') {
-                          navigation.navigate('ProductList');
+                          if (dealerMode) {
+                            navigation.navigate('Products' as never);
+                          } else {
+                            navigation.navigate('ProductList');
+                          }
                           return;
                         }
                         if (action.title === 'Customers') {
@@ -223,7 +230,13 @@ export function DashboardScreen({ navigation }: Props) {
       <ProfileMenu
         visible={profileMenuVisible}
         onClose={() => setProfileMenuVisible(false)}
-        onMyProfile={() => navigation.navigate('MyProfile')}
+        onMyProfile={() => {
+          if (dealerMode) {
+            navigation.navigate('Profile' as never);
+          } else {
+            navigation.navigate('MyProfile');
+          }
+        }}
         onChangePassword={() => navigation.navigate('ChangePassword')}
         onLogout={handleLogout}
       />

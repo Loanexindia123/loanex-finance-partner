@@ -23,6 +23,12 @@
             "usesCleartextTraffic": true
           }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow LoanEx Super Admin to access your photos for product images."
+        }
       ]
     ],
     "extra": {

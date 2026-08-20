@@ -19,6 +19,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/useTheme';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { isDealer } from '../../auth/rbacStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MyProfile'>;
 
@@ -27,6 +28,7 @@ export function MyProfileScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [profile, setProfile] = React.useState<User | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const dealerTabRoot = isDealer() && !navigation.canGoBack();
 
   useFocusEffect(
     useCallback(() => {
@@ -49,25 +51,34 @@ export function MyProfileScreen({ navigation }: Props) {
       navigation.goBack();
       return;
     }
+    if (isDealer()) {
+      navigation.navigate('DealerTabs', { screen: 'Dashboard' });
+      return;
+    }
     navigation.navigate('Dashboard');
   }, [navigation]);
 
   useFocusEffect(
     useCallback(() => {
       const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (dealerTabRoot) return true;
         handleGoBack();
         return true;
       });
       return () => subscription.remove();
-    }, [handleGoBack]),
+    }, [handleGoBack, dealerTabRoot]),
   );
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleGoBack} style={styles.backButton} accessibilityLabel="Back">
-          <Ionicons name="arrow-back" size={24} color={colors.primary} />
-        </TouchableOpacity>
+        {dealerTabRoot ? (
+          <View style={styles.backButton} />
+        ) : (
+          <TouchableOpacity onPress={handleGoBack} style={styles.backButton} accessibilityLabel="Back">
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
+          </TouchableOpacity>
+        )}
         <Text style={styles.headerTitle}>My Profile</Text>
         <View style={styles.backButton} />
       </View>

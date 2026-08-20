@@ -15,6 +15,7 @@ interface InputProps extends TextInputProps {
   hint?: string;
   required?: boolean;
   suffix?: React.ReactNode;
+  containerStyle?: object;
 }
 
 export function Input({
@@ -24,12 +25,13 @@ export function Input({
   required,
   suffix,
   style,
+  containerStyle,
   ...props
 }: InputProps) {
   const [focused, setFocused] = useState(false);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerStyle]}>
       {label && (
         <Text style={styles.label}>
           {label}

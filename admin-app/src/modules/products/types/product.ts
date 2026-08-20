@@ -75,6 +75,10 @@ export interface VariantAttribute {
 
 export interface SupplierEntry {
   id: string;
+  /** Matches Admin Web supplier.dealerId */
+  dealerId?: string;
+  productSourceType?: string;
+  sourceCreatedBy?: string;
   supplier: string;
   dealer: string;
   wholesaler: string;
@@ -114,8 +118,11 @@ export interface ProductFormData {
   warranty: string;
   productCondition: string;
   shortDescription: string;
+  /** UI label: Overview — backend key remains `description`. */
   description: string;
   specifications: KeyValueItem[];
+  /** Matches Admin Web "About this item" list. */
+  aboutThisItem: TextListItem[];
   features: TextListItem[];
   boxContents: TextListItem[];
   productVideoUrl: string;
@@ -250,6 +257,9 @@ export const createEmptyEmiPlan = (): EMIPlan => ({
 
 export const createEmptySupplier = (): SupplierEntry => ({
   id: Date.now().toString(),
+  dealerId: '',
+  productSourceType: 'Dealer',
+  sourceCreatedBy: '',
   supplier: '',
   dealer: '',
   wholesaler: '',
@@ -287,10 +297,11 @@ export const initialFormData: ProductFormData = {
   manufacturer: '',
   countryOfOrigin: '',
   warranty: '',
-  productCondition: 'new',
+  productCondition: 'New',
   shortDescription: '',
   description: '',
   specifications: [],
+  aboutThisItem: [],
   features: [],
   boxContents: [],
   productVideoUrl: '',

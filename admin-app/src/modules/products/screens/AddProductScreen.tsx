@@ -19,8 +19,6 @@ import { Step2Category } from '../wizard/steps/Step2Category';
 import { Step3Variants } from '../wizard/steps/Step3Variants';
 import { Step4Images } from '../wizard/steps/Step4Images';
 import { Step5Pricing } from '../wizard/steps/Step5Pricing';
-import { Step6Inventory } from '../wizard/steps/Step6Inventory';
-import { Step7Supplier } from '../wizard/steps/Step7Supplier';
 import { Step8Delivery } from '../wizard/steps/Step8Delivery';
 import { Step9EMI } from '../wizard/steps/Step9EMI';
 import { Step10SEO } from '../wizard/steps/Step10SEO';
@@ -29,30 +27,96 @@ import { colors } from '../../../theme/colors';
 import { shadow, spacing } from '../../../theme/spacing';
 import { RootStackParamList } from '../../../navigation/types';
 import { useRbac } from '../../../auth/rbacStore';
-import { getProductById, createProduct, updateProduct } from '../../../services/productService';
-import { ProductVariant } from '../types/product';
+import { getProductById, createProduct, updateProduct, uploadProductImage } from '../../../services/productService';
+import { ProductFormData, ProductVariant, TextListItem } from '../types/product';
 import {
   normalizeColourSizeVariant,
   normalizeKeyValueItems,
   normalizeString,
   normalizeTextListItems,
 } from '../utils/normalizeWizardLists';
+import {
+  clearPendingImage,
+  getPendingImage,
+  remapImageUris,
+} from '../utils/pendingImages';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddProduct'>;
 
+/** Step components in Admin Web order (Inventory/Supplier are not separate wizard steps on Web). */
 const STEP_COMPONENTS = [
   Step1BasicInfo,
   Step2Category,
   Step3Variants,
   Step4Images,
   Step5Pricing,
-  Step6Inventory,
-  Step7Supplier,
   Step8Delivery,
   Step9EMI,
   Step10SEO,
   Step11Review,
 ];
+
+function parseNonNegativeIntValue(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const raw = String(value).trim();
+  if (raw === '') return null;
+  if (!/^\d+$/.test(raw)) return null;
+  return parseInt(raw, 10);
+}
+
+function toStringList(items: Array<TextListItem | string> | undefined): string[] {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) =>
+    typeof item === 'string' ? item : String((item as TextListItem)?.value ?? ''),
+  );
+}
+
+function resolvePayloadStock(
+  availableStock: unknown,
+  variants: ProductVariant[],
+): number | undefined {
+  if (variants.length > 0) {
+    let sum = 0;
+    for (const variant of variants) {
+      const parsed = parseNonNegativeIntValue(variant.stock);
+      if (parsed === null) return undefined;
+      sum += parsed;
+    }
+    return sum;
+  }
+  return parseNonNegativeIntValue(availableStock) ?? undefined;
+}
+
+/** Collect image URIs from form and upload any pending local files (Admin Web flushPendingImages). */
+async function flushPendingProductImages(data: ProductFormData): Promise<ProductFormData> {
+  const uris = new Set<string>();
+  if (data.primaryImage) uris.add(data.primaryImage);
+  for (const uri of data.galleryImages ?? []) {
+    if (uri) uris.add(uri);
+  }
+  for (const variant of data.variants ?? []) {
+    if (variant.variantImage) uris.add(variant.variantImage);
+    for (const uri of variant.galleryImages ?? []) {
+      if (uri) uris.add(uri);
+    }
+  }
+
+  const urlMap = new Map<string, string>();
+  for (const uri of uris) {
+    const pending = getPendingImage(uri);
+    if (!pending) continue;
+    const uploaded = await uploadProductImage(pending);
+    const serverUrl = String(uploaded?.url ?? '').trim();
+    if (!serverUrl) {
+      throw new Error('Image upload did not return a URL');
+    }
+    urlMap.set(uri, serverUrl);
+    clearPendingImage(uri);
+  }
+
+  if (urlMap.size === 0) return data;
+  return remapImageUris(data, urlMap);
+}
 
 function AddProductContent({ navigation, route }: Props) {
   const { currentStep, setCurrentStep, resetForm, formData, updateForm } = useWizard();
@@ -66,10 +130,18 @@ function AddProductContent({ navigation, route }: Props) {
   const [loading, setLoading] = useState(isEditMode);
   const [savingDraft, setSavingDraft] = useState(false);
   const [productStatus, setProductStatus] = useState('');
-  const EMI_STEP = 9;
-  const visibleSteps = isRestrictedCreator ? WIZARD_STEPS.filter((step) => step !== 'EMI') : WIZARD_STEPS;
-  const displayStep =
-    isRestrictedCreator && currentStep > EMI_STEP ? currentStep - 1 : currentStep;
+  /** 1-based indices matching WIZARD_STEPS */
+  const DELIVERY_STEP = 6;
+  const EMI_STEP = 7;
+  const SEO_STEP = 8;
+  const RESTRICTED_HIDDEN_STEPS = new Set([DELIVERY_STEP, EMI_STEP]);
+  const visibleSteps = isRestrictedCreator
+    ? WIZARD_STEPS.filter((step) => step !== 'EMI' && step !== 'Delivery')
+    : WIZARD_STEPS;
+  const displayStep = isRestrictedCreator
+    ? currentStep -
+      [...RESTRICTED_HIDDEN_STEPS].filter((stepIndex) => stepIndex < currentStep).length
+    : currentStep;
   const showSaveForApproval =
     isRestrictedCreator &&
     (!isEditMode ||
@@ -82,15 +154,11 @@ function AddProductContent({ navigation, route }: Props) {
           const p = await getProductById(productId);
           setProductStatus(String((p as any).status ?? ''));
           const wizardDataRaw = ((p as any).wizardData || {}) as Record<string, unknown>;
-          // Never overwrite defaults with undefined — undefined fields crash `.trim()` calls.
           const wizardData = Object.fromEntries(
             Object.entries(wizardDataRaw).filter(([, v]) => v !== undefined),
           ) as Record<string, unknown>;
           const primaryImage =
             normalizeString(p.image || wizardData.primaryImage) || null;
-          // Prefer the dedicated gallery list; fall back to `images`
-          // (which includes the primary image) and drop the primary from it
-          // so the gallery doesn't show a duplicate first image.
           const galleryRaw =
             (p as any).galleryImages || wizardData.galleryImages || (p as any).images || [];
 
@@ -130,11 +198,13 @@ function AddProductContent({ navigation, route }: Props) {
             metaTitle: normalizeString(wizardData.metaTitle),
             metaDescription: normalizeString(wizardData.metaDescription),
             keywords: normalizeString(wizardData.keywords ?? (p as any).keywords),
-            // API may store these as plain objects / JSON; UI expects KeyValueItem[] / TextListItem[]
             specifications: normalizeKeyValueItems(
               wizardData.specifications ?? (p as any).specifications,
             ),
             features: normalizeTextListItems(wizardData.features ?? (p as any).features),
+            aboutThisItem: normalizeTextListItems(
+              wizardData.aboutThisItem ?? (p as any).aboutThisItem,
+            ),
             boxContents: normalizeTextListItems(
               wizardData.boxContents ?? (p as any).boxContents,
             ),
@@ -150,11 +220,9 @@ function AddProductContent({ navigation, route }: Props) {
               features: normalizeTextListItems(variant.features),
               boxContents: normalizeTextListItems(variant.boxContents),
             })),
-            // Products created before the variants step existed have no
-            // wizardData.variantsEnabled — derive it from the saved variants.
             variantsEnabled:
               (Array.isArray(wizardData.variants) && wizardData.variants.length > 0) ||
-              (wizardData.variantsEnabled === true),
+              wizardData.variantsEnabled === true,
             suppliers: Array.isArray(wizardData.suppliers) ? wizardData.suppliers : [],
             emiPlans: Array.isArray(wizardData.emiPlans) ? wizardData.emiPlans : [],
             attributes: Array.isArray(wizardData.attributes) ? wizardData.attributes : [],
@@ -178,29 +246,160 @@ function AddProductContent({ navigation, route }: Props) {
     setTimeout(() => setCurrentStep(nextStep), 150);
   };
 
+  /** Matches Admin Web next() gate on Basic Info stock. */
+  const validateBasicInfoStock = (): string | null => {
+    const stock = String(formData.availableStock ?? '').trim();
+    if (stock === '') return 'Stock quantity is required.';
+    if (!/^\d+$/.test(stock)) return 'Stock quantity must be an integer of 0 or more.';
+    return null;
+  };
+
+  /** Matches Admin Web save() required-field gates. */
+  const validateForSave = (): { message: string; jumpStep?: number } | null => {
+    if (!formData.productName?.trim()) {
+      return { message: 'Product name, MRP and selling price are required.', jumpStep: 1 };
+    }
+    const mrp = String(formData.mrp ?? '').trim();
+    const sellingPrice = String(formData.sellingPrice ?? '').trim();
+    if (mrp === '' || sellingPrice === '') {
+      return { message: 'Product name, MRP and selling price are required.', jumpStep: 1 };
+    }
+
+    const variantsOn = formData.variantsEnabled === true && formData.variants.length > 0;
+    if (variantsOn) {
+      const invalid = formData.variants.some((v) => parseNonNegativeIntValue(v.stock) === null);
+      if (invalid) {
+        return {
+          message: 'Each variant needs a stock quantity (integer 0 or more).',
+          jumpStep: 3,
+        };
+      }
+    }
+
+    const stockError = validateBasicInfoStock();
+    if (stockError) return { message: stockError, jumpStep: 1 };
+    return null;
+  };
+
   const goNext = () => {
     if (currentStep >= WIZARD_STEPS.length) return;
+    if (currentStep === 1) {
+      const error = validateBasicInfoStock();
+      if (error) {
+        Alert.alert('Missing Details', error);
+        return;
+      }
+    }
     let next = currentStep + 1;
-    if (isRestrictedCreator && next === EMI_STEP) next += 1;
+    while (isRestrictedCreator && RESTRICTED_HIDDEN_STEPS.has(next) && next <= WIZARD_STEPS.length) {
+      next += 1;
+    }
     if (next <= WIZARD_STEPS.length) animateStep(next);
   };
 
   const goPrev = () => {
     if (currentStep <= 1) return;
     let prev = currentStep - 1;
-    if (isRestrictedCreator && prev === EMI_STEP) prev -= 1;
+    while (isRestrictedCreator && RESTRICTED_HIDDEN_STEPS.has(prev) && prev >= 1) {
+      prev -= 1;
+    }
     if (prev >= 1) animateStep(prev);
   };
 
+  const buildWizardData = (data: ProductFormData, variants: ProductVariant[]) => {
+    const replacementWindow = String(data.replacementWindow || data.replacementDays || '');
+    const resolvedStock = resolvePayloadStock(data.availableStock, variants);
+    return {
+      ...data,
+      variantsEnabled: variants.length > 0 ? true : data.variantsEnabled,
+      variants,
+      features: toStringList(data.features),
+      boxContents: toStringList(data.boxContents),
+      aboutThisItem: toStringList(data.aboutThisItem),
+      mrp: String(data.mrp ?? ''),
+      sellingPrice: String(data.sellingPrice ?? ''),
+      purchasePrice: String(data.purchasePrice ?? ''),
+      gst: String(data.gst ?? ''),
+      availableStock: resolvedStock === undefined ? '' : String(resolvedStock),
+      replacementWindow,
+      replacementDays: replacementWindow,
+      replacementWindowDays: replacementWindow,
+    };
+  };
+
+  const buildPayload = (
+    status: 'active' | 'draft' | 'pending_approval',
+    data: ProductFormData = formData,
+  ) => {
+    const variants = data.variantsEnabled && data.variants.length > 0 ? data.variants : [];
+    const wizardBase = buildWizardData(data, variants);
+    const wizardData = isRestrictedCreator
+      ? {
+          ...wizardBase,
+          emiEnabled: isEditMode ? data.emiEnabled : false,
+          emiPlans: isEditMode ? data.emiPlans : [],
+          deliveryCharges: isEditMode ? data.deliveryCharges : '',
+          deliveryDays: isEditMode ? data.deliveryDays : '',
+          dispatchSla: isEditMode ? data.dispatchSla : '',
+          deliveryPartner: isEditMode ? data.deliveryPartner : '',
+          deliveryZone: isEditMode ? data.deliveryZone : '',
+          expressDelivery: isEditMode ? data.expressDelivery : false,
+          installationRequired: isEditMode ? data.installationRequired : false,
+          installationCharge: isEditMode ? data.installationCharge : '',
+          deliveryConfirmationOtp: isEditMode ? data.deliveryConfirmationOtp : false,
+          serialImeiCaptureAtDelivery: isEditMode ? data.serialImeiCaptureAtDelivery : false,
+        }
+      : wizardBase;
+
+    return {
+      name: data.productName,
+      sku: data.sku,
+      brand: data.brand,
+      description: data.description,
+      shortDescription: data.shortDescription,
+      categoryId: data.category || undefined,
+      image: data.primaryImage || undefined,
+      galleryImages: data.galleryImages,
+      price: Number(data.sellingPrice) || 0,
+      mrp: Number(data.mrp) || 0,
+      stock: resolvePayloadStock(data.availableStock, variants),
+      status: isRestrictedCreator && status === 'active' ? 'pending_approval' : status,
+      emiAvailable: isRestrictedCreator
+        ? isEditMode
+          ? data.emiEnabled
+          : false
+        : data.emiEnabled,
+      warranty: data.warranty || undefined,
+      hsnCode: data.hsnCode || undefined,
+      manufacturer: data.manufacturer || undefined,
+      wizardData,
+    };
+  };
+
+  const saveWithImages = async (status: 'active' | 'draft' | 'pending_approval') => {
+    const flushed = await flushPendingProductImages(formData);
+    if (flushed !== formData) {
+      updateForm(flushed);
+    }
+    const payload = buildPayload(status, flushed);
+    if (isEditMode && productId) {
+      await updateProduct(productId, payload);
+    } else {
+      await createProduct(payload);
+    }
+  };
+
   const handleSaveDraft = async () => {
+    // Admin Web validates required fields on every save(), including draft.
+    const saveError = validateForSave();
+    if (saveError) {
+      Alert.alert('Missing required fields', saveError.message);
+      if (saveError.jumpStep) animateStep(saveError.jumpStep);
+      return;
+    }
     try {
       setSavingDraft(true);
-      const payload = buildPayload('draft');
-      if (isEditMode && productId) {
-        await updateProduct(productId, payload);
-      } else {
-        await createProduct(payload);
-      }
+      await saveWithImages('draft');
       Alert.alert('Draft Saved', `Product ${isEditMode ? 'updated as' : 'saved as'} draft`);
       resetForm();
       navigation.navigate('ProductList');
@@ -212,57 +411,16 @@ function AddProductContent({ navigation, route }: Props) {
     }
   };
 
-  const buildPayload = (status: 'active' | 'draft' | 'pending_approval') => ({
-    name: formData.productName,
-    sku: formData.sku,
-    brand: formData.brand,
-    description: formData.description,
-    shortDescription: formData.shortDescription,
-    categoryId: formData.category || undefined,
-    image: formData.primaryImage || undefined,
-    galleryImages: formData.galleryImages,
-    price: parseFloat(formData.sellingPrice) || 0,
-    mrp: parseFloat(formData.mrp) || 0,
-    stock: parseInt(formData.availableStock, 10) || 0,
-    status: isRestrictedCreator && status === 'active' ? 'pending_approval' : status,
-    emiAvailable: isRestrictedCreator ? false : formData.emiEnabled,
-    warranty: formData.warranty,
-    hsnCode: formData.hsnCode,
-    manufacturer: formData.manufacturer,
-    wizardData: isRestrictedCreator
-      ? {
-          ...formData,
-          emiEnabled: isEditMode ? formData.emiEnabled : false,
-          emiPlans: isEditMode ? formData.emiPlans : [],
-        }
-      : formData,
-  });
-
   const handlePublish = async () => {
-    const sellingPrice = parseFloat(formData.sellingPrice) || 0;
-    const mrp = parseFloat(formData.mrp) || 0;
-
-    if (!formData.productName?.trim()) {
-      Alert.alert('Missing Details', 'Product name is required.');
-      return;
-    }
-    if (sellingPrice <= 0) {
-      Alert.alert('Invalid Pricing', 'Selling price must be greater than 0.');
-      return;
-    }
-    if (mrp > 0 && mrp < sellingPrice) {
-      Alert.alert('Invalid Pricing', 'MRP cannot be less than the selling price.');
+    const saveError = validateForSave();
+    if (saveError) {
+      Alert.alert('Missing required fields', saveError.message);
+      if (saveError.jumpStep) animateStep(saveError.jumpStep);
       return;
     }
 
     try {
-      const payload = buildPayload(isRestrictedCreator ? 'pending_approval' : 'active');
-
-      if (isEditMode && productId) {
-        await updateProduct(productId, payload);
-      } else {
-        await createProduct(payload);
-      }
+      await saveWithImages(isRestrictedCreator ? 'pending_approval' : 'active');
 
       Alert.alert(
         'Success',
@@ -329,18 +487,29 @@ function AddProductContent({ navigation, route }: Props) {
               <Button title="Back" onPress={goPrev} variant="outline" style={{ flex: 1 }} />
               <Button title="Save Draft" onPress={handleSaveDraft} variant="secondary" style={{ flex: 1 }} />
               {!isRestrictedCreator ? (
-                <Button title={isEditMode ? 'Update Product' : 'Publish Product'} onPress={handlePublish} variant="accent" style={{ flex: 1 }} />
+                <Button
+                  title={isEditMode ? 'Update Product' : 'Publish Product'}
+                  onPress={handlePublish}
+                  variant="accent"
+                  style={{ flex: 1 }}
+                />
               ) : showSaveForApproval ? (
                 <Button title="Save for Approval" onPress={handlePublish} variant="accent" style={{ flex: 1 }} />
               ) : null}
             </View>
           ) : (
             <View style={styles.navActions}>
-              <Button title="Previous" onPress={goPrev} variant="outline" disabled={currentStep === 1} style={{ flex: 1 }} />
               <Button
-                title={currentStep === 9 ? 'Continue' : 'Next'}
+                title="Previous"
+                onPress={goPrev}
+                variant="outline"
+                disabled={currentStep === 1}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title={currentStep === SEO_STEP ? 'Continue' : 'Next'}
                 onPress={goNext}
-                variant={currentStep === 9 ? 'accent' : 'primary'}
+                variant={currentStep === SEO_STEP ? 'accent' : 'primary'}
                 style={{ flex: 1 }}
               />
             </View>

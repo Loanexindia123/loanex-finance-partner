@@ -4,6 +4,8 @@ import { verifyAccessToken, type AccessTokenPayload } from '../utils/jwt';
 
 export interface AuthenticatedRequest extends Request {
   user?: AccessTokenPayload;
+  /** Set by optionalAuthenticate when a Bearer token was sent but failed verification. */
+  authFailed?: boolean;
 }
 
 export function authenticate(

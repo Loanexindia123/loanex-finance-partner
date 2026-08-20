@@ -385,6 +385,21 @@ export class DealerForm {
     this.persist('pending');
   }
 
+  /** Admin approval — sets formStatus approved so backend provisions dealer login. */
+  approveAndProvision(): void {
+    this.form.markAllAsTouched();
+    const missing = this.validateFullForm();
+    if (missing.length) {
+      this.messages.add({
+        severity: 'warn',
+        summary: 'Incomplete form',
+        detail: `Please fill: ${missing.join(', ')}`,
+      });
+      return;
+    }
+    this.persist('approved');
+  }
+
   cancel(): void {
     if (this.returnTo) {
       this.router.navigateByUrl(this.returnTo);
@@ -398,7 +413,7 @@ export class DealerForm {
   }
 
   private persist(
-    formStatus: 'draft' | 'pending',
+    formStatus: 'draft' | 'pending' | 'approved',
     options?: { previewAfterSave?: boolean },
   ): void {
     if (!this.form.get('dealerName')?.value?.trim()) {
@@ -423,7 +438,7 @@ export class DealerForm {
       return;
     }
 
-    if (formStatus === 'pending') {
+    if (formStatus === 'pending' || formStatus === 'approved') {
       this.form.markAllAsTouched();
       const missing = this.validateFullForm();
       if (missing.length) {
@@ -482,9 +497,17 @@ export class DealerForm {
             summary:
               formStatus === 'draft'
                 ? 'Draft saved'
-                : 'Dealer submitted for approval',
+                : formStatus === 'approved'
+                  ? 'Dealer approved'
+                  : 'Dealer submitted for approval',
+            detail:
+              formStatus === 'approved'
+                ? saved.userId
+                  ? 'Dealer login account is ready (welcome@123).'
+                  : 'Dealer approved.'
+                : undefined,
           });
-          if (options?.previewAfterSave) {
+          if (options?.previewAfterSave || formStatus === 'approved') {
             this.router.navigate(['/masters/dealers', saved.id]);
             return;
           }
@@ -579,7 +602,7 @@ export class DealerForm {
       dealerName: string;
       dealerCode: string;
       categoryDepartment: string;
-      formStatus: 'draft' | 'pending';
+      formStatus: 'draft' | 'pending' | 'approved';
     },
   ): DealerPayload {
     const branch = String(raw['branch'] ?? '').trim();
@@ -588,6 +611,8 @@ export class DealerForm {
     const holdPercentage = String(raw['holdPercentage'] ?? '').trim();
     const commissionRaw = String(raw['commission'] ?? '').trim();
     const { categoryDepartments: _categories, commission: _commissionInput, ...rest } = raw;
+    const verificationFromForm =
+      (raw['verificationStatus'] as DealerPayload['verificationStatus']) || 'pending';
     return {
       ...emptyDealer(),
       ...(rest as Partial<DealerPayload>),
@@ -597,8 +622,9 @@ export class DealerForm {
       categoryDepartment: extras.categoryDepartment,
       status: raw['status'] ? 'active' : 'inactive',
       formStatus: extras.formStatus,
+      // Approve button must also mark verification approved so provisioning runs.
       verificationStatus:
-        (raw['verificationStatus'] as DealerPayload['verificationStatus']) || 'pending',
+        extras.formStatus === 'approved' ? 'approved' : verificationFromForm,
       dealer_address: String(raw['shopAddress'] ?? ''),
       dealerMobile: String(raw['mobile'] ?? ''),
       branch,

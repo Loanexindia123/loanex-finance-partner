@@ -455,6 +455,15 @@
             [loading]="submitting()"
             (click)="submit()"
           ></button>
+          <button
+            pButton
+            type="button"
+            icon="pi pi-user-plus"
+            label="Approve &amp; Create Login"
+            severity="success"
+            [loading]="submitting()"
+            (click)="approveAndProvision()"
+          ></button>
         </div>
       </footer>
     </section>

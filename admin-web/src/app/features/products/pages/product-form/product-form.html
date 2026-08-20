@@ -1752,14 +1752,20 @@
               <section class="review-card">
                 <header>
                   <h3>Delivery</h3>
-                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(5)"></button>
+                  @if (!hideEmiStep()) {
+                    <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(5)"></button>
+                  }
                 </header>
-                <dl>
-                  <div><dt>Weight</dt><dd>{{ display(form.get('weight')!.value) }}</dd></div>
-                  <div><dt>Charges</dt><dd>{{ inr(form.get('deliveryCharges')!.value) }}</dd></div>
-                  <div><dt>Days</dt><dd>{{ display(form.get('deliveryDays')!.value) }}</dd></div>
-                  <div><dt>Express</dt><dd>{{ display(form.get('expressDelivery')!.value) }}</dd></div>
-                </dl>
+                @if (hideEmiStep()) {
+                  <p>An admin will configure delivery after you submit this product for approval.</p>
+                } @else {
+                  <dl>
+                    <div><dt>Weight</dt><dd>{{ display(form.get('weight')!.value) }}</dd></div>
+                    <div><dt>Charges</dt><dd>{{ inr(form.get('deliveryCharges')!.value) }}</dd></div>
+                    <div><dt>Days</dt><dd>{{ display(form.get('deliveryDays')!.value) }}</dd></div>
+                    <div><dt>Express</dt><dd>{{ display(form.get('expressDelivery')!.value) }}</dd></div>
+                  </dl>
+                }
               </section>
 
               <section class="review-card">
@@ -2063,12 +2069,13 @@
       <section class="review-card">
         <header><h3>Delivery &amp; EMI</h3></header>
         <dl>
-          <div><dt>Delivery days</dt><dd>{{ display(form.get('deliveryDays')!.value) }}</dd></div>
-          <div><dt>Delivery charges</dt><dd>{{ display(form.get('deliveryCharges')!.value) }}</dd></div>
-          <div><dt>Express</dt><dd>{{ display(form.get('expressDelivery')!.value) }}</dd></div>
           @if (hideEmiStep()) {
+            <div><dt>Delivery</dt><dd>Admin will configure after approval</dd></div>
             <div><dt>EMI</dt><dd>Admin will decide after approval</dd></div>
           } @else {
+            <div><dt>Delivery days</dt><dd>{{ display(form.get('deliveryDays')!.value) }}</dd></div>
+            <div><dt>Delivery charges</dt><dd>{{ display(form.get('deliveryCharges')!.value) }}</dd></div>
+            <div><dt>Express</dt><dd>{{ display(form.get('expressDelivery')!.value) }}</dd></div>
             <div><dt>EMI enabled</dt><dd>{{ display(form.get('emiEnabled')!.value) }}</dd></div>
             <div><dt>EMI plans</dt><dd>{{ emiPlansArr.length }}</dd></div>
           }

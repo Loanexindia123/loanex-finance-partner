@@ -16,7 +16,12 @@ function actorId(req: Request): string {
 
 export class DealerController {
   list = async (req: Request, res: Response) => {
-    const data = await dealerService.list(actorId(req));
+    const raw = req.query.approvedOnly;
+    const approvedOnly =
+      raw === '1' ||
+      raw === 'true' ||
+      (Array.isArray(raw) && (raw[0] === '1' || raw[0] === 'true'));
+    const data = await dealerService.list(actorId(req), { approvedOnly });
     return sendSuccess(res, data, 'Dealers fetched');
   };
 

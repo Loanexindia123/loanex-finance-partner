@@ -34,8 +34,8 @@ export function Step6Inventory() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>Inventory</Text>
-      <Text style={styles.subheading}>Manage stock levels and warehouse allocation</Text>
+      <Text style={styles.heading}>Stock / Inventory</Text>
+      <Text style={styles.subheading}>Manage stock quantity and warehouse allocation</Text>
 
       <Card>
         <ManageableDropdown
@@ -73,11 +73,16 @@ export function Step6Inventory() {
           </View>
           <View style={styles.half}>
             <Input
-              label="Available Stock"
-              placeholder="Current available"
+              label="Stock Quantity"
+              placeholder="10"
               value={formData.availableStock}
-              onChangeText={(v) => updateForm({ availableStock: v })}
-              keyboardType="numeric"
+              onChangeText={(v) => {
+                const cleaned = v.replace(/[^\d]/g, '');
+                updateForm({ availableStock: cleaned });
+              }}
+              keyboardType="number-pad"
+              required
+              hint="Required. Integer of 0 or more."
             />
           </View>
         </View>

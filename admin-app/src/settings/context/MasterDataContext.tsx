@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, ReactNode } from 'react';
 import api from '../../services/api';
+import { getStoredUser, type User } from '../../services/authService';
+import { getRbacState, isDealer, subscribeRbac } from '../../auth/rbacStore';
 import {
   BrandMaster,
   CategoryMaster,
@@ -27,6 +29,13 @@ import {
   seedWarehouses,
   seedWholesalers,
 } from '../data/masterSeeds';
+
+function isDealerAccount(user: Pick<User, 'role' | 'roleName'> | null | undefined): boolean {
+  if (!user) return false;
+  const roleName = String(user.roleName ?? '').trim().toLowerCase();
+  const role = String(user.role ?? '').trim().toLowerCase();
+  return roleName === 'dealer' || role === 'dealer';
+}
 
 type NameDraft = { name: string };
 
@@ -174,6 +183,7 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    let adminMastersLoaded = false;
 
     const unwrapList = (payload: any): any[] => {
       const data = payload?.data ?? payload;
@@ -182,76 +192,121 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
       return [];
     };
 
-    api
-      .get('/categories')
-      .then((response) => {
+    const loadCategories = () => {
+      api
+        .get('/categories')
+        .then((response) => {
+          if (cancelled) return;
+          const apiCats: CategoryMaster[] = unwrapList(response.data).map(
+            (cat: any, index: number) => ({
+              id: cat.id,
+              name: cat.name,
+              parentId: cat.parentId ?? null,
+              imageUri: cat.icon || cat.imageUri || cat.image || cat.imageUrl || '',
+              displayOrder: cat.sortOrder ?? index,
+              status: cat.status || 'active',
+            }),
+          );
+          if (apiCats.length > 0) setCategories(apiCats);
+        })
+        .catch((err) => console.warn('Unable to load categories from API:', err));
+    };
+
+    const loadAdminMasters = () => {
+      // Dealers must not hit /admin/* masters (403). Categories stay available above.
+      if (cancelled || adminMastersLoaded || isDealer()) return;
+      adminMastersLoaded = true;
+
+      Promise.allSettled([
+        api.get('/admin/suppliers'),
+        api.get('/admin/dealers'),
+        api.get('/admin/warehouses'),
+        api.get('/admin/brands'),
+        api.get('/admin/wholesalers'),
+        api.get('/admin/delivery_partners'),
+        api.get('/admin/delivery_zones'),
+        api.get('/admin/branches'),
+        api.get('/admin/pincodes'),
+      ]).then((results) => {
         if (cancelled) return;
-        const apiCats: CategoryMaster[] = unwrapList(response.data).map(
-          (cat: any, index: number) => ({
-            id: cat.id,
-            name: cat.name,
-            parentId: cat.parentId ?? null,
-            displayOrder: cat.sortOrder ?? index,
-            status: cat.status || 'active',
-          }),
-        );
-        if (apiCats.length > 0) setCategories(apiCats);
-      })
-      .catch((err) => console.warn('Unable to load categories from API:', err));
+        const [
+          suppliersRes,
+          dealersRes,
+          warehousesRes,
+          brandsRes,
+          wholesalersRes,
+          deliveryPartnersRes,
+          deliveryZonesRes,
+          branchesRes,
+          pincodesRes,
+        ] = results;
 
-    Promise.allSettled([
-      api.get('/admin/suppliers'),
-      api.get('/admin/dealers'),
-      api.get('/admin/warehouses'),
-      api.get('/admin/brands'),
-      api.get('/admin/wholesalers'),
-      api.get('/admin/delivery_partners'),
-      api.get('/admin/delivery_zones'),
-      api.get('/admin/branches'),
-      api.get('/admin/pincodes'),
-    ]).then((results) => {
-      if (cancelled) return;
-      const [
-        suppliersRes,
-        dealersRes,
-        warehousesRes,
-        brandsRes,
-        wholesalersRes,
-        deliveryPartnersRes,
-        deliveryZonesRes,
-        branchesRes,
-        pincodesRes,
-      ] = results;
+        const apply = (result: PromiseSettledResult<any>, setter: (list: any[]) => void) => {
+          if (result.status === 'fulfilled') {
+            const list = unwrapList(result.value.data);
+            if (list.length > 0) setter(list);
+          } else {
+            console.warn('Unable to load master data from API:', result.reason);
+          }
+        };
 
-      const apply = (result: PromiseSettledResult<any>, setter: (list: any[]) => void) => {
-        if (result.status === 'fulfilled') {
-          const list = unwrapList(result.value.data);
-          if (list.length > 0) setter(list);
+        apply(suppliersRes, setSuppliers);
+        apply(dealersRes, setDealers);
+        apply(warehousesRes, setWarehouses);
+        if (brandsRes.status === 'fulfilled') {
+          const list = unwrapList(brandsRes.value.data).map((b: any) => ({
+            id: b.id,
+            name: b.name,
+            logoUri: b.logoUri || b.logo || b.image || b.imageUrl || '',
+            description: b.description || '',
+            status: b.status || 'active',
+          }));
+          if (list.length > 0) setBrands(list);
         } else {
-          console.warn('Unable to load master data from API:', result.reason);
+          console.warn('Unable to load brands from API:', brandsRes.reason);
         }
-      };
+        apply(wholesalersRes, setWholesalers);
+        apply(deliveryPartnersRes, setDeliveryPartners);
+        apply(deliveryZonesRes, setDeliveryZones);
+        // Branches: always replace local seeds with API data (including []).
+        // Keeping seeds when the server list is empty caused Edit PUT 404s on
+        // client-only UUIDs that were never persisted.
+        if (branchesRes.status === 'fulfilled') {
+          setBranches(unwrapList(branchesRes.value.data));
+        } else {
+          console.warn('Unable to load branches from API:', branchesRes.reason);
+        }
+        apply(pincodesRes, setPincodes);
+      });
+    };
 
-      apply(suppliersRes, setSuppliers);
-      apply(dealersRes, setDealers);
-      apply(warehousesRes, setWarehouses);
-      apply(brandsRes, setBrands);
-      apply(wholesalersRes, setWholesalers);
-      apply(deliveryPartnersRes, setDeliveryPartners);
-      apply(deliveryZonesRes, setDeliveryZones);
-      // Branches: always replace local seeds with API data (including []).
-      // Keeping seeds when the server list is empty caused Edit PUT 404s on
-      // client-only UUIDs that were never persisted.
-      if (branchesRes.status === 'fulfilled') {
-        setBranches(unwrapList(branchesRes.value.data));
-      } else {
-        console.warn('Unable to load branches from API:', branchesRes.reason);
+    const bootstrap = async () => {
+      loadCategories();
+
+      // Provider mounts before Splash sets RBAC — check stored session first.
+      const stored = await getStoredUser();
+      if (cancelled) return;
+      if (isDealerAccount(stored) || isDealer()) {
+        return;
       }
-      apply(pincodesRes, setPincodes);
+
+      loadAdminMasters();
+    };
+
+    void bootstrap();
+
+    // If a dealer session was present at mount (prefetch skipped), then an
+    // Admin/Employee later logs in, load admin masters once for them.
+    const unsubscribe = subscribeRbac(() => {
+      if (cancelled) return;
+      const { user } = getRbacState();
+      if (!user || isDealer()) return;
+      loadAdminMasters();
     });
 
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 
@@ -429,7 +484,33 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
       branches,
       pincodes,
 
-      saveBrand: (data) => saveNamedSynced(brands, setBrands, data, 'brand', '/admin/brands'),
+      saveBrand: (data) => {
+        const name = normalizeName(data.name);
+        if (!name) return false;
+        if (nameTaken(brands, name, data.id)) return false;
+        const item: BrandMaster = {
+          id: data.id ?? createMasterId('brand'),
+          name,
+          logoUri: data.logoUri || '',
+          description: data.description || '',
+          status: data.status || 'active',
+        };
+        setBrands((prev) =>
+          data.id
+            ? prev.map((it) => (it.id === data.id ? item : it))
+            : [...prev, item],
+        );
+        const isEdit = !!data.id;
+        const url = isEdit ? `/admin/brands/${item.id}` : '/admin/brands';
+        api[isEdit ? 'put' : 'post'](url, {
+          id: item.id,
+          name: item.name,
+          logo: item.logoUri || '',
+          description: item.description || '',
+          status: item.status,
+        }).catch((err) => console.warn('Failed to sync /admin/brands:', err));
+        return true;
+      },
       deleteBrand: (id) => {
         setBrands((prev) => prev.filter((b) => b.id !== id));
         syncDelete('/admin/brands', id);
@@ -451,6 +532,7 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
           parentId: data.parentId ?? null,
           status: data.status || 'active',
           sortOrder: data.displayOrder || 0,
+          icon: data.imageUri || '',
         })
           .then((response) => {
             const saved = response.data?.data;
@@ -464,35 +546,22 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
                     c.name === saved.name &&
                     c.parentId === (saved.parentId ?? data.parentId ?? null),
                 );
+                const mapped: CategoryMaster = {
+                  id: saved.id,
+                  name: saved.name,
+                  parentId: saved.parentId ?? null,
+                  imageUri: saved.icon || data.imageUri || '',
+                  displayOrder: saved.sortOrder ?? data.displayOrder ?? 0,
+                  status: saved.status || 'active',
+                };
                 if (optimistic) {
-                  return prev.map((c) =>
-                    c.id === optimistic.id
-                      ? {
-                          id: saved.id,
-                          name: saved.name,
-                          parentId: saved.parentId ?? null,
-                          displayOrder: saved.sortOrder ?? c.displayOrder ?? 0,
-                          status: saved.status || 'active',
-                        }
-                      : c,
-                  );
+                  return prev.map((c) => (c.id === optimistic.id ? mapped : c));
                 }
                 const exists = prev.some((c) => c.id === saved.id);
                 if (exists) {
-                  return prev.map((c) =>
-                    c.id === saved.id ? { ...c, name: saved.name, status: saved.status } : c,
-                  );
+                  return prev.map((c) => (c.id === saved.id ? { ...c, ...mapped } : c));
                 }
-                return [
-                  ...prev,
-                  {
-                    id: saved.id,
-                    name: saved.name,
-                    parentId: data.parentId ?? null,
-                    displayOrder: saved.sortOrder ?? 0,
-                    status: saved.status || 'active',
-                  },
-                ];
+                return [...prev, mapped];
               });
             }
           })

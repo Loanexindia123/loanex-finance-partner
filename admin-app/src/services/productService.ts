@@ -109,6 +109,31 @@ export const deleteProduct = async (productId: string): Promise<void> => {
 };
 
 /**
+ * Upload a product image (Admin Web: POST /products/images).
+ * Accepts a local file URI from the image picker (deferred until save).
+ */
+export const uploadProductImage = async (file: {
+  uri: string;
+  name: string;
+  type: string;
+}): Promise<{ id: string; url: string; fileName: string }> => {
+  const body = new FormData();
+  // React Native FormData file shape (uri/name/type)
+  body.append('image', {
+    uri: file.uri,
+    name: file.name,
+    type: file.type,
+  } as unknown as Blob);
+
+  const response = await api.post('/products/images', body, {
+    // Override default application/json so RN sets multipart boundary correctly
+    headers: { 'Content-Type': 'multipart/form-data' },
+    transformRequest: [(data) => data],
+  });
+  return response.data.data;
+};
+
+/**
  * Get all categories
  */
 export const getCategories = async (): Promise<Category[]> => {

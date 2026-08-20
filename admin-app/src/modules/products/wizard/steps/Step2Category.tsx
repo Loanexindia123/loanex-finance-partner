@@ -4,12 +4,15 @@ import { useWizard } from '../WizardContext';
 import { useOptionsRegistry } from '../OptionsRegistryContext';
 import { ManageableDropdown } from '../../components/ManageableDropdown';
 import { Card } from '../../../../components/ui/Card';
+import { useRbac, isDealer } from '../../../../auth/rbacStore';
 import { colors } from '../../../../theme/colors';
 import { spacing } from '../../../../theme/spacing';
 
 export function Step2Category() {
   const { formData, updateForm } = useWizard();
   const options = useOptionsRegistry();
+  useRbac();
+  const dealerMode = isDealer();
 
   const categoryOptions = useMemo(() => Object.keys(options.categories), [options.categories]);
   const subCategoryOptions = useMemo(
@@ -20,7 +23,7 @@ export function Step2Category() {
   return (
     <View style={styles.container}>
       <Text style={styles.heading}>Category</Text>
-      <Text style={styles.subheading}>Select product category hierarchy</Text>
+      <Text style={styles.subheading}>Place this product in the catalogue taxonomy.</Text>
 
       <Card style={styles.card}>
         <ManageableDropdown
@@ -30,6 +33,7 @@ export function Step2Category() {
           entityNamePlural="Categories"
           value={formData.category}
           options={categoryOptions}
+          allowManage={!dealerMode}
           onSelect={(v) =>
             updateForm({ category: v, subCategory: '', brand: '', childCategory: '' })
           }
@@ -53,6 +57,7 @@ export function Step2Category() {
           value={formData.subCategory}
           options={subCategoryOptions}
           disabled={!formData.category}
+          allowManage={!dealerMode}
           onSelect={(v) => updateForm({ subCategory: v, brand: '', childCategory: '' })}
           onValueSync={(v) => {
             if (!v) {
@@ -78,11 +83,18 @@ export function Step2Category() {
           value={formData.brand}
           options={formData.subCategory ? options.brands : []}
           disabled={!formData.subCategory}
+          allowManage={!dealerMode}
           onSelect={(v) => updateForm({ brand: v })}
           onAdd={(name) => options.addBrand(name)}
           onRename={(from, to) => options.renameBrand(from, to)}
           onDelete={(name) => options.deleteBrand(name)}
         />
+
+        {dealerMode ? (
+          <Text style={styles.hint}>
+            Missing a category or brand? Add it under Masters, then return to Product Add.
+          </Text>
+        ) : null}
       </Card>
 
       {formData.category && (
@@ -104,6 +116,12 @@ const styles = StyleSheet.create({
   heading: { fontSize: 20, fontWeight: '800', color: colors.textHeading, marginBottom: spacing.xs },
   subheading: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing.xxl },
   card: { marginBottom: spacing.lg },
+  hint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    lineHeight: 18,
+  },
   preview: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
   previewTitle: { fontSize: 12, fontWeight: '700', color: colors.primary, textTransform: 'uppercase' },
   previewPath: { fontSize: 16, fontWeight: '600', color: colors.text, marginTop: spacing.sm },

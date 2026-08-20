@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -20,13 +20,16 @@ import { PasswordInput } from '../../authentication/components/PasswordInput';
 import { SectionTitle } from '../../components/ui/SectionTitle';
 import api from '../../services/api';
 import { clearAuth } from '../../services/authService';
-import { clearRbac } from '../../auth/rbacStore';
+import { clearRbac, isDealer } from '../../auth/rbacStore';
 import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/useTheme';
 import { radius, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChangePassword'>;
+
+const SUCCESS_MESSAGE =
+  'Password changed successfully. Please log in again with your new password.';
 
 export function ChangePasswordScreen({ navigation, route }: Props) {
   const colors = useTheme();
@@ -47,8 +50,21 @@ export function ChangePasswordScreen({ navigation, route }: Props) {
       navigation.goBack();
       return;
     }
+    if (isDealer()) {
+      navigation.navigate('DealerTabs');
+      return;
+    }
     navigation.navigate('Dashboard');
   }, [forced, navigation]);
+
+  const resetToLogin = useCallback(() => {
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      }),
+    );
+  }, [navigation]);
 
   useFocusEffect(
     useCallback(() => {
@@ -89,10 +105,25 @@ export function ChangePasswordScreen({ navigation, route }: Props) {
         currentPassword,
         newPassword,
       });
+
+      // Forced first-login: always clear session and land on Login immediately.
+      // Do not wait on Alert OK — Alert is unreliable on web and left dealers in-app.
+      if (forced) {
+        await clearAuth();
+        clearRbac();
+        resetToLogin();
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+          window.alert(SUCCESS_MESSAGE);
+        } else {
+          Alert.alert('Password Updated', SUCCESS_MESSAGE);
+        }
+        return;
+      }
+
       await clearAuth();
       clearRbac();
-      Alert.alert('Password Updated', 'Password changed successfully. Please log in again with your new password.', [
-        { text: 'OK', onPress: () => navigation.replace('Login') },
+      Alert.alert('Password Updated', SUCCESS_MESSAGE, [
+        { text: 'OK', onPress: resetToLogin },
       ]);
     } catch (e: any) {
       setError(e.message || 'Failed to update password. Please try again.');

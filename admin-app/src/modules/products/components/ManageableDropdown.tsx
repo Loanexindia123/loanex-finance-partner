@@ -27,6 +27,8 @@ interface ManageableDropdownProps {
   onDelete: (name: string) => void;
   error?: string;
   disabled?: boolean;
+  /** When false, renders as a plain dropdown (no inline + / manage footer). */
+  allowManage?: boolean;
 }
 
 export function ManageableDropdown({
@@ -43,12 +45,14 @@ export function ManageableDropdown({
   onDelete,
   error,
   disabled,
+  allowManage = true,
 }: ManageableDropdownProps) {
   const [open, setOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [clearedNote, setClearedNote] = useState('');
   const plural = entityNamePlural || `${entityName}s`;
+  const canManage = allowManage && !disabled;
 
   const syncValue = (next: string) => {
     if (onValueSync) onValueSync(next);
@@ -86,7 +90,25 @@ export function ManageableDropdown({
 
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      <View style={styles.labelRow}>
+        {label ? (
+          <Text style={styles.label}>
+            {label}
+          </Text>
+        ) : (
+          <View />
+        )}
+        {canManage ? (
+          <TouchableOpacity
+            style={styles.inlineAddBtn}
+            onPress={openAddNew}
+            accessibilityLabel={`Add ${entityName}`}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.inlineAddText}>+</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
       <TouchableOpacity
         style={[styles.trigger, error && styles.triggerError, disabled && styles.triggerDisabled]}
         onPress={() => !disabled && setOpen(true)}
@@ -128,14 +150,16 @@ export function ManageableDropdown({
                 </TouchableOpacity>
               )}
             />
-            <View style={styles.footer}>
-              <TouchableOpacity style={styles.footerBtn} onPress={openAddNew}>
-                <Text style={styles.addText}>+ Add New {entityName}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.footerBtn} onPress={openManage}>
-                <Text style={styles.manageText}>Manage {plural}</Text>
-              </TouchableOpacity>
-            </View>
+            {canManage ? (
+              <View style={styles.footer}>
+                <TouchableOpacity style={styles.footerBtn} onPress={openAddNew}>
+                  <Text style={styles.addText}>+ Add New {entityName}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.footerBtn} onPress={openManage}>
+                  <Text style={styles.manageText}>Manage {plural}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
         </Pressable>
       </Modal>
@@ -176,11 +200,34 @@ export function ManageableDropdown({
 
 const styles = StyleSheet.create({
   container: { marginBottom: spacing.lg, width: '100%', minWidth: 0 },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
   label: {
     fontSize: 13,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: spacing.sm,
+    flex: 1,
+  },
+  inlineAddBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+    backgroundColor: colors.secondaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inlineAddText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.secondary,
+    lineHeight: 20,
   },
   trigger: {
     flexDirection: 'row',

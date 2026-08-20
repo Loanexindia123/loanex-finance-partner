@@ -22,7 +22,9 @@ import {
   assertCatalogEmiReadyForPublish,
   isRestrictedCatalogUser,
   restoreEmployeeEmiFromExisting,
+  stripEmployeeDeliveryFromPayload,
   stripEmployeeEmiFromPayload,
+  restoreEmployeeDeliveryFromExisting,
 } from '../utils/product-emi';
 import type { Product } from '../../../types/database.types';
 import { resolveProductStockForWrite } from '../utils/product-stock';
@@ -984,6 +986,11 @@ export class ProductService {
       throw new ForbiddenError('Not authorized to create products');
     }
 
+    const actorIsRestricted = isRestrictedCatalogUser(actorUserId);
+    if (actorIsRestricted) {
+      stripEmployeeDeliveryFromPayload(data);
+    }
+
     data = await persistInlineProductImages(data);
     const mapped = this.mapPayloadToPrisma(data);
     const stockResult = resolveProductStockForWrite(data, 'create');
@@ -1009,7 +1016,6 @@ export class ProductService {
     }
     // Creator always from authenticated session — ignore client spoofing.
     mapped.creatorId = creatorId;
-    const actorIsRestricted = isRestrictedCatalogUser(actorUserId);
     if (actorIsRestricted) {
       applyEmployeeEmiCreateDefaults(mapped);
     }
@@ -1055,12 +1061,14 @@ export class ProductService {
 
     if (actorIsRestricted) {
       stripEmployeeEmiFromPayload(data);
+      stripEmployeeDeliveryFromPayload(data);
     }
 
     data = await persistInlineProductImages(data);
     const mapped = this.mapPayloadToPrisma(data);
     if (actorIsRestricted) {
       restoreEmployeeEmiFromExisting(mapped, existing);
+      restoreEmployeeDeliveryFromExisting(mapped, existing);
     }
     // Preserve marketing flags when this request didn't explicitly set them
     // (the wizard never sends them, so re-saving a featured product must not
