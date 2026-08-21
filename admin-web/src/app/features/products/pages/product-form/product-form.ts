@@ -152,10 +152,16 @@ export class ProductForm {
   );
   /** Same gate as EMI — Employee (and Dealer on admin-app) must not configure delivery. */
   readonly hideEmiStep = computed(() => this.isEmployee());
+  readonly seoStepIndex = 7;
+  readonly hideSeoStep = computed(() => this.isEmployee());
   readonly visibleStepMeta = computed(() =>
     this.stepMeta
       .map((step, index) => ({ ...step, index }))
-      .filter((step) => !this.isHiddenWizardStep(step.index)),
+      .filter(
+        (step) =>
+          !(this.hideEmiStep() && step.index === this.emiStepIndex) &&
+          !(this.hideSeoStep() && step.index === this.seoStepIndex),
+      ),
   );
   readonly showPublishButton = computed(() => this.isEdit && !this.isEmployee());
   readonly showSaveForApproval = computed(() => {
@@ -1003,8 +1009,8 @@ export class ProductForm {
         const detail =
           err instanceof HttpErrorResponse
             ? ((err.error as { message?: string; error?: string } | null)?.message ||
-                (err.error as { message?: string; error?: string } | null)?.error ||
-                err.message)
+              (err.error as { message?: string; error?: string } | null)?.error ||
+              err.message)
             : err instanceof Error
               ? err.message
               : 'Could not create product type.';
@@ -2543,33 +2549,28 @@ export class ProductForm {
     return fallbackName || raw;
   }
 
-  goToStep(index: number): void {
-    if (this.isHiddenWizardStep(index)) return;
+    goToStep(index: number): void {
+    if (this.hideEmiStep() && index === this.emiStepIndex) return;
+    if (this.hideSeoStep() && index === this.seoStepIndex) return;
     this.activeStep.set(index);
   }
   next(): void {
-    if (this.activeStep() === 0) {
-      const stockCtrl = this.form.get('availableStock');
-      stockCtrl?.markAsTouched();
-      if (stockCtrl?.invalid) return;
-    }
     this.activeStep.update((i) => {
-      let next = i + 1;
-      while (next < this.steps.length && this.isHiddenWizardStep(next)) {
-        next += 1;
-      }
+      let next = Math.min(i + 1, this.steps.length - 1);
+      if (this.hideEmiStep() && next === this.emiStepIndex) next += 1;
+      if (this.hideSeoStep() && next === this.seoStepIndex) next += 1;
       return Math.min(next, this.steps.length - 1);
     });
   }
   back(): void {
     this.activeStep.update((i) => {
-      let prev = i - 1;
-      while (prev >= 0 && this.isHiddenWizardStep(prev)) {
-        prev -= 1;
-      }
+      let prev = Math.max(i - 1, 0);
+      if (this.hideEmiStep() && prev === this.emiStepIndex) prev -= 1;
+      if (this.hideSeoStep() && prev === this.seoStepIndex) prev -= 1;
       return Math.max(prev, 0);
     });
   }
+  
   backToList(): void {
     this.router.navigate(['/products']);
   }

@@ -1,429 +1,300 @@
 <header class="form-header">
   <div class="form-header__left">
-    <button
-      pButton
-      type="button"
-      icon="pi pi-arrow-left"
-      label="Back to Products"
-      [text]="true"
-      (click)="backToList()"
-    ></button>
+    <button pButton type="button" icon="pi pi-arrow-left" label="Back to Products" [text]="true"
+      (click)="backToList()"></button>
     <div>
       <h1>{{ isEdit ? 'Edit Product' : 'Create Product' }}</h1>
       <p>{{ isEdit ? 'Update this product in the LoanEx catalogue' : 'Add a new product to the LoanEx catalogue' }}</p>
     </div>
   </div>
   <div class="form-header__actions">
-    <button
-      pButton
-      type="button"
-      severity="secondary"
-      [outlined]="true"
-      icon="pi pi-eye"
-      label="Preview"
-      [disabled]="submitting()"
-      (click)="openPreview()"
-    ></button>
+    <button pButton type="button" severity="secondary" [outlined]="true" icon="pi pi-eye" label="Preview"
+      [disabled]="submitting()" (click)="openPreview()"></button>
     @if (showPublishButton()) {
-      <button
-        pButton
-        type="button"
-        severity="secondary"
-        [outlined]="true"
-        icon="pi pi-save"
-        label="Save Draft"
-        [disabled]="submitting()"
-        [loading]="submittingKind() === 'draft'"
-        (click)="save('draft')"
-      ></button>
-      <button
-        pButton
-        type="button"
-        icon="pi pi-check"
-        label="Publish Product"
-        [disabled]="submitting()"
-        [loading]="submittingKind() === 'active'"
-        (click)="save('active')"
-      ></button>
+    <button pButton type="button" severity="secondary" [outlined]="true" icon="pi pi-save" label="Save Draft"
+      [disabled]="submitting()" [loading]="submittingKind() === 'draft'" (click)="save('draft')"></button>
+    <button pButton type="button" icon="pi pi-check" label="Publish Product" [disabled]="submitting()"
+      [loading]="submittingKind() === 'active'" (click)="save('active')"></button>
     } @else {
-      <button
-        pButton
-        type="button"
-        severity="secondary"
-        [outlined]="true"
-        icon="pi pi-save"
-        label="Save Draft"
-        [disabled]="submitting()"
-        [loading]="submittingKind() === 'draft'"
-        (click)="save('draft')"
-      ></button>
-      @if (showSaveForApproval()) {
-        <button
-          pButton
-          type="button"
-          icon="pi pi-send"
-          label="Save for Approval"
-          [disabled]="submitting()"
-          [loading]="submittingKind() === 'pending_approval'"
-          (click)="save('pending_approval')"
-        ></button>
-      }
+    <button pButton type="button" severity="secondary" [outlined]="true" icon="pi pi-save" label="Save Draft"
+      [disabled]="submitting()" [loading]="submittingKind() === 'draft'" (click)="save('draft')"></button>
+    @if (showSaveForApproval()) {
+    <button pButton type="button" icon="pi pi-send" label="Save for Approval" [disabled]="submitting()"
+      [loading]="submittingKind() === 'pending_approval'" (click)="save('pending_approval')"></button>
+    }
     }
   </div>
 </header>
 
 @if (loading()) {
-  <app-branded-loader message="Loading Product..." />
+<app-branded-loader message="Loading Product..." />
 } @else {
-  <div class="wizard" [formGroup]="form">
-    <nav class="wizard__steps" aria-label="Product wizard steps">
-      @for (step of visibleStepMeta(); track step.title; let displayIndex = $index) {
-        <button
-          type="button"
-          class="wizard__step"
-          [class.wizard__step--active]="activeStep() === step.index"
-          [class.wizard__step--done]="step.index < activeStep()"
-          (click)="goToStep(step.index)"
-        >
-          <span class="wizard__step-index">
-            @if (step.index < activeStep()) {
-              <i class="pi pi-check" aria-hidden="true"></i>
-            } @else {
-              {{ displayIndex + 1 }}
-            }
-          </span>
-          <span class="wizard__step-copy">
-            <span class="wizard__step-title">{{ step.title }}</span>
-            <span class="wizard__step-desc">{{ step.description }}</span>
-          </span>
-        </button>
-      }
-    </nav>
+<div class="wizard" [formGroup]="form">
+  <nav class="wizard__steps" aria-label="Product wizard steps">
+    @for (step of visibleStepMeta(); track step.title; let displayIndex = $index) {
+    <button type="button" class="wizard__step" [class.wizard__step--active]="activeStep() === step.index"
+      [class.wizard__step--done]="step.index < activeStep()" (click)="goToStep(step.index)">
+      <span class="wizard__step-index">
+        @if (step.index < activeStep()) { <i class="pi pi-check" aria-hidden="true"></i>
+          } @else {
+          {{ displayIndex + 1 }}
+          }
+      </span>
+      <span class="wizard__step-copy">
+        <span class="wizard__step-title">{{ step.title }}</span>
+        <span class="wizard__step-desc">{{ step.description }}</span>
+      </span>
+    </button>
+    }
+  </nav>
 
-    <div class="wizard__panel">
-      <header class="panel-head">
-        <span class="panel-head__icon" aria-hidden="true">
-          <i class="pi" [class]="currentStep().icon"></i>
-        </span>
-        <div>
-          <h2>{{ currentStep().title }}</h2>
-          <p>{{ currentStep().description }}</p>
+  <div class="wizard__panel">
+    <header class="panel-head">
+      <span class="panel-head__icon" aria-hidden="true">
+        <i class="pi" [class]="currentStep().icon"></i>
+      </span>
+      <div>
+        <h2>{{ currentStep().title }}</h2>
+        <p>{{ currentStep().description }}</p>
+      </div>
+    </header>
+
+    <div class="panel-body">
+      @switch (activeStep()) {
+      @case (0) {
+      <div class="grid-2">
+        <div class="field" [class.field--invalid]="invalid('productName')">
+          <label for="productName">Product Name <span class="req">*</span></label>
+          <input id="productName" pInputText formControlName="productName"
+            placeholder="e.g. Samsung Galaxy S24 Ultra" />
+          @if (invalid('productName')) {
+          <small class="field-error">Product name is required.</small>
+          }
         </div>
-      </header>
+        <div class="field">
+          <label for="shortName">Short Name</label>
+          <input id="shortName" pInputText formControlName="shortName" placeholder="Display name" />
+        </div>
+        <div class="field">
+          <label>Product Type</label>
+          <div class="sku-row">
+            <p-select [options]="selectOptions(form.get('productType')?.value, productTypeSelectOptions())"
+              formControlName="productType" optionLabel="label" optionValue="value"
+              [placeholder]="options.productTypesLoading() ? 'Loading types...' : (options.productTypes().length ? 'Select type' : 'No active types')"
+              [showClear]="true" [filter]="true" filterBy="label" appendTo="body" panelStyleClass="catalog-filter-panel"
+              [checkmark]="false" scrollHeight="240px" [disabled]="options.productTypesLoading()" />
+            <button pButton type="button" [rounded]="true" severity="secondary" icon="pi pi-plus" label="Add"
+              (click)="openAddProductType()"></button>
+          </div>
+          @if (options.productTypesLoading()) {
+          <small class="field-hint">Loading product types…</small>
+          } @else if (options.productTypesError()) {
+          <small class="field-error">
+            {{ options.productTypesError() }}
+            <button type="button" class="linkish" (click)="options.reloadProductTypes()">Retry</button>
+          </small>
+          } @else if (!options.productTypes().length) {
+          <small class="field-hint">No active product types yet. Click Add to create one.</small>
+          }
+        </div>
+        <div class="field">
+          <label for="modelNumber">Model Number</label>
+          <input id="modelNumber" pInputText formControlName="modelNumber" placeholder="e.g. TN-X1-256" />
+          <small class="field-hint">Preferred for auto-generate SKU; Auto Generate also works without it.</small>
+        </div>
+        <div class="field">
+          <label for="sku">SKU <span class="req">*</span></label>
+          <div class="sku-row">
+            <input id="sku" pInputText formControlName="sku" placeholder="Unique product code" />
+            <button pButton type="button" [rounded]="true" severity="secondary" icon="pi pi-sparkles"
+              label="Auto Generate" [disabled]="!canAutoGenerateSku()" (click)="autoGenerateSku()"></button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="barcode">Barcode</label>
+          <input id="barcode" pInputText formControlName="barcode" placeholder="EAN / UPC" />
+        </div>
+        <div class="field">
+          <label for="hsnCode">HSN Code</label>
+          <input id="hsnCode" pInputText formControlName="hsnCode" placeholder="Tax classification" />
+        </div>
+        <div class="field">
+          <label for="manufacturer">Manufacturer</label>
+          <input id="manufacturer" pInputText formControlName="manufacturer" placeholder="Manufacturer name" />
+        </div>
+        <div class="field">
+          <label>Dealer</label>
+          <p-select [options]="basicDealerSelectOptions()" [ngModel]="primaryDealerId()"
+            [ngModelOptions]="{standalone: true}" (ngModelChange)="onPrimaryDealerSelected($event)" optionLabel="label"
+            optionValue="value"
+            [placeholder]="dealersLoading() ? 'Loading dealers...' : (dealerCatalog().length ? 'Select Dealer' : 'No dealers')"
+            [showClear]="true" [filter]="true" filterBy="label" appendTo="body"
+            panelStyleClass="catalog-filter-panel dealer-select-panel" [checkmark]="false" scrollHeight="240px"
+            [loading]="dealersLoading()" [disabled]="dealersLoading()" />
+          @if (dealersLoading()) {
+          <small class="field-hint">Loading dealers…</small>
+          } @else if (dealersError()) {
+          <small class="field-error">
+            {{ dealersError() }}
+            <button type="button" class="linkish" (click)="reloadDealers()">Retry</button>
+          </small>
+          } @else if (!dealerCatalog().length) {
+          <small class="field-hint">No dealers available. Add dealers from Masters.</small>
+          }
+        </div>
+        <div class="field">
+          <label>Warranty</label>
+          <p-select [options]="selectOptions(form.get('warranty')?.value, warrantyOptions)" formControlName="warranty"
+            optionLabel="label" optionValue="value" placeholder="Select warranty" [showClear]="true" appendTo="body"
+            panelStyleClass="catalog-filter-panel" [checkmark]="false" scrollHeight="240px" />
+        </div>
+        <div class="field">
+          <label>Product Condition</label>
+          <p-select [options]="conditionOptions" formControlName="productCondition" optionLabel="label"
+            optionValue="value" appendTo="body" panelStyleClass="catalog-filter-panel" [checkmark]="false"
+            scrollHeight="240px" />
+        </div>
+        <div class="field" [class.field--invalid]="invalid('availableStock')">
+          <label for="availableStock">Stock Quantity <span class="req">*</span></label>
+          <p-inputNumber inputId="availableStock" formControlName="availableStock" [min]="0" [maxFractionDigits]="0"
+            [useGrouping]="false" [showClear]="true" placeholder="10" />
+          <small class="field-hint">Enter the quantity currently available for sale.</small>
+          @if (invalid('availableStock')) {
+          <small class="field-error">
+            {{ form.get('availableStock')!.hasError('required') ? 'Stock quantity is required.' : 'Stock quantity must
+            be an integer of 0 or more.' }}
+          </small>
+          }
+        </div>
+      </div>
+      <div class="field">
+        <label for="shortDescription">Short Description</label>
+        <input id="shortDescription" pInputText formControlName="shortDescription" maxlength="160"
+          placeholder="Brief product summary (max 160 chars)" />
+      </div>
+      <div class="field">
+        <label for="description">Overview</label>
+        <textarea id="description" pTextarea formControlName="description" rows="5"
+          placeholder="Enter product overview..."></textarea>
+      </div>
 
-      <div class="panel-body">
-        @switch (activeStep()) {
-          @case (0) {
-            <div class="grid-2">
-              <div class="field" [class.field--invalid]="invalid('productName')">
-                <label for="productName">Product Name <span class="req">*</span></label>
-                <input id="productName" pInputText formControlName="productName" placeholder="e.g. Samsung Galaxy S24 Ultra" />
-                @if (invalid('productName')) {
-                  <small class="field-error">Product name is required.</small>
-                }
-              </div>
-              <div class="field">
-                <label for="shortName">Short Name</label>
-                <input id="shortName" pInputText formControlName="shortName" placeholder="Display name" />
-              </div>
-              <div class="field">
-                <label>Product Type</label>
-                <div class="sku-row">
-                  <p-select
-                    [options]="selectOptions(form.get('productType')?.value, productTypeSelectOptions())"
-                    formControlName="productType"
-                    optionLabel="label"
-                    optionValue="value"
-                    [placeholder]="options.productTypesLoading() ? 'Loading types...' : (options.productTypes().length ? 'Select type' : 'No active types')"
-                    [showClear]="true"
-                    [filter]="true"
-                    filterBy="label"
-                    appendTo="body"
-                    panelStyleClass="catalog-filter-panel"
-                    [checkmark]="false"
-                    scrollHeight="240px"
-                    [disabled]="options.productTypesLoading()"
-                  />
-                  <button
-                    pButton
-                    type="button"
-                    [rounded]="true"
-                    severity="secondary"
-                    icon="pi pi-plus"
-                    label="Add"
-                    (click)="openAddProductType()"
-                  ></button>
-                </div>
-                @if (options.productTypesLoading()) {
-                  <small class="field-hint">Loading product types…</small>
-                } @else if (options.productTypesError()) {
-                  <small class="field-error">
-                    {{ options.productTypesError() }}
-                    <button type="button" class="linkish" (click)="options.reloadProductTypes()">Retry</button>
-                  </small>
-                } @else if (!options.productTypes().length) {
-                  <small class="field-hint">No active product types yet. Click Add to create one.</small>
-                }
-              </div>
-              <div class="field">
-                <label for="modelNumber">Model Number</label>
-                <input id="modelNumber" pInputText formControlName="modelNumber" placeholder="e.g. TN-X1-256" />
-                <small class="field-hint">Preferred for auto-generate SKU; Auto Generate also works without it.</small>
-              </div>
-              <div class="field">
-                <label for="sku">SKU <span class="req">*</span></label>
-                <div class="sku-row">
-                  <input id="sku" pInputText formControlName="sku" placeholder="Unique product code" />
-                  <button
-                    pButton
-                    type="button"
-                    [rounded]="true"
-                    severity="secondary"
-                    icon="pi pi-sparkles"
-                    label="Auto Generate"
-                    [disabled]="!canAutoGenerateSku()"
-                    (click)="autoGenerateSku()"
-                  ></button>
-                </div>
-              </div>
-              <div class="field">
-                <label for="barcode">Barcode</label>
-                <input id="barcode" pInputText formControlName="barcode" placeholder="EAN / UPC" />
-              </div>
-              <div class="field">
-                <label for="hsnCode">HSN Code</label>
-                <input id="hsnCode" pInputText formControlName="hsnCode" placeholder="Tax classification" />
-              </div>
-              <div class="field">
-                <label for="manufacturer">Manufacturer</label>
-                <input id="manufacturer" pInputText formControlName="manufacturer" placeholder="Manufacturer name" />
-              </div>
-              <div class="field">
-                <label>Dealer</label>
-                <p-select
-                  [options]="basicDealerSelectOptions()"
-                  [ngModel]="primaryDealerId()"
-                  [ngModelOptions]="{standalone: true}"
-                  (ngModelChange)="onPrimaryDealerSelected($event)"
-                  optionLabel="label"
-                  optionValue="value"
-                  [placeholder]="dealersLoading() ? 'Loading dealers...' : (dealerCatalog().length ? 'Select Dealer' : 'No dealers')"
-                  [showClear]="true"
-                  [filter]="true"
-                  filterBy="label"
-                  appendTo="body"
-                  panelStyleClass="catalog-filter-panel dealer-select-panel"
-                  [checkmark]="false"
-                  scrollHeight="240px"
-                  [loading]="dealersLoading()"
-                  [disabled]="dealersLoading()"
-                />
-                @if (dealersLoading()) {
-                  <small class="field-hint">Loading dealers…</small>
-                } @else if (dealersError()) {
-                  <small class="field-error">
-                    {{ dealersError() }}
-                    <button type="button" class="linkish" (click)="reloadDealers()">Retry</button>
-                  </small>
-                } @else if (!dealerCatalog().length) {
-                  <small class="field-hint">No dealers available. Add dealers from Masters.</small>
-                }
-              </div>
-              <div class="field">
-                <label>Warranty</label>
-                <p-select
-                  [options]="selectOptions(form.get('warranty')?.value, warrantyOptions)"
-                  formControlName="warranty"
-                  optionLabel="label"
-                  optionValue="value"
-                  placeholder="Select warranty"
-                  [showClear]="true"
-                  appendTo="body"
-                  panelStyleClass="catalog-filter-panel"
-                  [checkmark]="false"
-                  scrollHeight="240px"
-                />
-              </div>
-              <div class="field">
-                <label>Product Condition</label>
-                <p-select
-                  [options]="conditionOptions"
-                  formControlName="productCondition"
-                  optionLabel="label"
-                  optionValue="value"
-                  appendTo="body"
-                  panelStyleClass="catalog-filter-panel"
-                  [checkmark]="false"
-                  scrollHeight="240px"
-                />
-              </div>
-              <div class="field" [class.field--invalid]="invalid('availableStock')">
-                <label for="availableStock">Stock Quantity <span class="req">*</span></label>
-                <p-inputNumber
-                  inputId="availableStock"
-                  formControlName="availableStock"
-                  [min]="0"
-                  [maxFractionDigits]="0"
-                  [useGrouping]="false"
-                  [showClear]="true"
-                  placeholder="10"
-                />
-                <small class="field-hint">Enter the quantity currently available for sale.</small>
-                @if (invalid('availableStock')) {
-                  <small class="field-error">
-                    {{ form.get('availableStock')!.hasError('required') ? 'Stock quantity is required.' : 'Stock quantity must be an integer of 0 or more.' }}
-                  </small>
-                }
-              </div>
-            </div>
-            <div class="field">
-              <label for="shortDescription">Short Description</label>
-              <input id="shortDescription" pInputText formControlName="shortDescription" maxlength="160" placeholder="Brief product summary (max 160 chars)" />
-            </div>
-            <div class="field">
-              <label for="description">Overview</label>
-              <textarea id="description" pTextarea formControlName="description" rows="5" placeholder="Enter product overview..."></textarea>
-            </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="productVideoUrl">Product Video URL</label>
+          <input id="productVideoUrl" pInputText formControlName="productVideoUrl"
+            placeholder="https://youtube.com/watch?v=..." />
+        </div>
+        <div class="field">
+          <label for="colourSizeVariant">Colour / Size / Variant</label>
+          <input id="colourSizeVariant" pInputText formControlName="colourSizeVariant"
+            placeholder="e.g. Black / 256GB" />
+          <small class="field-hint">Free-text label; separate from Variants step attributes</small>
+        </div>
+      </div>
 
-            <div class="grid-2">
-              <div class="field">
-                <label for="productVideoUrl">Product Video URL</label>
-                <input id="productVideoUrl" pInputText formControlName="productVideoUrl" placeholder="https://youtube.com/watch?v=..." />
-              </div>
-              <div class="field">
-                <label for="colourSizeVariant">Colour / Size / Variant</label>
-                <input id="colourSizeVariant" pInputText formControlName="colourSizeVariant" placeholder="e.g. Black / 256GB" />
-                <small class="field-hint">Free-text label; separate from Variants step attributes</small>
-              </div>
-            </div>
+      <div class="setting-row">
+        <div>
+          <label for="serialImeiTracking">Serial Number / IMEI Tracking</label>
+          <p>Track serial numbers or IMEI for this product</p>
+        </div>
+        <p-toggleswitch formControlName="serialImeiTracking" inputId="serialImeiTracking" />
+      </div>
 
-            <div class="setting-row">
-              <div>
-                <label for="serialImeiTracking">Serial Number / IMEI Tracking</label>
-                <p>Track serial numbers or IMEI for this product</p>
-              </div>
-              <p-toggleswitch formControlName="serialImeiTracking" inputId="serialImeiTracking" />
-            </div>
+      <section class="section-card amazon-paste" aria-labelledby="amazon-paste-heading">
+        <div class="section-card__head">
+          <div>
+            <h3 id="amazon-paste-heading">Product Details</h3>
+            <p>Paste Amazon product information here. Auto Fill populates the existing fields below so you can review
+              them before saving.</p>
+          </div>
+        </div>
+        <textarea id="amazonPaste" pTextarea rows="10" [ngModel]="amazonPaste()" [ngModelOptions]="{standalone: true}"
+          (ngModelChange)="amazonPaste.set($event)" placeholder="Paste Amazon product information here..."
+          [disabled]="amazonAnalyzing()"></textarea>
+        <div class="amazon-paste__actions">
+          <button pButton type="button" icon="pi pi-sparkles" label="Auto Fill Product Details"
+            [loading]="amazonAnalyzing()" [disabled]="amazonAnalyzing() || !amazonPaste().trim()"
+            (click)="autoFillFromAmazon()"></button>
+          @if (amazonFeedback(); as feedback) {
+          <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
+            {{ feedback.message }}
+          </small>
+          }
+        </div>
+      </section>
 
-            <section class="section-card amazon-paste" aria-labelledby="amazon-paste-heading">
-              <div class="section-card__head">
-                <div>
-                  <h3 id="amazon-paste-heading">Product Details</h3>
-                  <p>Paste Amazon product information here. Auto Fill populates the existing fields below so you can review them before saving.</p>
-                </div>
-              </div>
-              <textarea
-                id="amazonPaste"
-                pTextarea
-                rows="10"
-                [ngModel]="amazonPaste()"
-                [ngModelOptions]="{standalone: true}"
-                (ngModelChange)="amazonPaste.set($event)"
-                placeholder="Paste Amazon product information here..."
-                [disabled]="amazonAnalyzing()"
-              ></textarea>
-              <div class="amazon-paste__actions">
-                <button
-                  pButton
-                  type="button"
-                  icon="pi pi-sparkles"
-                  label="Auto Fill Product Details"
-                  [loading]="amazonAnalyzing()"
-                  [disabled]="amazonAnalyzing() || !amazonPaste().trim()"
-                  (click)="autoFillFromAmazon()"
-                ></button>
-                @if (amazonFeedback(); as feedback) {
-                  <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
-                    {{ feedback.message }}
-                  </small>
-                }
-              </div>
-            </section>
+      <div class="list-field">
+        <label>Specifications</label>
+        @for (spec of specificationsArr.controls; track $index; let i = $index) {
+        <div class="list-field__row list-field__row--pair" [formGroup]="asGroup(spec)">
+          <input pInputText formControlName="key" placeholder="Name" />
+          <input pInputText formControlName="value" placeholder="Value" />
+          <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger"
+            (click)="removeAt(specificationsArr, i)"></button>
+        </div>
+        }
+        <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add specification"
+          (click)="addSpecification()"></button>
+      </div>
 
-            <div class="list-field">
-              <label>Specifications</label>
-              @for (spec of specificationsArr.controls; track $index; let i = $index) {
-                <div class="list-field__row list-field__row--pair" [formGroup]="asGroup(spec)">
-                  <input pInputText formControlName="key" placeholder="Name" />
-                  <input pInputText formControlName="value" placeholder="Value" />
-                  <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger" (click)="removeAt(specificationsArr, i)"></button>
-                </div>
-              }
-              <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add specification" (click)="addSpecification()"></button>
-            </div>
+      <section class="section-card amazon-paste" aria-labelledby="about-this-item-heading">
+        <div class="section-card__head">
+          <div>
+            <h3 id="about-this-item-heading">About this item</h3>
+            <p>Paste Amazon's About this item section. Auto Fill creates editable entries below. This stays separate
+              from Specifications and Features.</p>
+          </div>
+        </div>
+        <textarea id="aboutThisItemPaste" pTextarea rows="8" [ngModel]="aboutThisItemPaste()"
+          [ngModelOptions]="{standalone: true}" (ngModelChange)="aboutThisItemPaste.set($event)"
+          placeholder="Paste About this item content here..." [disabled]="aboutThisItemAnalyzing()"></textarea>
+        <div class="amazon-paste__actions">
+          <button pButton type="button" icon="pi pi-sparkles" label="Auto Fill About This Item"
+            [loading]="aboutThisItemAnalyzing()" [disabled]="aboutThisItemAnalyzing() || !aboutThisItemPaste().trim()"
+            (click)="autoFillAboutThisItem()"></button>
+          @if (aboutThisItemFeedback(); as feedback) {
+          <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
+            {{ feedback.message }}
+          </small>
+          }
+        </div>
+      </section>
 
-            <section class="section-card amazon-paste" aria-labelledby="about-this-item-heading">
-              <div class="section-card__head">
-                <div>
-                  <h3 id="about-this-item-heading">About this item</h3>
-                  <p>Paste Amazon's About this item section. Auto Fill creates editable entries below. This stays separate from Specifications and Features.</p>
-                </div>
-              </div>
-              <textarea
-                id="aboutThisItemPaste"
-                pTextarea
-                rows="8"
-                [ngModel]="aboutThisItemPaste()"
-                [ngModelOptions]="{standalone: true}"
-                (ngModelChange)="aboutThisItemPaste.set($event)"
-                placeholder="Paste About this item content here..."
-                [disabled]="aboutThisItemAnalyzing()"
-              ></textarea>
-              <div class="amazon-paste__actions">
-                <button
-                  pButton
-                  type="button"
-                  icon="pi pi-sparkles"
-                  label="Auto Fill About This Item"
-                  [loading]="aboutThisItemAnalyzing()"
-                  [disabled]="aboutThisItemAnalyzing() || !aboutThisItemPaste().trim()"
-                  (click)="autoFillAboutThisItem()"
-                ></button>
-                @if (aboutThisItemFeedback(); as feedback) {
-                  <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
-                    {{ feedback.message }}
-                  </small>
-                }
-              </div>
-            </section>
+      <div class="list-field">
+        <label>About this item</label>
+        @for (ctrl of aboutThisItemArr.controls; track $index; let i = $index) {
+        <div class="list-field__row list-field__row--about">
+          <textarea pTextarea [formControl]="ctrl" rows="2" placeholder="About this item entry"></textarea>
+          <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger"
+            (click)="removeAt(aboutThisItemArr, i)"></button>
+        </div>
+        }
+        <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add item"
+          (click)="addAboutThisItem()"></button>
+      </div>
 
-            <div class="list-field">
-              <label>About this item</label>
-              @for (ctrl of aboutThisItemArr.controls; track $index; let i = $index) {
-                <div class="list-field__row list-field__row--about">
-                  <textarea pTextarea [formControl]="ctrl" rows="2" placeholder="About this item entry"></textarea>
-                  <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger" (click)="removeAt(aboutThisItemArr, i)"></button>
-                </div>
-              }
-              <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add item" (click)="addAboutThisItem()"></button>
-            </div>
+      <div class="list-field">
+        <label>Features</label>
+        @for (ctrl of featuresArr.controls; track $index; let i = $index) {
+        <div class="list-field__row">
+          <input pInputText [formControl]="ctrl" placeholder="Key feature" />
+          <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger"
+            (click)="removeAt(featuresArr, i)"></button>
+        </div>
+        }
+        <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add Feature"
+          (click)="addFeature()"></button>
+      </div>
 
-            <div class="list-field">
-              <label>Features</label>
-              @for (ctrl of featuresArr.controls; track $index; let i = $index) {
-                <div class="list-field__row">
-                  <input pInputText [formControl]="ctrl" placeholder="Key feature" />
-                  <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger" (click)="removeAt(featuresArr, i)"></button>
-                </div>
-              }
-              <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add Feature" (click)="addFeature()"></button>
-            </div>
-
-            <section class="section-card amazon-paste" aria-labelledby="box-contents-paste-heading">
-              <div class="section-card__head">
-                <div>
-                  <h3 id="box-contents-paste-heading">Amazon Box Contents</h3>
-                  <p>Paste the 'What's in the box' / 'Box Contents' section copied from Amazon.</p>
-                </div>
-              </div>
-              <textarea
-                id="boxContentsPaste"
-                pTextarea
-                rows="8"
-                [ngModel]="boxContentsPaste()"
-                [ngModelOptions]="{standalone: true}"
-                (ngModelChange)="boxContentsPaste.set($event)"
-                placeholder="What's in the box
+      <section class="section-card amazon-paste" aria-labelledby="box-contents-paste-heading">
+        <div class="section-card__head">
+          <div>
+            <h3 id="box-contents-paste-heading">Amazon Box Contents</h3>
+            <p>Paste the 'What's in the box' / 'Box Contents' section copied from Amazon.</p>
+          </div>
+        </div>
+        <textarea id="boxContentsPaste" pTextarea rows="8" [ngModel]="boxContentsPaste()"
+          [ngModelOptions]="{standalone: true}" (ngModelChange)="boxContentsPaste.set($event)" placeholder="What's in the box
 
 1 x Office Chair
 1 x Headrest
@@ -431,1677 +302,1717 @@
 1 x Base
 1 x Caster Wheels
 1 x Installation Manual
-1 x Hardware Kit"
-                [disabled]="boxContentsAnalyzing()"
-              ></textarea>
-              <div class="amazon-paste__actions">
-                <button
-                  pButton
-                  type="button"
-                  icon="pi pi-sparkles"
-                  label="Auto Fill Box Contents"
-                  [loading]="boxContentsAnalyzing()"
-                  [disabled]="boxContentsAnalyzing() || !boxContentsPaste().trim()"
-                  (click)="autoFillBoxContents()"
-                ></button>
-                @if (boxContentsFeedback(); as feedback) {
+1 x Hardware Kit" [disabled]="boxContentsAnalyzing()"></textarea>
+        <div class="amazon-paste__actions">
+          <button pButton type="button" icon="pi pi-sparkles" label="Auto Fill Box Contents"
+            [loading]="boxContentsAnalyzing()" [disabled]="boxContentsAnalyzing() || !boxContentsPaste().trim()"
+            (click)="autoFillBoxContents()"></button>
+          @if (boxContentsFeedback(); as feedback) {
+          <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
+            {{ feedback.message }}
+          </small>
+          }
+        </div>
+      </section>
+
+      <div class="list-field">
+        <label>Box Contents</label>
+        @for (ctrl of boxContentsArr.controls; track $index; let i = $index) {
+        <div class="list-field__row">
+          <input pInputText [formControl]="ctrl" placeholder="Item in the box" />
+          <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger"
+            (click)="removeAt(boxContentsArr, i)"></button>
+        </div>
+        }
+        <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add item"
+          (click)="addBoxContent()"></button>
+      </div>
+      }
+
+      @case (1) {
+      <section class="section-card">
+        <app-manageable-select label="Category" placeholder="Select main category" entityName="Category"
+          entityNamePlural="Categories" [options]="categoryNames()" [value]="form.get('category')!.value"
+          (valueChange)="onCategoryChange($event)" (add)="options.addCategory($event)"
+          (rename)="renameCategory($event.from, $event.to)" (remove)="deleteCategory($event)" />
+        <app-manageable-select label="Sub Category"
+          [placeholder]="form.get('category')!.value ? 'Select sub category' : 'Select category first'"
+          entityName="Sub Category" entityNamePlural="Sub Categories" [options]="subCategoryNames()"
+          [value]="form.get('subCategory')!.value" [disabled]="!form.get('category')!.value"
+          (valueChange)="onSubCategoryChange($event)"
+          (add)="options.addSubCategory(form.get('category')!.value, $event)"
+          (rename)="renameSubCategory($event.from, $event.to)" (remove)="deleteSubCategory($event)" />
+        <app-manageable-select label="Brand"
+          [placeholder]="form.get('subCategory')!.value ? 'Select brand' : 'Select sub category first'"
+          entityName="Brand" entityNamePlural="Brands"
+          [options]="form.get('subCategory')!.value ? options.brands() : []" [value]="form.get('brand')!.value"
+          [disabled]="!form.get('subCategory')!.value" (valueChange)="onBrandChange($event)"
+          (add)="options.addBrand($event)" (rename)="renameBrand($event.from, $event.to)"
+          (remove)="deleteBrand($event)" />
+      </section>
+      @if (form.get('category')!.value) {
+      <section class="section-card path-card">
+        <h3>Selected Path</h3>
+        <p>{{ selectedPath() }}</p>
+      </section>
+      }
+      }
+
+      @case (2) {
+      <section class="section-card">
+        <div class="setting-row">
+          <div>
+            <label for="variantsEnabled">Enable Variants</label>
+            <p>Turn on to create multiple SKUs with different attributes</p>
+          </div>
+          <p-toggleswitch formControlName="variantsEnabled" inputId="variantsEnabled" />
+        </div>
+        @if (!form.get('variantsEnabled')!.value) {
+        <div class="empty-hint empty-hint--tall">
+          <i class="pi pi-box" aria-hidden="true"></i>
+          <div>
+            <strong>Normal Product</strong>
+            <p>This product will be sold as a single SKU without variants.</p>
+          </div>
+        </div>
+        }
+      </section>
+
+      @if (form.get('variantsEnabled')!.value) {
+      <section class="section-card">
+        <div class="section-card__head">
+          <div>
+            <h3>Quick Add Variant</h3>
+            <p>Type a variant name (e.g. Red, 64GB, Large) and add it to the list.</p>
+          </div>
+        </div>
+        <div class="quick-add">
+          <input pInputText [value]="newVariantName()" (input)="newVariantName.set($any($event.target).value)"
+            (keydown.enter)="addVariant(); $event.preventDefault()" placeholder="e.g. Red - 64GB" />
+          <button pButton type="button" [rounded]="true" icon="pi pi-plus" label="Add Variant"
+            (click)="addVariant()"></button>
+        </div>
+
+        @if (variantsArr.length === 0) {
+        <div class="empty-hint empty-hint--tall">
+          <i class="pi pi-clone" aria-hidden="true"></i>
+          <div>
+            <strong>No variants yet</strong>
+            <p>Use + Add variant to create a named SKU. Combinations are not auto-generated — each variant is added
+              manually.</p>
+          </div>
+          <p class="muted">Type a name above and click Add Variant.</p>
+        </div>
+        } @else {
+        <div class="section-head">
+          <h3>{{ variantsArr.length }} variant{{ variantsArr.length === 1 ? '' : 's' }} added</h3>
+          <button pButton type="button" size="small" [text]="true" severity="danger" label="Clear all"
+            (click)="clearVariants()"></button>
+        </div>
+
+        <div class="entity-table variant-manager">
+          <div class="entity-table__head">
+            <span>Name</span>
+            <span>SKU</span>
+            <span>MRP</span>
+            <span>Selling Price</span>
+            <span>Stock</span>
+            <span>Actions</span>
+          </div>
+
+          @for (ctrl of variantsArr.controls; track variantId(ctrl); let i = $index) {
+          <article class="entity-row" [formGroup]="asGroup(ctrl)"
+            [class.entity-row--open]="isVariantExpanded(variantId(ctrl))">
+            <div class="entity-row__grid">
+              <div class="field">
+                <label>Name</label>
+                <input pInputText formControlName="name" placeholder="e.g. Red - 64GB" />
+                @if (asGroup(ctrl).get('name')!.invalid && (asGroup(ctrl).get('name')!.touched ||
+                asGroup(ctrl).get('name')!.dirty)) {
+                <small class="field-error">Name is required.</small>
+                }
+              </div>
+              <div class="field">
+                <label>SKU</label>
+                <input pInputText formControlName="sku" placeholder="Variant SKU" />
+              </div>
+              <div class="field">
+                <label>MRP</label>
+                <input pInputText formControlName="mrp" placeholder="0" />
+              </div>
+              <div class="field">
+                <label>Selling Price</label>
+                <input pInputText formControlName="sellingPrice" placeholder="0" />
+              </div>
+              <div class="field">
+                <label>Stock</label>
+                <input pInputText formControlName="stock" placeholder="0" inputmode="numeric" />
+                @if (asGroup(ctrl).get('stock')!.invalid && (asGroup(ctrl).get('stock')!.touched ||
+                asGroup(ctrl).get('stock')!.dirty)) {
+                <small class="field-error">Enter a whole number of 0 or more.</small>
+                }
+              </div>
+              <div class="entity-row__actions">
+                <span class="pill" [class.pill--ok]="asGroup(ctrl).get('saved')!.value"
+                  [class.pill--draft]="!asGroup(ctrl).get('saved')!.value">
+                  {{ asGroup(ctrl).get('saved')!.value ? 'Saved' : 'Draft' }}
+                </span>
+                <button pButton type="button" [text]="true"
+                  [icon]="isVariantExpanded(variantId(ctrl)) ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+                  pTooltip="More details" [tooltipOptions]="actionTooltip"
+                  (click)="toggleVariant(variantId(ctrl))"></button>
+                <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger"
+                  pTooltip="Delete variant" [tooltipOptions]="actionTooltip" (click)="removeVariant(i)"></button>
+              </div>
+            </div>
+
+            @if (isVariantExpanded(variantId(ctrl))) {
+            <div class="entity-row__details">
+              <div class="grid-2">
+                <div class="field">
+                  <label>Barcode</label>
+                  <input pInputText formControlName="barcode" />
+                </div>
+                <div class="field">
+                  <label>Purchase price</label>
+                  <input pInputText formControlName="purchasePrice" placeholder="0" />
+                </div>
+                <div class="field">
+                  <label>Status</label>
+                  <p-select [options]="variantStatusOptions" formControlName="status" optionLabel="label"
+                    optionValue="value" appendTo="body" panelStyleClass="catalog-filter-panel" [checkmark]="false"
+                    scrollHeight="240px" />
+                </div>
+                <div class="field">
+                  <label>EMI Plan Mapping</label>
+                  @if (hideEmiStep()) {
+                  <p class="field-hint">An admin will map EMI plans after you submit this product for approval.</p>
+                  } @else {
+                  <p-select [options]="emiPlanOptions()" formControlName="emiPlanId" optionLabel="label"
+                    optionValue="value" placeholder="Select EMI plan" [showClear]="true" appendTo="body"
+                    panelStyleClass="catalog-filter-panel" [checkmark]="false" scrollHeight="240px" />
+                  }
+                </div>
+              </div>
+
+              <section class="section-card amazon-paste" [attr.aria-labelledby]="'variant-amazon-' + variantId(ctrl)">
+                <div class="section-card__head">
+                  <div>
+                    <h3 [id]="'variant-amazon-' + variantId(ctrl)">Product Details</h3>
+                    <p>Paste Amazon product information here. Auto Fill populates this variant’s fields below so you can
+                      review them before saving.</p>
+                  </div>
+                </div>
+                <textarea pTextarea rows="8" [ngModel]="variantAmazonPaste()[variantId(ctrl)] || ''"
+                  [ngModelOptions]="{standalone: true}"
+                  (ngModelChange)="setVariantPaste('amazon', variantId(ctrl), $event)"
+                  placeholder="Paste Amazon product information here..."
+                  [disabled]="!!variantAmazonAnalyzing()[variantId(ctrl)]"></textarea>
+                <div class="amazon-paste__actions">
+                  <button pButton type="button" icon="pi pi-sparkles" label="Auto Fill Product Details"
+                    [loading]="!!variantAmazonAnalyzing()[variantId(ctrl)]"
+                    [disabled]="!!variantAmazonAnalyzing()[variantId(ctrl)] || !(variantAmazonPaste()[variantId(ctrl)] || '').trim()"
+                    (click)="autoFillVariantFromAmazon(i)"></button>
+                  @if (variantAmazonFeedback()[variantId(ctrl)]; as feedback) {
                   <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
                     {{ feedback.message }}
                   </small>
-                }
-              </div>
-            </section>
-
-            <div class="list-field">
-              <label>Box Contents</label>
-              @for (ctrl of boxContentsArr.controls; track $index; let i = $index) {
-                <div class="list-field__row">
-                  <input pInputText [formControl]="ctrl" placeholder="Item in the box" />
-                  <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger" (click)="removeAt(boxContentsArr, i)"></button>
+                  }
                 </div>
-              }
-              <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add item" (click)="addBoxContent()"></button>
-            </div>
-          }
-
-          @case (1) {
-            <section class="section-card">
-              <app-manageable-select
-                label="Category"
-                placeholder="Select main category"
-                entityName="Category"
-                entityNamePlural="Categories"
-                [options]="categoryNames()"
-                [value]="form.get('category')!.value"
-                (valueChange)="onCategoryChange($event)"
-                (add)="options.addCategory($event)"
-                (rename)="renameCategory($event.from, $event.to)"
-                (remove)="deleteCategory($event)"
-              />
-              <app-manageable-select
-                label="Sub Category"
-                [placeholder]="form.get('category')!.value ? 'Select sub category' : 'Select category first'"
-                entityName="Sub Category"
-                entityNamePlural="Sub Categories"
-                [options]="subCategoryNames()"
-                [value]="form.get('subCategory')!.value"
-                [disabled]="!form.get('category')!.value"
-                (valueChange)="onSubCategoryChange($event)"
-                (add)="options.addSubCategory(form.get('category')!.value, $event)"
-                (rename)="renameSubCategory($event.from, $event.to)"
-                (remove)="deleteSubCategory($event)"
-              />
-              <app-manageable-select
-                label="Brand"
-                [placeholder]="form.get('subCategory')!.value ? 'Select brand' : 'Select sub category first'"
-                entityName="Brand"
-                entityNamePlural="Brands"
-                [options]="form.get('subCategory')!.value ? options.brands() : []"
-                [value]="form.get('brand')!.value"
-                [disabled]="!form.get('subCategory')!.value"
-                (valueChange)="onBrandChange($event)"
-                (add)="options.addBrand($event)"
-                (rename)="renameBrand($event.from, $event.to)"
-                (remove)="deleteBrand($event)"
-              />
-            </section>
-            @if (form.get('category')!.value) {
-              <section class="section-card path-card">
-                <h3>Selected Path</h3>
-                <p>{{ selectedPath() }}</p>
               </section>
-            }
-          }
 
-          @case (2) {
-            <section class="section-card">
-              <div class="setting-row">
-                <div>
-                  <label for="variantsEnabled">Enable Variants</label>
-                  <p>Turn on to create multiple SKUs with different attributes</p>
-                </div>
-                <p-toggleswitch formControlName="variantsEnabled" inputId="variantsEnabled" />
+              <div class="field">
+                <label>Description</label>
+                <textarea pTextarea formControlName="description" rows="3"></textarea>
               </div>
-              @if (!form.get('variantsEnabled')!.value) {
-                <div class="empty-hint empty-hint--tall">
-                  <i class="pi pi-box" aria-hidden="true"></i>
+
+              <div class="grid-2">
+                <div class="field">
+                  <label>Dealer</label>
+                  <p-select formControlName="supplier" [options]="variantDealerSelectOptions()" optionLabel="label"
+                    optionValue="value" placeholder="Search dealer..."
+                    panelStyleClass="catalog-filter-panel dealer-select-panel" [filter]="true"
+                    filterPlaceholder="Search by name or code..." [showClear]="true" [loading]="dealersLoading()"
+                    (onChange)="onVariantDealerChange(i)" />
+                </div>
+                <div class="field">
+                  <app-manageable-select label="Warehouse" entityName="Warehouse" [options]="options.warehouses()"
+                    [value]="asGroup(ctrl).get('warehouse')!.value"
+                    (valueChange)="asGroup(ctrl).patchValue({ warehouse: $event })" (add)="options.addWarehouse($event)"
+                    (rename)="renameWarehouseEverywhere($event.from, $event.to)"
+                    (remove)="deleteWarehouseEverywhere($event)" />
+                </div>
+                <div class="field">
+                  <label>Weight (kg)</label>
+                  <input pInputText formControlName="weight" />
+                </div>
+                <div class="field">
+                  <label>Length</label>
+                  <input pInputText formControlName="length" />
+                </div>
+                <div class="field">
+                  <label>Width</label>
+                  <input pInputText formControlName="width" />
+                </div>
+                <div class="field">
+                  <label>Height</label>
+                  <input pInputText formControlName="height" />
+                </div>
+              </div>
+
+              <div class="list-field">
+                <label>Specifications</label>
+                @for (spec of variantSpecsArr(i).controls; track $index; let si = $index) {
+                <div class="list-field__row list-field__row--pair" [formGroup]="asGroup(spec)">
+                  <input pInputText formControlName="key" placeholder="Name" />
+                  <input pInputText formControlName="value" placeholder="Value" />
+                  <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger"
+                    (click)="removeAt(variantSpecsArr(i), si)"></button>
+                </div>
+                }
+                <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add specification"
+                  (click)="addVariantSpec(i)"></button>
+              </div>
+
+              <section class="section-card amazon-paste" [attr.aria-labelledby]="'variant-about-' + variantId(ctrl)">
+                <div class="section-card__head">
                   <div>
-                    <strong>Normal Product</strong>
-                    <p>This product will be sold as a single SKU without variants.</p>
+                    <h3 [id]="'variant-about-' + variantId(ctrl)">About this item</h3>
+                    <p>Paste Amazon's About this item section. Auto Fill merges into Features below without creating
+                      duplicates.</p>
                   </div>
                 </div>
-              }
-            </section>
-
-            @if (form.get('variantsEnabled')!.value) {
-            <section class="section-card">
-              <div class="section-card__head">
-                <div>
-                  <h3>Quick Add Variant</h3>
-                  <p>Type a variant name (e.g. Red, 64GB, Large) and add it to the list.</p>
+                <textarea pTextarea rows="6" [ngModel]="variantAboutPaste()[variantId(ctrl)] || ''"
+                  [ngModelOptions]="{standalone: true}"
+                  (ngModelChange)="setVariantPaste('about', variantId(ctrl), $event)"
+                  placeholder="Paste About this item content here..."
+                  [disabled]="!!variantAboutAnalyzing()[variantId(ctrl)]"></textarea>
+                <div class="amazon-paste__actions">
+                  <button pButton type="button" icon="pi pi-sparkles" label="Auto Fill About This Item"
+                    [loading]="!!variantAboutAnalyzing()[variantId(ctrl)]"
+                    [disabled]="!!variantAboutAnalyzing()[variantId(ctrl)] || !(variantAboutPaste()[variantId(ctrl)] || '').trim()"
+                    (click)="autoFillVariantAboutThisItem(i)"></button>
+                  @if (variantAboutFeedback()[variantId(ctrl)]; as feedback) {
+                  <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
+                    {{ feedback.message }}
+                  </small>
+                  }
                 </div>
-              </div>
-              <div class="quick-add">
-                <input
-                  pInputText
-                  [value]="newVariantName()"
-                  (input)="newVariantName.set($any($event.target).value)"
-                  (keydown.enter)="addVariant(); $event.preventDefault()"
-                  placeholder="e.g. Red - 64GB"
-                />
-                <button pButton type="button" [rounded]="true" icon="pi pi-plus" label="Add Variant" (click)="addVariant()"></button>
+              </section>
+
+              <div class="list-field">
+                <label>Features</label>
+                @for (feat of variantFeaturesArr(i).controls; track $index; let fi = $index) {
+                <div class="list-field__row" [formGroup]="asGroup(feat)">
+                  <input pInputText formControlName="value" placeholder="Enter feature" />
+                  <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger"
+                    (click)="removeAt(variantFeaturesArr(i), fi)"></button>
+                </div>
+                }
+                <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add feature"
+                  (click)="addVariantFeature(i)"></button>
               </div>
 
-              @if (variantsArr.length === 0) {
-                <div class="empty-hint empty-hint--tall">
-                  <i class="pi pi-clone" aria-hidden="true"></i>
+              <section class="section-card amazon-paste" [attr.aria-labelledby]="'variant-box-' + variantId(ctrl)">
+                <div class="section-card__head">
                   <div>
-                    <strong>No variants yet</strong>
-                    <p>Use + Add variant to create a named SKU. Combinations are not auto-generated — each variant is added manually.</p>
+                    <h3 [id]="'variant-box-' + variantId(ctrl)">Amazon Box Contents</h3>
+                    <p>Paste the 'What's in the box' / 'Box Contents' section copied from Amazon.</p>
                   </div>
-                  <p class="muted">Type a name above and click Add Variant.</p>
                 </div>
-              } @else {
-                <div class="section-head">
-                  <h3>{{ variantsArr.length }} variant{{ variantsArr.length === 1 ? '' : 's' }} added</h3>
-                  <button pButton type="button" size="small" [text]="true" severity="danger" label="Clear all" (click)="clearVariants()"></button>
-                </div>
-
-                <div class="entity-table variant-manager">
-                  <div class="entity-table__head">
-                    <span>Name</span>
-                    <span>SKU</span>
-                    <span>MRP</span>
-                    <span>Selling Price</span>
-                    <span>Stock</span>
-                    <span>Actions</span>
-                  </div>
-
-                  @for (ctrl of variantsArr.controls; track variantId(ctrl); let i = $index) {
-                    <article class="entity-row" [formGroup]="asGroup(ctrl)" [class.entity-row--open]="isVariantExpanded(variantId(ctrl))">
-                      <div class="entity-row__grid">
-                        <div class="field">
-                          <label>Name</label>
-                          <input pInputText formControlName="name" placeholder="e.g. Red - 64GB" />
-                          @if (asGroup(ctrl).get('name')!.invalid && (asGroup(ctrl).get('name')!.touched || asGroup(ctrl).get('name')!.dirty)) {
-                            <small class="field-error">Name is required.</small>
-                          }
-                        </div>
-                        <div class="field">
-                          <label>SKU</label>
-                          <input pInputText formControlName="sku" placeholder="Variant SKU" />
-                        </div>
-                        <div class="field">
-                          <label>MRP</label>
-                          <input pInputText formControlName="mrp" placeholder="0" />
-                        </div>
-                        <div class="field">
-                          <label>Selling Price</label>
-                          <input pInputText formControlName="sellingPrice" placeholder="0" />
-                        </div>
-                        <div class="field">
-                          <label>Stock</label>
-                          <input pInputText formControlName="stock" placeholder="0" inputmode="numeric" />
-                          @if (asGroup(ctrl).get('stock')!.invalid && (asGroup(ctrl).get('stock')!.touched || asGroup(ctrl).get('stock')!.dirty)) {
-                            <small class="field-error">Enter a whole number of 0 or more.</small>
-                          }
-                        </div>
-                        <div class="entity-row__actions">
-                          <span class="pill" [class.pill--ok]="asGroup(ctrl).get('saved')!.value" [class.pill--draft]="!asGroup(ctrl).get('saved')!.value">
-                            {{ asGroup(ctrl).get('saved')!.value ? 'Saved' : 'Draft' }}
-                          </span>
-                          <button pButton type="button" [text]="true" [icon]="isVariantExpanded(variantId(ctrl)) ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" pTooltip="More details" [tooltipOptions]="actionTooltip" (click)="toggleVariant(variantId(ctrl))"></button>
-                          <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger" pTooltip="Delete variant" [tooltipOptions]="actionTooltip" (click)="removeVariant(i)"></button>
-                        </div>
-                      </div>
-
-                      @if (isVariantExpanded(variantId(ctrl))) {
-                        <div class="entity-row__details">
-                          <div class="grid-2">
-                            <div class="field">
-                              <label>Barcode</label>
-                              <input pInputText formControlName="barcode" />
-                            </div>
-                            <div class="field">
-                              <label>Purchase price</label>
-                              <input pInputText formControlName="purchasePrice" placeholder="0" />
-                            </div>
-                            <div class="field">
-                              <label>Status</label>
-                              <p-select
-                                [options]="variantStatusOptions"
-                                formControlName="status"
-                                optionLabel="label"
-                                optionValue="value"
-                                appendTo="body"
-                                panelStyleClass="catalog-filter-panel"
-                                [checkmark]="false"
-                                scrollHeight="240px"
-                              />
-                            </div>
-                            <div class="field">
-                              <label>EMI Plan Mapping</label>
-                              @if (hideEmiStep()) {
-                                <p class="field-hint">An admin will map EMI plans after you submit this product for approval.</p>
-                              } @else {
-                                <p-select
-                                  [options]="emiPlanOptions()"
-                                  formControlName="emiPlanId"
-                                  optionLabel="label"
-                                  optionValue="value"
-                                  placeholder="Select EMI plan"
-                                  [showClear]="true"
-                                  appendTo="body"
-                                  panelStyleClass="catalog-filter-panel"
-                                  [checkmark]="false"
-                                  scrollHeight="240px"
-                                />
-                              }
-                            </div>
-                          </div>
-
-                          <section class="section-card amazon-paste" [attr.aria-labelledby]="'variant-amazon-' + variantId(ctrl)">
-                            <div class="section-card__head">
-                              <div>
-                                <h3 [id]="'variant-amazon-' + variantId(ctrl)">Product Details</h3>
-                                <p>Paste Amazon product information here. Auto Fill populates this variant’s fields below so you can review them before saving.</p>
-                              </div>
-                            </div>
-                            <textarea
-                              pTextarea
-                              rows="8"
-                              [ngModel]="variantAmazonPaste()[variantId(ctrl)] || ''"
-                              [ngModelOptions]="{standalone: true}"
-                              (ngModelChange)="setVariantPaste('amazon', variantId(ctrl), $event)"
-                              placeholder="Paste Amazon product information here..."
-                              [disabled]="!!variantAmazonAnalyzing()[variantId(ctrl)]"
-                            ></textarea>
-                            <div class="amazon-paste__actions">
-                              <button
-                                pButton
-                                type="button"
-                                icon="pi pi-sparkles"
-                                label="Auto Fill Product Details"
-                                [loading]="!!variantAmazonAnalyzing()[variantId(ctrl)]"
-                                [disabled]="!!variantAmazonAnalyzing()[variantId(ctrl)] || !(variantAmazonPaste()[variantId(ctrl)] || '').trim()"
-                                (click)="autoFillVariantFromAmazon(i)"
-                              ></button>
-                              @if (variantAmazonFeedback()[variantId(ctrl)]; as feedback) {
-                                <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
-                                  {{ feedback.message }}
-                                </small>
-                              }
-                            </div>
-                          </section>
-
-                          <div class="field">
-                            <label>Description</label>
-                            <textarea pTextarea formControlName="description" rows="3"></textarea>
-                          </div>
-
-                          <div class="grid-2">
-                            <div class="field">
-                              <label>Dealer</label>
-                              <p-select
-                                formControlName="supplier"
-                                [options]="variantDealerSelectOptions()"
-                                optionLabel="label"
-                                optionValue="value"
-                                placeholder="Search dealer..."
-                                panelStyleClass="catalog-filter-panel dealer-select-panel"
-                                [filter]="true"
-                                filterPlaceholder="Search by name or code..."
-                                [showClear]="true"
-                                [loading]="dealersLoading()"
-                                (onChange)="onVariantDealerChange(i)"
-                              />
-                            </div>
-                            <div class="field">
-                              <app-manageable-select
-                                label="Warehouse"
-                                entityName="Warehouse"
-                                [options]="options.warehouses()"
-                                [value]="asGroup(ctrl).get('warehouse')!.value"
-                                (valueChange)="asGroup(ctrl).patchValue({ warehouse: $event })"
-                                (add)="options.addWarehouse($event)"
-                                (rename)="renameWarehouseEverywhere($event.from, $event.to)"
-                                (remove)="deleteWarehouseEverywhere($event)"
-                              />
-                            </div>
-                            <div class="field">
-                              <label>Weight (kg)</label>
-                              <input pInputText formControlName="weight" />
-                            </div>
-                            <div class="field">
-                              <label>Length</label>
-                              <input pInputText formControlName="length" />
-                            </div>
-                            <div class="field">
-                              <label>Width</label>
-                              <input pInputText formControlName="width" />
-                            </div>
-                            <div class="field">
-                              <label>Height</label>
-                              <input pInputText formControlName="height" />
-                            </div>
-                          </div>
-
-                          <div class="list-field">
-                            <label>Specifications</label>
-                            @for (spec of variantSpecsArr(i).controls; track $index; let si = $index) {
-                              <div class="list-field__row list-field__row--pair" [formGroup]="asGroup(spec)">
-                                <input pInputText formControlName="key" placeholder="Name" />
-                                <input pInputText formControlName="value" placeholder="Value" />
-                                <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger" (click)="removeAt(variantSpecsArr(i), si)"></button>
-                              </div>
-                            }
-                            <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add specification" (click)="addVariantSpec(i)"></button>
-                          </div>
-
-                          <section class="section-card amazon-paste" [attr.aria-labelledby]="'variant-about-' + variantId(ctrl)">
-                            <div class="section-card__head">
-                              <div>
-                                <h3 [id]="'variant-about-' + variantId(ctrl)">About this item</h3>
-                                <p>Paste Amazon's About this item section. Auto Fill merges into Features below without creating duplicates.</p>
-                              </div>
-                            </div>
-                            <textarea
-                              pTextarea
-                              rows="6"
-                              [ngModel]="variantAboutPaste()[variantId(ctrl)] || ''"
-                              [ngModelOptions]="{standalone: true}"
-                              (ngModelChange)="setVariantPaste('about', variantId(ctrl), $event)"
-                              placeholder="Paste About this item content here..."
-                              [disabled]="!!variantAboutAnalyzing()[variantId(ctrl)]"
-                            ></textarea>
-                            <div class="amazon-paste__actions">
-                              <button
-                                pButton
-                                type="button"
-                                icon="pi pi-sparkles"
-                                label="Auto Fill About This Item"
-                                [loading]="!!variantAboutAnalyzing()[variantId(ctrl)]"
-                                [disabled]="!!variantAboutAnalyzing()[variantId(ctrl)] || !(variantAboutPaste()[variantId(ctrl)] || '').trim()"
-                                (click)="autoFillVariantAboutThisItem(i)"
-                              ></button>
-                              @if (variantAboutFeedback()[variantId(ctrl)]; as feedback) {
-                                <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
-                                  {{ feedback.message }}
-                                </small>
-                              }
-                            </div>
-                          </section>
-
-                          <div class="list-field">
-                            <label>Features</label>
-                            @for (feat of variantFeaturesArr(i).controls; track $index; let fi = $index) {
-                              <div class="list-field__row" [formGroup]="asGroup(feat)">
-                                <input pInputText formControlName="value" placeholder="Enter feature" />
-                                <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger" (click)="removeAt(variantFeaturesArr(i), fi)"></button>
-                              </div>
-                            }
-                            <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add feature" (click)="addVariantFeature(i)"></button>
-                          </div>
-
-                          <section class="section-card amazon-paste" [attr.aria-labelledby]="'variant-box-' + variantId(ctrl)">
-                            <div class="section-card__head">
-                              <div>
-                                <h3 [id]="'variant-box-' + variantId(ctrl)">Amazon Box Contents</h3>
-                                <p>Paste the 'What's in the box' / 'Box Contents' section copied from Amazon.</p>
-                              </div>
-                            </div>
-                            <textarea
-                              pTextarea
-                              rows="6"
-                              [ngModel]="variantBoxPaste()[variantId(ctrl)] || ''"
-                              [ngModelOptions]="{standalone: true}"
-                              (ngModelChange)="setVariantPaste('box', variantId(ctrl), $event)"
-                              placeholder="What's in the box
+                <textarea pTextarea rows="6" [ngModel]="variantBoxPaste()[variantId(ctrl)] || ''"
+                  [ngModelOptions]="{standalone: true}"
+                  (ngModelChange)="setVariantPaste('box', variantId(ctrl), $event)" placeholder="What's in the box
 
 1 x Office Chair
 1 x Headrest
-1 x Hardware Kit"
-                              [disabled]="!!variantBoxAnalyzing()[variantId(ctrl)]"
-                            ></textarea>
-                            <div class="amazon-paste__actions">
-                              <button
-                                pButton
-                                type="button"
-                                icon="pi pi-sparkles"
-                                label="Auto Fill Box Contents"
-                                [loading]="!!variantBoxAnalyzing()[variantId(ctrl)]"
-                                [disabled]="!!variantBoxAnalyzing()[variantId(ctrl)] || !(variantBoxPaste()[variantId(ctrl)] || '').trim()"
-                                (click)="autoFillVariantBoxContents(i)"
-                              ></button>
-                              @if (variantBoxFeedback()[variantId(ctrl)]; as feedback) {
-                                <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
-                                  {{ feedback.message }}
-                                </small>
-                              }
-                            </div>
-                          </section>
-
-                          <div class="list-field">
-                            <label>Box contents</label>
-                            @for (item of variantBoxArr(i).controls; track $index; let bi = $index) {
-                              <div class="list-field__row" [formGroup]="asGroup(item)">
-                                <input pInputText formControlName="value" placeholder="Enter box item" />
-                                <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger" (click)="removeAt(variantBoxArr(i), bi)"></button>
-                              </div>
-                            }
-                            <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add item" (click)="addVariantBoxItem(i)"></button>
-                          </div>
-
-                          <div class="variant-images">
-                            <section class="media-mini">
-                              <label>Variant image</label>
-                              @if (asGroup(ctrl).get('variantImage')!.value) {
-                                <figure class="thumb">
-                                  @if (isBroken(asGroup(ctrl).get('variantImage')!.value)) {
-                                    <div class="thumb__broken">Preview unavailable</div>
-                                  } @else {
-                                    <img [src]="mediaSrc(asGroup(ctrl).get('variantImage')!.value)" alt="" (error)="onImageError(asGroup(ctrl).get('variantImage')!.value)" (load)="onImageLoad(asGroup(ctrl).get('variantImage')!.value)" />
-                                  }
-                                </figure>
-                              } @else {
-                                <button type="button" class="dropzone dropzone--mini" (click)="pickVariantImage(i)">
-                                  <i class="pi pi-image" aria-hidden="true"></i>
-                                  <strong>Upload variant image</strong>
-                                  <span>Click to choose JPG / PNG / WEBP</span>
-                                </button>
-                              }
-                              <div class="url-row">
-                                <button
-                                  pButton
-                                  type="button"
-                                  size="small"
-                                  [rounded]="true"
-                                  [outlined]="true"
-                                  icon="pi pi-upload"
-                                  [label]="asGroup(ctrl).get('variantImage')!.value ? 'Replace image' : 'Add image'"
-                                  (click)="pickVariantImage(i)"
-                                ></button>
-                                <button pButton type="button" size="small" [rounded]="true" [outlined]="true" label="Clear" (click)="clearVariantPrimaryImage(i)" [disabled]="!asGroup(ctrl).get('variantImage')!.value"></button>
-                              </div>
-                              <input pInputText formControlName="variantImage" placeholder="Or paste https://…/variant.jpg" />
-                            </section>
-
-                            <section class="media-mini">
-                              <label>Variant gallery</label>
-                              @if (variantGalleryArr(i).length) {
-                                <div class="media-mini__thumbs">
-                                  @for (gctrl of variantGalleryArr(i).controls; track $index; let gi = $index) {
-                                    <div class="media-mini__item">
-                                      <figure class="thumb thumb--sm">
-                                        @if (gctrl.value && !isBroken(gctrl.value)) {
-                                          <img [src]="mediaSrc(gctrl.value)" alt="" (error)="onImageError(gctrl.value!)" />
-                                        } @else {
-                                          <div class="thumb__broken">—</div>
-                                        }
-                                      </figure>
-                                      <button pButton type="button" icon="pi pi-times" [rounded]="true" [text]="true" severity="danger" pTooltip="Remove" [tooltipOptions]="actionTooltip" (click)="removeAt(variantGalleryArr(i), gi)"></button>
-                                    </div>
-                                  }
-                                </div>
-                              }
-                              <button type="button" class="dropzone dropzone--mini" (click)="pickVariantGallery(i)">
-                                <i class="pi pi-image" aria-hidden="true"></i>
-                                <strong>Upload gallery image</strong>
-                                <span>Click to choose JPG / PNG / WEBP</span>
-                              </button>
-                              <div class="url-row">
-                                <input
-                                  pInputText
-                                  [value]="variantDraft(variantId(ctrl))"
-                                  (input)="setVariantDraft(variantId(ctrl), $any($event.target).value)"
-                                  placeholder="Or paste https://…/gallery.jpg"
-                                />
-                                <button pButton type="button" size="small" [rounded]="true" [outlined]="true" icon="pi pi-plus" label="Add URL" (click)="addVariantGalleryImage(i)"></button>
-                              </div>
-                              @if (imageError('variant-gallery-' + variantId(ctrl))) {
-                                <small class="field-error">{{ imageError('variant-gallery-' + variantId(ctrl)) }}</small>
-                              }
-                            </section>
-                          </div>
-
-                          <div class="variant-card__actions">
-                            <button pButton type="button" icon="pi pi-check" label="Save Variant" (click)="saveVariant(i)"></button>
-                          </div>
-                        </div>
-                      }
-                    </article>
+1 x Hardware Kit" [disabled]="!!variantBoxAnalyzing()[variantId(ctrl)]"></textarea>
+                <div class="amazon-paste__actions">
+                  <button pButton type="button" icon="pi pi-sparkles" label="Auto Fill Box Contents"
+                    [loading]="!!variantBoxAnalyzing()[variantId(ctrl)]"
+                    [disabled]="!!variantBoxAnalyzing()[variantId(ctrl)] || !(variantBoxPaste()[variantId(ctrl)] || '').trim()"
+                    (click)="autoFillVariantBoxContents(i)"></button>
+                  @if (variantBoxFeedback()[variantId(ctrl)]; as feedback) {
+                  <small class="amazon-paste__status" [attr.data-severity]="feedback.severity">
+                    {{ feedback.message }}
+                  </small>
                   }
                 </div>
+              </section>
 
-              }
-            </section>
-            }
-          }
-
-          @case (3) {
-            <div class="source-toggle" role="tablist" aria-label="Image source">
-              <button
-                type="button"
-                role="tab"
-                [class.is-active]="imageSource() === 'upload'"
-                (click)="imageSource.set('upload')"
-              >
-                Upload image
-              </button>
-              <button
-                type="button"
-                role="tab"
-                [class.is-active]="imageSource() === 'url'"
-                (click)="imageSource.set('url')"
-              >
-                Use image URL
-              </button>
-            </div>
-
-            <section class="media-card">
-              <div class="media-card__copy">
-                <h3>Primary image</h3>
-                <p>Main product image shown in listings.</p>
+              <div class="list-field">
+                <label>Box contents</label>
+                @for (item of variantBoxArr(i).controls; track $index; let bi = $index) {
+                <div class="list-field__row" [formGroup]="asGroup(item)">
+                  <input pInputText formControlName="value" placeholder="Enter box item" />
+                  <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger"
+                    (click)="removeAt(variantBoxArr(i), bi)"></button>
+                </div>
+                }
+                <button pButton type="button" size="small" [outlined]="true" icon="pi pi-plus" label="Add item"
+                  (click)="addVariantBoxItem(i)"></button>
               </div>
 
-              @if (form.get('primaryImage')!.value) {
-                <div class="primary-preview">
-                  <figure class="primary-preview__frame">
-                    @if (isBroken(form.get('primaryImage')!.value)) {
-                      <div class="thumb__broken">Preview unavailable</div>
+              <div class="variant-images">
+                <section class="media-mini">
+                  <label>Variant image</label>
+                  @if (asGroup(ctrl).get('variantImage')!.value) {
+                  <figure class="thumb">
+                    @if (isBroken(asGroup(ctrl).get('variantImage')!.value)) {
+                    <div class="thumb__broken">Preview unavailable</div>
                     } @else {
-                      <img
-                        [src]="mediaSrc(form.get('primaryImage')!.value)"
-                        alt="Primary product image"
-                        (error)="onImageError(form.get('primaryImage')!.value)"
-                        (load)="onImageLoad(form.get('primaryImage')!.value)"
-                      />
+                    <img [src]="mediaSrc(asGroup(ctrl).get('variantImage')!.value)" alt=""
+                      (error)="onImageError(asGroup(ctrl).get('variantImage')!.value)"
+                      (load)="onImageLoad(asGroup(ctrl).get('variantImage')!.value)" />
                     }
-                    <span class="primary-badge">Primary</span>
                   </figure>
-                  <div class="primary-preview__meta">
-                    <strong>{{ fileNameFromUrl(form.get('primaryImage')!.value) }}</strong>
-                    <span>{{ isLocalImage(form.get('primaryImage')!.value) ? 'Preview only — uploads when you save the product' : form.get('primaryImage')!.value }}</span>
-                    <div class="url-row">
-                      @if (imageSource() === 'upload') {
-                        <button
-                          pButton
-                          type="button"
-                          size="small"
-                          [rounded]="true"
-                          [outlined]="true"
-                          icon="pi pi-upload"
-                          label="Replace"
-                          (click)="pickPrimaryImage()"
-                        ></button>
-                      }
-                      <button pButton type="button" size="small" severity="danger" [outlined]="true" icon="pi pi-trash" label="Remove" (click)="removePrimaryImage()"></button>
-                    </div>
-                  </div>
-                </div>
-              } @else if (imageSource() === 'upload') {
-                <button
-                  type="button"
-                  class="dropzone"
-                  (click)="pickPrimaryImage()"
-                  (dragover)="onDragOver($event)"
-                  (drop)="onPrimaryDrop($event)"
-                >
-                  <i class="pi pi-image" aria-hidden="true"></i>
-                  <strong>Upload primary image</strong>
-                  <span>Drag & drop or click to select</span>
-                  <small>JPG / PNG / WEBP / GIF · max 5MB</small>
-                </button>
-              }
-
-              @if (imageSource() === 'url') {
-                <div class="field">
-                  <label for="primaryImage">Image URL</label>
-                  <div class="url-row">
-                    <input
-                      id="primaryImage"
-                      pInputText
-                      formControlName="primaryImage"
-                      placeholder="https://…/product.jpg"
-                      (keydown.enter)="$event.preventDefault(); applyPrimaryUrl(form.get('primaryImage')!.value)"
-                    />
-                    <button pButton type="button" label="Apply" (click)="applyPrimaryUrl(form.get('primaryImage')!.value)"></button>
-                  </div>
-                </div>
-              }
-              @if (imageError('primary')) {
-                <small class="field-error">{{ imageError('primary') }}</small>
-              }
-            </section>
-
-            <section
-              class="media-card"
-              (dragover)="onDragOver($event)"
-              (drop)="onGalleryDrop($event)"
-            >
-              <div class="section-head">
-                <div class="media-card__copy">
-                  <h3>Gallery</h3>
-                  <p>Additional product photos (up to {{ galleryLimit }}).</p>
-                </div>
-                <span class="pill">{{ galleryImagesArr.length }} / {{ galleryLimit }}</span>
-              </div>
-
-              @if (galleryImagesArr.length === 0) {
-                <div class="empty-hint">
-                  <i class="pi pi-images" aria-hidden="true"></i>
-                  <p>No gallery images yet. {{ imageSource() === 'upload' ? 'Upload files or switch to URL.' : 'Paste HTTPS URLs below.' }}</p>
-                </div>
-              }
-
-              <div class="image-grid">
-                @for (ctrl of galleryImagesArr.controls; track $index; let i = $index) {
-                  <figure class="image-card">
-                    @if (ctrl.value && !isBroken(ctrl.value)) {
-                      <img [src]="mediaSrc(ctrl.value)" [alt]="'Gallery image ' + (i + 1)" (error)="onImageError(ctrl.value!)" (load)="onImageLoad(ctrl.value!)" />
-                    } @else {
-                      <div class="thumb__broken">{{ ctrl.value ? 'Preview unavailable' : 'No URL' }}</div>
-                    }
-                    <figcaption>{{ fileNameFromUrl(ctrl.value) || 'Image' }}</figcaption>
-                    <div class="image-card__actions">
-                      <button pButton type="button" size="small" [text]="true" severity="danger" icon="pi pi-trash" label="Remove" (click)="removeAt(galleryImagesArr, i)"></button>
-                    </div>
-                  </figure>
-                }
-              </div>
-
-              @if (galleryImagesArr.length < galleryLimit) {
-                @if (imageSource() === 'upload') {
-                  <button
-                    type="button"
-                    class="dropzone"
-                    (click)="pickGalleryImages()"
-                    (dragover)="onDragOver($event)"
-                    (drop)="$event.stopPropagation(); onGalleryDrop($event)"
-                  >
-                    <i class="pi pi-plus" aria-hidden="true"></i>
-                    <strong>Add gallery image</strong>
-                    <span>Click or drag files here</span>
-                    <small>JPG / PNG / WEBP / GIF · max 5MB</small>
-                  </button>
-                } @else {
-                  <div class="field">
-                    <label for="galleryDraft">Add gallery image URL</label>
-                    <div class="url-row">
-                      <input
-                        id="galleryDraft"
-                        pInputText
-                        [value]="galleryDraft()"
-                        (input)="galleryDraft.set($any($event.target).value)"
-                        (keydown.enter)="$event.preventDefault(); addGalleryImage()"
-                        placeholder="https://…/gallery.jpg"
-                      />
-                      <button pButton type="button" icon="pi pi-plus" label="Add image" (click)="addGalleryImage()"></button>
-                    </div>
-                  </div>
-                }
-              }
-              @if (imageError('gallery')) {
-                <small class="field-error">{{ imageError('gallery') }}</small>
-              }
-            </section>
-
-            @if (variantsArr.length > 0) {
-              <section class="media-card">
-                <div class="media-card__copy">
-                  <h3>Variant images</h3>
-                  <p>Assign a photo to each variant. These write to the same variant fields as the Variants step.</p>
-                </div>
-                <div class="variant-image-list">
-                  @for (ctrl of variantsArr.controls; track variantId(ctrl); let i = $index) {
-                    <div class="variant-image-row" [formGroup]="asGroup(ctrl)">
-                      <div class="variant-image-row__label">
-                        <strong>{{ asGroup(ctrl).get('name')!.value }}</strong>
-                        <small>{{ display(asGroup(ctrl).get('sku')!.value) }}</small>
-                      </div>
-                      @if (asGroup(ctrl).get('variantImage')!.value) {
-                        <figure class="thumb thumb--sm">
-                          @if (isBroken(asGroup(ctrl).get('variantImage')!.value)) {
-                            <div class="thumb__broken">—</div>
-                          } @else {
-                            <img [src]="mediaSrc(asGroup(ctrl).get('variantImage')!.value)" alt="" (error)="onImageError(asGroup(ctrl).get('variantImage')!.value)" />
-                          }
-                        </figure>
-                      } @else {
-                        <div class="thumb thumb--sm thumb--empty" aria-hidden="true">
-                          <i class="pi pi-image"></i>
-                        </div>
-                      }
-                      @if (imageSource() === 'upload') {
-                        <button
-                          pButton
-                          type="button"
-                          size="small"
-                          [rounded]="true"
-                          [outlined]="true"
-                          icon="pi pi-upload"
-                          [label]="asGroup(ctrl).get('variantImage')!.value ? 'Replace image' : 'Add image'"
-                          (click)="pickVariantImage(i)"
-                        ></button>
-                      } @else {
-                        <input pInputText formControlName="variantImage" placeholder="https://…/variant.jpg" />
-                      }
-                      <button pButton type="button" icon="pi pi-times" [rounded]="true" [text]="true" severity="danger" pTooltip="Clear" [tooltipOptions]="actionTooltip" (click)="clearVariantPrimaryImage(i)" [disabled]="!asGroup(ctrl).get('variantImage')!.value"></button>
-                    </div>
-                  }
-                </div>
-              </section>
-            }
-
-            <section class="media-card media-card--muted">
-              <h3>Preview grid</h3>
-              @if (previewUrls().length === 0) {
-                <p class="muted">No images added yet.</p>
-              } @else {
-                <div class="review-thumbs review-thumbs--lg">
-                  @for (src of previewUrls(); track src) {
-                    <img [src]="mediaSrc(src)" alt="" (error)="onImageError(src)" />
-                  }
-                </div>
-              }
-            </section>
-          }
-
-          @case (4) {
-            <div class="grid-2">
-              <div class="field" [class.field--invalid]="invalid('mrp')">
-                <label>MRP <span class="req">*</span></label>
-                <p-inputNumber formControlName="mrp" mode="currency" currency="INR" locale="en-IN" />
-                @if (invalid('mrp')) {
-                  <small class="field-error">MRP is required.</small>
-                }
-              </div>
-              <div class="field" [class.field--invalid]="invalid('sellingPrice')">
-                <label>Selling price <span class="req">*</span></label>
-                <p-inputNumber formControlName="sellingPrice" mode="currency" currency="INR" locale="en-IN" />
-                @if (invalid('sellingPrice')) {
-                  <small class="field-error">Selling price is required.</small>
-                }
-              </div>
-              <div class="field">
-                <label>Purchase price</label>
-                <p-inputNumber formControlName="purchasePrice" mode="currency" currency="INR" locale="en-IN" />
-              </div>
-              <div class="field">
-                <label>GST (%)</label>
-                <p-inputNumber formControlName="gst" suffix="%" />
-              </div>
-            </div>
-
-            <section class="section-card calc-card">
-              <h3>Calculated Values</h3>
-              <dl>
-                <div><dt>Discount</dt><dd>{{ display(form.get('discount')!.value) }}</dd></div>
-                <div><dt>GST Amount</dt><dd>{{ form.get('gstAmount')!.value ? inr(form.get('gstAmount')!.value) : '—' }}</dd></div>
-                <div><dt>Landing Cost</dt><dd>{{ form.get('landingCost')!.value ? inr(form.get('landingCost')!.value) : '—' }}</dd></div>
-                <div><dt>Margin</dt><dd>{{ display(form.get('margin')!.value) }}</dd></div>
-              </dl>
-            </section>
-
-            @if (pricingAlerts().length) {
-              <ul class="alert-list">
-                @for (alert of pricingAlerts(); track alert.id) {
-                  <li [class.alert-list__item--error]="alert.severity === 'error'" [class.alert-list__item--warn]="alert.severity === 'warning'">
-                    {{ alert.message }}
-                  </li>
-                }
-              </ul>
-            }
-
-            <h3 class="section-title">Marketplace Price Comparison</h3>
-            <p class="section-sub">Compare listing price against major marketplaces</p>
-            <div class="grid-2">
-              <div class="field">
-                <label>Amazon Price</label>
-                <p-inputNumber formControlName="amazonPrice" mode="currency" currency="INR" locale="en-IN" />
-              </div>
-              <div class="field">
-                <label>Flipkart Price</label>
-                <p-inputNumber formControlName="flipkartPrice" mode="currency" currency="INR" locale="en-IN" />
-              </div>
-              <div class="field">
-                <label>Other Website Price</label>
-                <p-inputNumber formControlName="otherWebsitePrice" mode="currency" currency="INR" locale="en-IN" />
-              </div>
-              <div class="field">
-                <label>Market Lowest Price</label>
-                <p-inputNumber formControlName="marketLowestPrice" mode="currency" currency="INR" locale="en-IN" />
-                <small class="field-hint">Auto-calculated as min of Amazon / Flipkart / Other</small>
-              </div>
-              <div class="field">
-                <label>Price Checked Date</label>
-                <input pInputText formControlName="priceCheckedDate" placeholder="DD/MM/YYYY" />
-              </div>
-              <div class="field">
-                <label>Price Checked By</label>
-                <input pInputText formControlName="priceCheckedBy" placeholder="Team member name" />
-              </div>
-              <div class="field">
-                <label>Maximum Discount Allowed (%)</label>
-                <p-inputNumber formControlName="maximumDiscountAllowed" suffix="%" />
-              </div>
-            </div>
-            <div class="setting-row">
-              <div>
-                <label for="priceMatchAllowed">Price Match Allowed</label>
-                <p>Allow matching competitor marketplace prices</p>
-              </div>
-              <p-toggleswitch formControlName="priceMatchAllowed" inputId="priceMatchAllowed" />
-            </div>
-          }
-
-          @case (5) {
-            <section class="section-card">
-              <p class="subsection-label">Package Dimensions</p>
-              <div class="grid-2">
-                <div class="field"><label for="weight">Weight (kg)</label><input id="weight" pInputText formControlName="weight" placeholder="0.0" inputmode="decimal" /></div>
-                <div class="field"><label for="length">Length (cm)</label><input id="length" pInputText formControlName="length" inputmode="decimal" /></div>
-                <div class="field"><label for="width">Width (cm)</label><input id="width" pInputText formControlName="width" inputmode="decimal" /></div>
-                <div class="field"><label for="height">Height (cm)</label><input id="height" pInputText formControlName="height" inputmode="decimal" /></div>
-              </div>
-              <p class="subsection-label">Delivery &amp; Fulfillment</p>
-              <div class="grid-2">
-                <div class="field"><label for="dispatchSla">Dispatch SLA</label><input id="dispatchSla" pInputText formControlName="dispatchSla" placeholder="e.g. 24 hours" /></div>
-                <div class="field"><label>Delivery Charges (₹)</label><p-inputNumber formControlName="deliveryCharges" mode="currency" currency="INR" locale="en-IN" /></div>
-                <div class="field"><label for="deliveryDays">Delivery Days</label><input id="deliveryDays" pInputText formControlName="deliveryDays" placeholder="e.g. 3-5 days" /></div>
-                <div class="field"><label for="replacementWindow">Replacement Window</label><input id="replacementWindow" pInputText formControlName="replacementWindow" placeholder="e.g. 7 days" /></div>
-                <div class="field"><label for="deliveryCode">Delivery Code</label><input id="deliveryCode" pInputText formControlName="deliveryCode" placeholder="e.g. DEL-ZONE-01" /></div>
-                <div class="field">
-                  <app-manageable-select
-                    label="Delivery Partner"
-                    entityName="Delivery Partner"
-                    [options]="options.deliveryPartners()"
-                    [value]="form.get('deliveryPartner')!.value"
-                    (valueChange)="form.patchValue({ deliveryPartner: $event })"
-                    (add)="options.addDeliveryPartner($event)"
-                    (rename)="options.renameDeliveryPartner($event.from, $event.to)"
-                    (remove)="options.deleteDeliveryPartner($event)"
-                  />
-                </div>
-                <div class="field">
-                  <app-manageable-select
-                    label="Delivery Zone"
-                    entityName="Delivery Zone"
-                    [options]="options.deliveryZones()"
-                    [value]="form.get('deliveryZone')!.value"
-                    (valueChange)="form.patchValue({ deliveryZone: $event })"
-                    (add)="options.addDeliveryZone($event)"
-                    (rename)="options.renameDeliveryZone($event.from, $event.to)"
-                    (remove)="options.deleteDeliveryZone($event)"
-                  />
-                </div>
-                <div class="field">
-                  <label>Delivery Charge Method</label>
-                  <p-select
-                    [options]="deliveryChargeMethodOptions"
-                    formControlName="deliveryChargeMethod"
-                    optionLabel="label"
-                    optionValue="value"
-                    placeholder="Select method"
-                    [showClear]="true"
-                    appendTo="body"
-                    panelStyleClass="catalog-filter-panel"
-                    [checkmark]="false"
-                    scrollHeight="240px"
-                  />
-                </div>
-              </div>
-              <div class="setting-row">
-                <div>
-                  <label for="expressDelivery">Express Delivery</label>
-                  <p>Offer express delivery for this product</p>
-                </div>
-                <p-toggleswitch formControlName="expressDelivery" inputId="expressDelivery" />
-              </div>
-              <div class="setting-row">
-                <div>
-                  <label for="installationRequired">Installation Required</label>
-                  <p>Product requires professional installation</p>
-                </div>
-                <p-toggleswitch formControlName="installationRequired" inputId="installationRequired" />
-              </div>
-              @if (form.get('installationRequired')!.value) {
-                <div class="field">
-                  <label>Installation Charge (₹)</label>
-                  <p-inputNumber formControlName="installationCharge" mode="currency" currency="INR" locale="en-IN" />
-                </div>
-              }
-              <div class="setting-row">
-                <div>
-                  <label for="deliveryConfirmationOtp">Delivery Confirmation OTP</label>
-                  <p>Require OTP confirmation at delivery</p>
-                </div>
-                <p-toggleswitch formControlName="deliveryConfirmationOtp" inputId="deliveryConfirmationOtp" />
-              </div>
-              <div class="setting-row">
-                <div>
-                  <label for="serialImeiCaptureAtDelivery">Serial/IMEI Capture at Delivery</label>
-                  <p>Capture serial or IMEI when product is delivered</p>
-                </div>
-                <p-toggleswitch formControlName="serialImeiCaptureAtDelivery" inputId="serialImeiCaptureAtDelivery" />
-              </div>
-            </section>
-          }
-
-          @case (6) {
-            @if (hideEmiStep()) {
-              <section class="section-card">
-                <div class="section-card__head">
-                  <div>
-                    <h3>EMI is configured by an admin</h3>
-                    <p>Save this product for approval. An admin will decide whether EMI is required and configure plans before it becomes visible to customers.</p>
-                  </div>
-                </div>
-              </section>
-            } @else {
-            @if (effectiveSellingPrice() <= 0) {
-              <div class="alert-list">
-                <div class="alert-list__item--warn">
-                  <strong>Selling price required for EMI calculations</strong>
-                  <p>Go to Step 5 (Pricing) and enter the Selling Price.</p>
-                </div>
-              </div>
-            }
-            <section class="section-card">
-              <div class="section-card__head">
-                <div>
-                  <h3>EMI Product Configuration</h3>
-                  <p>Default charges and approval rules for this product.</p>
-                </div>
-              </div>
-              <div class="setting-row">
-                <div>
-                  <label for="emiEnabled">EMI Enable / Disable</label>
-                  <p>Master switch to allow EMI purchase for this product</p>
-                </div>
-                <p-toggleswitch formControlName="emiEnabled" inputId="emiEnabled" />
-              </div>
-
-              <div class="field">
-                <label>Default Down Payment Percentage (%)</label>
-                <p-inputNumber formControlName="defaultDownPaymentPercent" suffix="%" />
-                <small class="field-hint">Product-wise default down payment used for EMI applications</small>
-              </div>
-              <div class="grid-2">
-                <div class="field">
-                  <label>Min Customer Down Payment (₹)</label>
-                  <p-inputNumber formControlName="minCustomerDownPayment" mode="currency" currency="INR" locale="en-IN" />
-                </div>
-                <div class="field">
-                  <label>Max Down Payment (₹)</label>
-                  <p-inputNumber formControlName="maxDownPayment" mode="currency" currency="INR" locale="en-IN" />
-                </div>
-                <div class="field">
-                  <label>Service Charge Method</label>
-                  <p-select
-                    [options]="serviceChargeMethodOptions"
-                    formControlName="serviceChargeMethod"
-                    optionLabel="label"
-                    optionValue="value"
-                    placeholder="Select method"
-                    [showClear]="true"
-                    appendTo="body"
-                    panelStyleClass="catalog-filter-panel"
-                    [checkmark]="false"
-                    scrollHeight="240px"
-                  />
-                </div>
-                <div class="field">
-                  <label>Documentation Charge (₹)</label>
-                  <p-inputNumber formControlName="documentationCharge" mode="currency" currency="INR" locale="en-IN" />
-                </div>
-                <div class="field">
-                  <label>Verification Charge (₹)</label>
-                  <p-inputNumber formControlName="verificationCharge" mode="currency" currency="INR" locale="en-IN" />
-                </div>
-                <div class="field">
-                  <label for="firstEmiDueAfter">First EMI Due After (days)</label>
-                  <input id="firstEmiDueAfter" pInputText formControlName="firstEmiDueAfter" placeholder="e.g. 30" inputmode="numeric" />
-                </div>
-                <div class="field">
-                  <label for="gracePeriod">Grace Period (days)</label>
-                  <input id="gracePeriod" pInputText formControlName="gracePeriod" placeholder="e.g. 7" inputmode="numeric" />
-                </div>
-              </div>
-              <div class="setting-row">
-                <div>
-                  <label for="downPaymentEditableAtApproval">Down Payment Editable at Approval</label>
-                  <p>Allow changing down payment during loan approval</p>
-                </div>
-                <p-toggleswitch formControlName="downPaymentEditableAtApproval" inputId="downPaymentEditableAtApproval" />
-              </div>
-            </section>
-
-            <section class="section-card">
-              <div class="section-card__head">
-                <div>
-                  <h3>EMI Plan Table</h3>
-                  <p>{{ emiPlansArr.length }} option(s)</p>
-                </div>
-                <button pButton type="button" icon="pi pi-plus" label="Add EMI Option" (click)="openAddEmiModal()"></button>
-              </div>
-              @if (emiPlansArr.length === 0) {
-                <div class="empty-hint empty-hint--tall">
-                  <i class="pi pi-credit-card" aria-hidden="true"></i>
-                  <div>
-                    <strong>No EMI options configured</strong>
-                    <p>Use + Add EMI Option to create plans with any tenure.</p>
-                  </div>
-                </div>
-              } @else {
-                <div class="table-wrap">
-                  <table class="emi-table">
-                    <thead>
-                      <tr>
-                        <th>Enable</th>
-                        <th>Plan Name</th>
-                        <th>EMI Duration</th>
-                        <th>Down Payment</th>
-                        <th>EMI Principal</th>
-                        <th>Service Charge</th>
-                        <th>Delivery Charge</th>
-                        <th>Down Payment (Upfront)</th>
-                        <th>Total Payable</th>
-                        <th>Monthly EMI</th>
-                        <th>Min Eligibility</th>
-                        <th>Customer Visibility</th>
-                        <th>Edit</th>
-                        <th>Delete</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (ctrl of emiPlansArr.controls; track $index; let i = $index) {
-                        <tr [formGroup]="asGroup(ctrl)" [class.is-disabled]="!asGroup(ctrl).get('enabled')!.value">
-                          <td><p-toggleswitch formControlName="enabled" [inputId]="'emi-enabled-' + i" /></td>
-                          <td>{{ display(asGroup(ctrl).get('planName')!.value) }}</td>
-                          <td>{{ display(asGroup(ctrl).get('months')!.value) }}</td>
-                          <td>{{ money(asGroup(ctrl).get('downPayment')!.value) }}</td>
-                          <td>{{ effectiveSellingPrice() > 0 ? inr(emiRowCalcs(i).balanceAmount) : '—' }}</td>
-                          <td>{{ money(asGroup(ctrl).get('serviceCharge')!.value) }}</td>
-                          <td>{{ money(asGroup(ctrl).get('deliveryCharge')!.value) }}</td>
-                          <td>{{ effectiveSellingPrice() > 0 ? inr(emiRowCalcs(i).upfrontPayment) : '—' }}</td>
-                          <td>{{ effectiveSellingPrice() > 0 ? inr(emiRowCalcs(i).totalPayable) : '—' }}</td>
-                          <td>{{ effectiveSellingPrice() > 0 && asGroup(ctrl).get('months')!.value ? inr(emiRowCalcs(i).monthlyEmi) : '—' }}</td>
-                          <td>{{ money(asGroup(ctrl).get('minEligibilityAmount')!.value) }}</td>
-                          <td>{{ asGroup(ctrl).get('customerVisibility')!.value === 'visible' ? 'Visible' : 'Hidden' }}</td>
-                          <td><button pButton type="button" size="small" [text]="true" label="Edit" (click)="openEditEmiModal(i)"></button></td>
-                          <td><button pButton type="button" size="small" [text]="true" severity="danger" label="Delete" (click)="removeEmiPlan(i)"></button></td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
-              }
-            </section>
-
-            <p-dialog
-              [header]="emiEditing()?.planName ? 'Edit EMI Option' : 'Add EMI Option'"
-              [visible]="emiModalOpen()"
-              (visibleChange)="!$event && closeEmiModal()"
-              [modal]="true"
-              [draggable]="false"
-              appendTo="body"
-              styleClass="admin-dialog"
-              [style]="{ width: 'min(640px, calc(100vw - 2rem))' }"
-            >
-              @if (emiEditing(); as plan) {
-                <div class="field">
-                  <label>Plan Name</label>
-                  <input pInputText [ngModel]="plan.planName" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateEmiDraft({ planName: $event })" placeholder="e.g. Standard 18 Month" />
-                </div>
-                <div class="field">
-                  <label>EMI Duration (Months)</label>
-                  <input pInputText [ngModel]="plan.months" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateEmiDraft({ months: $event })" placeholder="Any value — 3, 5, 11, 18…" inputmode="numeric" />
-                </div>
-                <div class="grid-2">
-                  <div class="field">
-                    <label>Down Payment (₹)</label>
-                    <input pInputText [ngModel]="plan.downPayment" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateEmiDraft({ downPayment: $event })" inputmode="decimal" />
-                  </div>
-                  <div class="field">
-                    <label>Service Charge (₹)</label>
-                    <input pInputText [ngModel]="plan.serviceCharge" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateEmiDraft({ serviceCharge: $event })" inputmode="decimal" />
-                  </div>
-                  <div class="field">
-                    <label>Delivery Charge (₹)</label>
-                    <input pInputText [ngModel]="plan.deliveryCharge" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateEmiDraft({ deliveryCharge: $event })" inputmode="decimal" />
-                  </div>
-                  <div class="field">
-                    <label>Minimum Eligibility Amount (₹)</label>
-                    <input pInputText [ngModel]="plan.minEligibilityAmount" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateEmiDraft({ minEligibilityAmount: $event })" inputmode="decimal" />
-                  </div>
-                </div>
-                <div class="field">
-                  <label>Customer Visibility</label>
-                  <p-select
-                    [options]="emiVisibilityOptions"
-                    [ngModel]="plan.customerVisibility"
-                    [ngModelOptions]="{standalone: true}"
-                    (ngModelChange)="updateEmiDraft({ customerVisibility: $event })"
-                    optionLabel="label"
-                    optionValue="value"
-                    appendTo="body"
-                    panelStyleClass="catalog-filter-panel"
-                    [checkmark]="false"
-                  />
-                </div>
-                <div class="setting-row">
-                  <div>
-                    <label>Enable this EMI option</label>
-                  </div>
-                  <p-toggleswitch
-                    [ngModel]="plan.enabled"
-                    [ngModelOptions]="{standalone: true}"
-                    (ngModelChange)="updateEmiDraft({ enabled: $event })"
-                  />
-                </div>
-                @if (emiModalCalcs() && effectiveSellingPrice() > 0) {
-                  <section class="section-card calc-card">
-                    <h3>Auto Calculated Preview</h3>
-                    <dl>
-                      <div><dt>Service Charge</dt><dd>{{ inr(plan.serviceCharge || 0) }}</dd></div>
-                      <div><dt>Delivery Charge</dt><dd>{{ inr(plan.deliveryCharge || 0) }}</dd></div>
-                      <div><dt>EMI Principal</dt><dd>{{ inr(emiModalCalcs()!.loanAmount) }}</dd></div>
-                      <div><dt>Monthly EMI</dt><dd>{{ plan.months ? inr(emiModalCalcs()!.monthlyEmi) : '—' }}</dd></div>
-                      <div><dt>Down Payment (Upfront)</dt><dd>{{ inr(emiModalCalcs()!.upfrontPayment) }}</dd></div>
-                      <div><dt>Total Payable</dt><dd>{{ inr(emiModalCalcs()!.totalPayable) }}</dd></div>
-                    </dl>
-                  </section>
-                } @else {
-                  <p class="muted">Set Selling Price in Step 5 (Pricing) to preview calculated values.</p>
-                }
-              }
-              <ng-template pTemplate="footer">
-                <button pButton type="button" [rounded]="true" severity="secondary" [outlined]="true" label="Cancel" (click)="closeEmiModal()"></button>
-                <button pButton type="button" [rounded]="true" label="Save Option" (click)="saveEmiModal()"></button>
-              </ng-template>
-            </p-dialog>
-            }
-          }
-
-          @case (7) {
-            <section class="section-card">
-              <div class="field">
-                <label for="slug">Slug</label>
-                <input id="slug" pInputText formControlName="slug" placeholder="product-url-slug" />
-                <small class="field-hint">URL-friendly identifier for the product page</small>
-              </div>
-              <div class="field">
-                <label for="metaTitle">Meta Title</label>
-                <input id="metaTitle" pInputText formControlName="metaTitle" maxlength="60" placeholder="Page title for search results" />
-                <small class="field-hint">{{ (form.get('metaTitle')!.value || '').length }}/60 characters</small>
-              </div>
-              <div class="field">
-                <label for="metaDescription">Meta Description</label>
-                <textarea id="metaDescription" pTextarea formControlName="metaDescription" rows="3" maxlength="160" placeholder="Brief description for search results"></textarea>
-                <small class="field-hint">{{ (form.get('metaDescription')!.value || '').length }}/160 characters</small>
-              </div>
-              <div class="field">
-                <label for="keywords">Keywords</label>
-                <input id="keywords" pInputText formControlName="keywords" placeholder="smartphone, samsung, galaxy, 5g" />
-                <small class="field-hint">Comma-separated keywords for search indexing</small>
-              </div>
-            </section>
-            @if (form.get('metaTitle')!.value) {
-              <section class="section-card seo-preview">
-                <p class="subsection-label">Search Preview</p>
-                <p class="seo-preview__title">{{ form.get('metaTitle')!.value }}</p>
-                <p class="seo-preview__url">{{ slugPreview() }}</p>
-                <p class="seo-preview__desc">{{ form.get('metaDescription')!.value || form.get('shortDescription')!.value || 'No description provided.' }}</p>
-              </section>
-            }
-          }
-
-          @case (8) {
-            <section class="live-panel">
-              <button type="button" class="live-panel__head" (click)="liveCollapsed.set(!liveCollapsed())">
-                <div>
-                  <h3>Live Product Calculation</h3>
-                  <p>Margin {{ display(form.get('margin')!.value) }} · Complete {{ overallCompleteness() }}%</p>
-                </div>
-                <i class="pi" [class.pi-chevron-up]="!liveCollapsed()" [class.pi-chevron-down]="liveCollapsed()"></i>
-              </button>
-              @if (!liveCollapsed()) {
-                <div class="live-panel__body">
-                  <p class="subsection-label">Cash Sale Summary</p>
-                  <dl>
-                    <div><dt>Customer Pays</dt><dd>{{ inr(liveCalc().sellingPrice) }}</dd></div>
-                    <div><dt>Landing Cost</dt><dd>{{ inr(liveCalc().landingCost) }}</dd></div>
-                    <div><dt>Margin</dt><dd>{{ display(form.get('margin')!.value) }}</dd></div>
-                    <div><dt>Discount</dt><dd>{{ display(form.get('discount')!.value) }}</dd></div>
-                  </dl>
-                  <p class="subsection-label">Selected EMI Plan Breakdown</p>
-                  @if (selectedEmi() && selectedEmiCalcs(); as emi) {
-                    <dl>
-                      <div><dt>Plan</dt><dd>{{ selectedEmi()!.planName || selectedEmi()!.months + ' months' }}</dd></div>
-                      <div><dt>Down Payment</dt><dd>{{ money(selectedEmi()!.downPayment) }}</dd></div>
-                      <div><dt>Service Charge</dt><dd>{{ inr(selectedEmi()!.serviceCharge || 0) }}</dd></div>
-                      <div><dt>Delivery Charge</dt><dd>{{ inr(selectedEmi()!.deliveryCharge || 0) }}</dd></div>
-                      <div><dt>EMI Principal</dt><dd>{{ inr(emi.loanAmount) }}</dd></div>
-                      <div><dt>Monthly EMI</dt><dd>{{ inr(emi.monthlyEmi) }}</dd></div>
-                      <div><dt>Total Payable</dt><dd>{{ inr(emi.totalPayable) }}</dd></div>
-                    </dl>
                   } @else {
-                    <p class="muted">No EMI plan selected — enable a visible plan in the EMI step</p>
+                  <button type="button" class="dropzone dropzone--mini" (click)="pickVariantImage(i)">
+                    <i class="pi pi-image" aria-hidden="true"></i>
+                    <strong>Upload variant image</strong>
+                    <span>Click to choose JPG / PNG / WEBP</span>
+                  </button>
                   }
-                  @if (liveAlerts().length) {
-                    <ul class="alert-list">
-                      @for (alert of liveAlerts(); track alert.id) {
-                        <li [class.alert-list__item--error]="alert.severity === 'error'" [class.alert-list__item--warn]="alert.severity === 'warning'">
-                          {{ alert.message }}
-                        </li>
-                      }
-                    </ul>
-                  }
-                  <p class="subsection-label">Product Completeness</p>
-                  <ul class="completeness">
-                    @for (section of completeness(); track section.key) {
-                      <li>
-                        <span>{{ section.label }}</span>
-                        <strong>{{ section.percent }}%</strong>
-                      </li>
-                    }
-                  </ul>
-                </div>
-              }
-            </section>
+                  <div class="url-row">
+                    <button pButton type="button" size="small" [rounded]="true" [outlined]="true" icon="pi pi-upload"
+                      [label]="asGroup(ctrl).get('variantImage')!.value ? 'Replace image' : 'Add image'"
+                      (click)="pickVariantImage(i)"></button>
+                    <button pButton type="button" size="small" [rounded]="true" [outlined]="true" label="Clear"
+                      (click)="clearVariantPrimaryImage(i)"
+                      [disabled]="!asGroup(ctrl).get('variantImage')!.value"></button>
+                  </div>
+                  <input pInputText formControlName="variantImage" placeholder="Or paste https://…/variant.jpg" />
+                </section>
 
-            <div class="review-grid">
-              <section class="review-card">
-                <header>
-                  <h3>Basic Information</h3>
-                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(0)"></button>
-                </header>
-                <dl>
-                  <div><dt>Product Name</dt><dd>{{ display(form.get('productName')!.value) }}</dd></div>
-                  <div><dt>SKU</dt><dd>{{ display(form.get('sku')!.value) }}</dd></div>
-                  <div><dt>Dealer</dt><dd>{{ display(selectedDealer(0)?.dealerName) }}</dd></div>
-                  <div><dt>Colour / Size / Variant</dt><dd>{{ display(form.get('colourSizeVariant')!.value) }}</dd></div>
-                  <div><dt>Product Video URL</dt><dd>{{ display(form.get('productVideoUrl')!.value) }}</dd></div>
-                  <div><dt>Stock Quantity</dt><dd>{{ display(form.get('availableStock')!.value) }}</dd></div>
-                  <div><dt>Serial/IMEI Tracking</dt><dd>{{ display(form.get('serialImeiTracking')!.value) }}</dd></div>
-                  <div><dt>Specifications</dt><dd>{{ specificationsArr.length }} items</dd></div>
-                  <div><dt>About this item</dt><dd>{{ aboutThisItemArr.length }} items</dd></div>
-                  <div><dt>Features</dt><dd>{{ featuresArr.length }} items</dd></div>
-                  <div><dt>Box Contents</dt><dd>{{ boxContentsArr.length }} items</dd></div>
-                </dl>
-              </section>
-
-              <section class="review-card">
-                <header>
-                  <h3>Category</h3>
-                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(1)"></button>
-                </header>
-                <dl>
-                  <div><dt>Path</dt><dd>{{ selectedPath() || '—' }}</dd></div>
-                  <div><dt>Brand</dt><dd>{{ display(form.get('brand')!.value) }}</dd></div>
-                </dl>
-              </section>
-
-              <section class="review-card">
-                <header>
-                  <h3>Variants</h3>
-                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(2)"></button>
-                </header>
-                <dl>
-                  <div><dt>Mode</dt><dd>{{ form.get('variantsEnabled')!.value ? variantsArr.length + ' variants' : 'Normal Product (Single SKU)' }}</dd></div>
-                </dl>
-                @if (variantsArr.length) {
-                  <ul class="review-list">
-                    @for (ctrl of variantsArr.controls; track variantId(ctrl)) {
-                      <li>{{ asGroup(ctrl).get('name')!.value }} · {{ display(asGroup(ctrl).get('sku')!.value) }}</li>
-                    }
-                  </ul>
-                }
-              </section>
-
-              <section class="review-card">
-                <header>
-                  <h3>Images</h3>
-                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(3)"></button>
-                </header>
-                @if (previewUrls().length === 0) {
-                  <p class="muted">No image URLs entered.</p>
-                } @else {
-                  <div class="review-thumbs">
-                    @for (src of previewUrls(); track src) {
-                      <img [src]="mediaSrc(src)" alt="" />
+                <section class="media-mini">
+                  <label>Variant gallery</label>
+                  @if (variantGalleryArr(i).length) {
+                  <div class="media-mini__thumbs">
+                    @for (gctrl of variantGalleryArr(i).controls; track $index; let gi = $index) {
+                    <div class="media-mini__item">
+                      <figure class="thumb thumb--sm">
+                        @if (gctrl.value && !isBroken(gctrl.value)) {
+                        <img [src]="mediaSrc(gctrl.value)" alt="" (error)="onImageError(gctrl.value!)" />
+                        } @else {
+                        <div class="thumb__broken">—</div>
+                        }
+                      </figure>
+                      <button pButton type="button" icon="pi pi-times" [rounded]="true" [text]="true" severity="danger"
+                        pTooltip="Remove" [tooltipOptions]="actionTooltip"
+                        (click)="removeAt(variantGalleryArr(i), gi)"></button>
+                    </div>
                     }
                   </div>
-                }
-              </section>
-
-              <section class="review-card">
-                <header>
-                  <h3>Pricing</h3>
-                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(4)"></button>
-                </header>
-                <dl>
-                  <div><dt>MRP</dt><dd>{{ inr(form.get('mrp')!.value) }}</dd></div>
-                  <div><dt>Selling price</dt><dd>{{ inr(form.get('sellingPrice')!.value) }}</dd></div>
-                  <div><dt>Purchase price</dt><dd>{{ inr(form.get('purchasePrice')!.value) }}</dd></div>
-                  <div><dt>GST</dt><dd>{{ display(form.get('gst')!.value) }}</dd></div>
-                </dl>
-              </section>
-
-              <section class="review-card">
-                <header>
-                  <h3>Delivery</h3>
-                  @if (!hideEmiStep()) {
-                    <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(5)"></button>
                   }
-                </header>
-                @if (hideEmiStep()) {
-                  <p>An admin will configure delivery after you submit this product for approval.</p>
-                } @else {
-                  <dl>
-                    <div><dt>Weight</dt><dd>{{ display(form.get('weight')!.value) }}</dd></div>
-                    <div><dt>Charges</dt><dd>{{ inr(form.get('deliveryCharges')!.value) }}</dd></div>
-                    <div><dt>Days</dt><dd>{{ display(form.get('deliveryDays')!.value) }}</dd></div>
-                    <div><dt>Express</dt><dd>{{ display(form.get('expressDelivery')!.value) }}</dd></div>
-                  </dl>
-                }
-              </section>
-
-              <section class="review-card">
-                <header>
-                  <h3>EMI</h3>
-                  @if (!hideEmiStep()) {
-                    <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(6)"></button>
+                  <button type="button" class="dropzone dropzone--mini" (click)="pickVariantGallery(i)">
+                    <i class="pi pi-image" aria-hidden="true"></i>
+                    <strong>Upload gallery image</strong>
+                    <span>Click to choose JPG / PNG / WEBP</span>
+                  </button>
+                  <div class="url-row">
+                    <input pInputText [value]="variantDraft(variantId(ctrl))"
+                      (input)="setVariantDraft(variantId(ctrl), $any($event.target).value)"
+                      placeholder="Or paste https://…/gallery.jpg" />
+                    <button pButton type="button" size="small" [rounded]="true" [outlined]="true" icon="pi pi-plus"
+                      label="Add URL" (click)="addVariantGalleryImage(i)"></button>
+                  </div>
+                  @if (imageError('variant-gallery-' + variantId(ctrl))) {
+                  <small class="field-error">{{ imageError('variant-gallery-' + variantId(ctrl)) }}</small>
                   }
-                </header>
-                @if (hideEmiStep()) {
-                  <p>An admin will decide whether this product requires EMI after you submit it for approval.</p>
-                } @else {
-                  <dl>
-                    <div><dt>Enabled</dt><dd>{{ display(form.get('emiEnabled')!.value) }}</dd></div>
-                    <div><dt>Plans</dt><dd>{{ emiPlansArr.length }}</dd></div>
-                  </dl>
-                }
-              </section>
+                </section>
+              </div>
 
-              <section class="review-card">
-                <header>
-                  <h3>SEO</h3>
-                  <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit" (click)="goToStep(7)"></button>
-                </header>
-                <dl>
-                  <div><dt>Slug</dt><dd>{{ display(form.get('slug')!.value) }}</dd></div>
-                  <div><dt>Meta title</dt><dd>{{ display(form.get('metaTitle')!.value) }}</dd></div>
-                </dl>
-              </section>
+              <div class="variant-card__actions">
+                <button pButton type="button" icon="pi pi-check" label="Save Variant" (click)="saveVariant(i)"></button>
+              </div>
             </div>
-
-            <section class="ready">
-              <div>
-                @if (showPublishButton()) {
-                  <h3>Ready to Publish</h3>
-                  <p>Save as draft to keep working, or publish to make this product active in the catalogue.</p>
-                } @else {
-                  <h3>Ready for Approval</h3>
-                  <p>Preview your product, then save for approval. An admin will decide EMI and approve it before customers can see it.</p>
-                }
-              </div>
-              <div class="form-header__actions">
-                <button
-                  pButton
-                  type="button"
-                  severity="secondary"
-                  [outlined]="true"
-                  icon="pi pi-eye"
-                  label="Preview"
-                  [disabled]="submitting()"
-                  (click)="openPreview()"
-                ></button>
-                @if (showPublishButton()) {
-                  <button pButton type="button" severity="secondary" [outlined]="true" label="Save Draft" [disabled]="submitting()" [loading]="submittingKind() === 'draft'" (click)="save('draft')"></button>
-                  <button pButton type="button" label="Publish Product" [disabled]="submitting()" [loading]="submittingKind() === 'active'" (click)="save('active')"></button>
-                } @else {
-                  <button pButton type="button" severity="secondary" [outlined]="true" label="Save Draft" [disabled]="submitting()" [loading]="submittingKind() === 'draft'" (click)="save('draft')"></button>
-                  @if (showSaveForApproval()) {
-                    <button pButton type="button" icon="pi pi-send" label="Save for Approval" [disabled]="submitting()" [loading]="submittingKind() === 'pending_approval'" (click)="save('pending_approval')"></button>
-                  }
-                }
-              </div>
-            </section>
-          }
-        }
-      </div>
-
-      <div class="wizard__nav">
-        <button
-          pButton
-          type="button"
-          severity="secondary"
-          [outlined]="true"
-          icon="pi pi-arrow-left"
-          label="Back"
-          [disabled]="activeStep() === 0"
-          (click)="back()"
-        ></button>
-        @if (activeStep() === steps.length - 1) {
-          <div class="wizard__nav-end">
-            <button
-              pButton
-              type="button"
-              severity="secondary"
-              [outlined]="true"
-              icon="pi pi-eye"
-              label="Preview"
-              [disabled]="submitting()"
-              (click)="openPreview()"
-            ></button>
-            @if (showPublishButton()) {
-              <button
-                pButton
-                type="button"
-                severity="secondary"
-                [outlined]="true"
-                icon="pi pi-save"
-                label="Save Draft"
-                [disabled]="submitting()"
-                [loading]="submittingKind() === 'draft'"
-                (click)="save('draft')"
-              ></button>
-              <button
-                pButton
-                type="button"
-                icon="pi pi-check"
-                label="Publish Product"
-                [disabled]="submitting()"
-                [loading]="submittingKind() === 'active'"
-                (click)="save('active')"
-              ></button>
-            } @else {
-              <button
-                pButton
-                type="button"
-                severity="secondary"
-                [outlined]="true"
-                icon="pi pi-save"
-                label="Save Draft"
-                [disabled]="submitting()"
-                [loading]="submittingKind() === 'draft'"
-                (click)="save('draft')"
-              ></button>
-              @if (showSaveForApproval()) {
-                <button
-                  pButton
-                  type="button"
-                  icon="pi pi-send"
-                  label="Save for Approval"
-                  [disabled]="submitting()"
-                  [loading]="submittingKind() === 'pending_approval'"
-                  (click)="save('pending_approval')"
-                ></button>
-              }
             }
+          </article>
+          }
+        </div>
+
+        }
+      </section>
+      }
+      }
+
+      @case (3) {
+      <div class="source-toggle" role="tablist" aria-label="Image source">
+        <button type="button" role="tab" [class.is-active]="imageSource() === 'upload'"
+          (click)="imageSource.set('upload')">
+          Upload image
+        </button>
+        <button type="button" role="tab" [class.is-active]="imageSource() === 'url'" (click)="imageSource.set('url')">
+          Use image URL
+        </button>
+      </div>
+
+      <section class="media-card">
+        <div class="media-card__copy">
+          <h3>Primary image</h3>
+          <p>Main product image shown in listings.</p>
+        </div>
+
+        @if (form.get('primaryImage')!.value) {
+        <div class="primary-preview">
+          <figure class="primary-preview__frame">
+            @if (isBroken(form.get('primaryImage')!.value)) {
+            <div class="thumb__broken">Preview unavailable</div>
+            } @else {
+            <img [src]="mediaSrc(form.get('primaryImage')!.value)" alt="Primary product image"
+              (error)="onImageError(form.get('primaryImage')!.value)"
+              (load)="onImageLoad(form.get('primaryImage')!.value)" />
+            }
+            <span class="primary-badge">Primary</span>
+          </figure>
+          <div class="primary-preview__meta">
+            <strong>{{ fileNameFromUrl(form.get('primaryImage')!.value) }}</strong>
+            <span>{{ isLocalImage(form.get('primaryImage')!.value) ? 'Preview only — uploads when you save the product'
+              : form.get('primaryImage')!.value }}</span>
+            <div class="url-row">
+              @if (imageSource() === 'upload') {
+              <button pButton type="button" size="small" [rounded]="true" [outlined]="true" icon="pi pi-upload"
+                label="Replace" (click)="pickPrimaryImage()"></button>
+              }
+              <button pButton type="button" size="small" severity="danger" [outlined]="true" icon="pi pi-trash"
+                label="Remove" (click)="removePrimaryImage()"></button>
+            </div>
           </div>
-        } @else {
-          <button pButton type="button" icon="pi pi-arrow-right" iconPos="right" label="Next" (click)="next()"></button>
+        </div>
+        } @else if (imageSource() === 'upload') {
+        <button type="button" class="dropzone" (click)="pickPrimaryImage()" (dragover)="onDragOver($event)"
+          (drop)="onPrimaryDrop($event)">
+          <i class="pi pi-image" aria-hidden="true"></i>
+          <strong>Upload primary image</strong>
+          <span>Drag & drop or click to select</span>
+          <small>JPG / PNG / WEBP / GIF · max 5MB</small>
+        </button>
         }
-      </div>
-    </div>
-  </div>
 
-  <p-dialog
-    header="Add Product Type"
-    [visible]="productTypeAddOpen()"
-    (visibleChange)="productTypeAddOpen.set($event)"
-    [modal]="true"
-    [draggable]="false"
-    appendTo="body"
-    styleClass="admin-dialog"
-    [style]="{ width: 'min(440px, calc(100vw - 2rem))' }"
-  >
-    <div class="field">
-      <label for="productTypeName">Product Type Name</label>
-      <input
-        id="productTypeName"
-        pInputText
-        [ngModel]="productTypeDraft()"
-        (ngModelChange)="productTypeDraft.set($event)"
-        [ngModelOptions]="{ standalone: true }"
-        placeholder="e.g. Gaming Chair"
-        (keydown.enter)="$event.preventDefault(); submitAddProductType()"
-      />
-    </div>
-    <ng-template pTemplate="footer">
-      <button
-        pButton
-        type="button"
-        [rounded]="true"
-        severity="secondary"
-        [outlined]="true"
-        label="Cancel"
-        [disabled]="productTypeSaving()"
-        (click)="productTypeAddOpen.set(false)"
-      ></button>
-      <button
-        pButton
-        type="button"
-        [rounded]="true"
-        icon="pi pi-plus"
-        label="Add Product Type"
-        [loading]="productTypeSaving()"
-        [disabled]="productTypeSaving()"
-        (click)="submitAddProductType()"
-      ></button>
-    </ng-template>
-  </p-dialog>
-
-  <p-dialog
-    header="Product Preview"
-    [visible]="previewOpen()"
-    (visibleChange)="previewOpen.set($event)"
-    [modal]="true"
-    [draggable]="false"
-    [dismissableMask]="true"
-    appendTo="body"
-    styleClass="admin-dialog product-preview-dialog"
-    [style]="{ width: 'min(920px, calc(100vw - 2rem))' }"
-    [contentStyle]="{ 'max-height': '75vh', overflow: 'auto' }"
-  >
-    <p class="preview-banner">Preview only — this does not save, submit, or publish the product.</p>
-
-    <div class="preview-hero">
-      <div class="preview-gallery">
-        @if (previewUrls()[0]; as src) {
-          <img [src]="mediaSrc(src)" [alt]="display(form.get('productName')!.value)" />
-        } @else {
-          <div class="preview-gallery__empty"><i class="pi pi-image"></i><span>No image</span></div>
+        @if (imageSource() === 'url') {
+        <div class="field">
+          <label for="primaryImage">Image URL</label>
+          <div class="url-row">
+            <input id="primaryImage" pInputText formControlName="primaryImage" placeholder="https://…/product.jpg"
+              (keydown.enter)="$event.preventDefault(); applyPrimaryUrl(form.get('primaryImage')!.value)" />
+            <button pButton type="button" label="Apply"
+              (click)="applyPrimaryUrl(form.get('primaryImage')!.value)"></button>
+          </div>
+        </div>
         }
+        @if (imageError('primary')) {
+        <small class="field-error">{{ imageError('primary') }}</small>
+        }
+      </section>
+
+      <section class="media-card" (dragover)="onDragOver($event)" (drop)="onGalleryDrop($event)">
+        <div class="section-head">
+          <div class="media-card__copy">
+            <h3>Gallery</h3>
+            <p>Additional product photos (up to {{ galleryLimit }}).</p>
+          </div>
+          <span class="pill">{{ galleryImagesArr.length }} / {{ galleryLimit }}</span>
+        </div>
+
+        @if (galleryImagesArr.length === 0) {
+        <div class="empty-hint">
+          <i class="pi pi-images" aria-hidden="true"></i>
+          <p>No gallery images yet. {{ imageSource() === 'upload' ? 'Upload files or switch to URL.' : 'Paste HTTPS URLs
+            below.' }}</p>
+        </div>
+        }
+
+        <div class="image-grid">
+          @for (ctrl of galleryImagesArr.controls; track $index; let i = $index) {
+          <figure class="image-card">
+            @if (ctrl.value && !isBroken(ctrl.value)) {
+            <img [src]="mediaSrc(ctrl.value)" [alt]="'Gallery image ' + (i + 1)" (error)="onImageError(ctrl.value!)"
+              (load)="onImageLoad(ctrl.value!)" />
+            } @else {
+            <div class="thumb__broken">{{ ctrl.value ? 'Preview unavailable' : 'No URL' }}</div>
+            }
+            <figcaption>{{ fileNameFromUrl(ctrl.value) || 'Image' }}</figcaption>
+            <div class="image-card__actions">
+              <button pButton type="button" size="small" [text]="true" severity="danger" icon="pi pi-trash"
+                label="Remove" (click)="removeAt(galleryImagesArr, i)"></button>
+            </div>
+          </figure>
+          }
+        </div>
+
+        @if (galleryImagesArr.length < galleryLimit) { @if (imageSource()==='upload' ) { <button type="button"
+          class="dropzone" (click)="pickGalleryImages()" (dragover)="onDragOver($event)"
+          (drop)="$event.stopPropagation(); onGalleryDrop($event)">
+          <i class="pi pi-plus" aria-hidden="true"></i>
+          <strong>Add gallery image</strong>
+          <span>Click or drag files here</span>
+          <small>JPG / PNG / WEBP / GIF · max 5MB</small>
+          </button>
+          } @else {
+          <div class="field">
+            <label for="galleryDraft">Add gallery image URL</label>
+            <div class="url-row">
+              <input id="galleryDraft" pInputText [value]="galleryDraft()"
+                (input)="galleryDraft.set($any($event.target).value)"
+                (keydown.enter)="$event.preventDefault(); addGalleryImage()" placeholder="https://…/gallery.jpg" />
+              <button pButton type="button" icon="pi pi-plus" label="Add image" (click)="addGalleryImage()"></button>
+            </div>
+          </div>
+          }
+          }
+          @if (imageError('gallery')) {
+          <small class="field-error">{{ imageError('gallery') }}</small>
+          }
+      </section>
+
+      @if (variantsArr.length > 0) {
+      <section class="media-card">
+        <div class="media-card__copy">
+          <h3>Variant images</h3>
+          <p>Assign a photo to each variant. These write to the same variant fields as the Variants step.</p>
+        </div>
+        <div class="variant-image-list">
+          @for (ctrl of variantsArr.controls; track variantId(ctrl); let i = $index) {
+          <div class="variant-image-row" [formGroup]="asGroup(ctrl)">
+            <div class="variant-image-row__label">
+              <strong>{{ asGroup(ctrl).get('name')!.value }}</strong>
+              <small>{{ display(asGroup(ctrl).get('sku')!.value) }}</small>
+            </div>
+            @if (asGroup(ctrl).get('variantImage')!.value) {
+            <figure class="thumb thumb--sm">
+              @if (isBroken(asGroup(ctrl).get('variantImage')!.value)) {
+              <div class="thumb__broken">—</div>
+              } @else {
+              <img [src]="mediaSrc(asGroup(ctrl).get('variantImage')!.value)" alt=""
+                (error)="onImageError(asGroup(ctrl).get('variantImage')!.value)" />
+              }
+            </figure>
+            } @else {
+            <div class="thumb thumb--sm thumb--empty" aria-hidden="true">
+              <i class="pi pi-image"></i>
+            </div>
+            }
+            @if (imageSource() === 'upload') {
+            <button pButton type="button" size="small" [rounded]="true" [outlined]="true" icon="pi pi-upload"
+              [label]="asGroup(ctrl).get('variantImage')!.value ? 'Replace image' : 'Add image'"
+              (click)="pickVariantImage(i)"></button>
+            } @else {
+            <input pInputText formControlName="variantImage" placeholder="https://…/variant.jpg" />
+            }
+            <button pButton type="button" icon="pi pi-times" [rounded]="true" [text]="true" severity="danger"
+              pTooltip="Clear" [tooltipOptions]="actionTooltip" (click)="clearVariantPrimaryImage(i)"
+              [disabled]="!asGroup(ctrl).get('variantImage')!.value"></button>
+          </div>
+          }
+        </div>
+      </section>
+      }
+
+      <section class="media-card media-card--muted">
+        <h3>Preview grid</h3>
+        @if (previewUrls().length === 0) {
+        <p class="muted">No images added yet.</p>
+        } @else {
+        <div class="review-thumbs review-thumbs--lg">
+          @for (src of previewUrls(); track src) {
+          <img [src]="mediaSrc(src)" alt="" (error)="onImageError(src)" />
+          }
+        </div>
+        }
+      </section>
+      }
+
+      @case (4) {
+      <div class="grid-2">
+        <div class="field" [class.field--invalid]="invalid('mrp')">
+          <label>MRP <span class="req">*</span></label>
+          <p-inputNumber formControlName="mrp" mode="currency" currency="INR" locale="en-IN" />
+          @if (invalid('mrp')) {
+          <small class="field-error">MRP is required.</small>
+          }
+        </div>
+        <div class="field" [class.field--invalid]="invalid('sellingPrice')">
+          <label>Selling price <span class="req">*</span></label>
+          <p-inputNumber formControlName="sellingPrice" mode="currency" currency="INR" locale="en-IN" />
+          @if (invalid('sellingPrice')) {
+          <small class="field-error">Selling price is required.</small>
+          }
+        </div>
+        <div class="field">
+          <label>Purchase price</label>
+          <p-inputNumber formControlName="purchasePrice" mode="currency" currency="INR" locale="en-IN" />
+        </div>
+        <div class="field">
+          <label>GST (%)</label>
+          <p-inputNumber formControlName="gst" suffix="%" />
+        </div>
       </div>
-      <div class="preview-summary">
-        <h2>{{ display(form.get('productName')!.value) }}</h2>
+
+      <section class="section-card calc-card">
+        <h3>Calculated Values</h3>
         <dl>
-          <div><dt>Short name</dt><dd>{{ display(form.get('shortName')!.value) }}</dd></div>
-          <div><dt>Product type</dt><dd>{{ display(form.get('productType')!.value) }}</dd></div>
-          <div><dt>Brand</dt><dd>{{ display(form.get('brand')!.value) }}</dd></div>
-          <div><dt>Model number</dt><dd>{{ display(form.get('modelNumber')!.value) }}</dd></div>
-          <div><dt>SKU</dt><dd>{{ display(form.get('sku')!.value) }}</dd></div>
-          <div><dt>Barcode</dt><dd>{{ display(form.get('barcode')!.value) }}</dd></div>
-          <div><dt>HSN</dt><dd>{{ display(form.get('hsnCode')!.value) }}</dd></div>
-          <div><dt>Manufacturer</dt><dd>{{ display(form.get('manufacturer')!.value) }}</dd></div>
-          <div><dt>Warranty</dt><dd>{{ display(form.get('warranty')!.value) }}</dd></div>
-          <div><dt>Condition</dt><dd>{{ display(form.get('productCondition')!.value) }}</dd></div>
-          <div><dt>Colour / Size / Variant</dt><dd>{{ display(form.get('colourSizeVariant')!.value) }}</dd></div>
+          <div>
+            <dt>Discount</dt>
+            <dd>{{ display(form.get('discount')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>GST Amount</dt>
+            <dd>{{ form.get('gstAmount')!.value ? inr(form.get('gstAmount')!.value) : '—' }}</dd>
+          </div>
+          <div>
+            <dt>Landing Cost</dt>
+            <dd>{{ form.get('landingCost')!.value ? inr(form.get('landingCost')!.value) : '—' }}</dd>
+          </div>
+          <div>
+            <dt>Margin</dt>
+            <dd>{{ display(form.get('margin')!.value) }}</dd>
+          </div>
         </dl>
+      </section>
+
+      @if (pricingAlerts().length) {
+      <ul class="alert-list">
+        @for (alert of pricingAlerts(); track alert.id) {
+        <li [class.alert-list__item--error]="alert.severity === 'error'"
+          [class.alert-list__item--warn]="alert.severity === 'warning'">
+          {{ alert.message }}
+        </li>
+        }
+      </ul>
+      }
+
+      <h3 class="section-title">Marketplace Price Comparison</h3>
+      <p class="section-sub">Compare listing price against major marketplaces</p>
+      <div class="grid-2">
+        <div class="field">
+          <label>Amazon Price</label>
+          <p-inputNumber formControlName="amazonPrice" mode="currency" currency="INR" locale="en-IN" />
+        </div>
+        <div class="field">
+          <label>Flipkart Price</label>
+          <p-inputNumber formControlName="flipkartPrice" mode="currency" currency="INR" locale="en-IN" />
+        </div>
+        <div class="field">
+          <label>Other Website Price</label>
+          <p-inputNumber formControlName="otherWebsitePrice" mode="currency" currency="INR" locale="en-IN" />
+        </div>
+        <div class="field">
+          <label>Market Lowest Price</label>
+          <p-inputNumber formControlName="marketLowestPrice" mode="currency" currency="INR" locale="en-IN" />
+          <small class="field-hint">Auto-calculated as min of Amazon / Flipkart / Other</small>
+        </div>
+        <div class="field">
+          <label>Price Checked Date</label>
+          <input pInputText formControlName="priceCheckedDate" placeholder="DD/MM/YYYY" />
+        </div>
+        <div class="field">
+          <label>Price Checked By</label>
+          <input pInputText formControlName="priceCheckedBy" placeholder="Team member name" />
+        </div>
+        <div class="field">
+          <label>Maximum Discount Allowed (%)</label>
+          <p-inputNumber formControlName="maximumDiscountAllowed" suffix="%" />
+        </div>
       </div>
+      <div class="setting-row">
+        <div>
+          <label for="priceMatchAllowed">Price Match Allowed</label>
+          <p>Allow matching competitor marketplace prices</p>
+        </div>
+        <p-toggleswitch formControlName="priceMatchAllowed" inputId="priceMatchAllowed" />
+      </div>
+      }
+
+      @case (5) {
+      <section class="section-card">
+        <p class="subsection-label">Package Dimensions</p>
+        <div class="grid-2">
+          <div class="field"><label for="weight">Weight (kg)</label><input id="weight" pInputText
+              formControlName="weight" placeholder="0.0" inputmode="decimal" /></div>
+          <div class="field"><label for="length">Length (cm)</label><input id="length" pInputText
+              formControlName="length" inputmode="decimal" /></div>
+          <div class="field"><label for="width">Width (cm)</label><input id="width" pInputText formControlName="width"
+              inputmode="decimal" /></div>
+          <div class="field"><label for="height">Height (cm)</label><input id="height" pInputText
+              formControlName="height" inputmode="decimal" /></div>
+        </div>
+        <p class="subsection-label">Delivery &amp; Fulfillment</p>
+        <div class="grid-2">
+          <div class="field"><label for="dispatchSla">Dispatch SLA</label><input id="dispatchSla" pInputText
+              formControlName="dispatchSla" placeholder="e.g. 24 hours" /></div>
+          <div class="field"><label>Delivery Charges (₹)</label><p-inputNumber formControlName="deliveryCharges"
+              mode="currency" currency="INR" locale="en-IN" /></div>
+          <div class="field"><label for="deliveryDays">Delivery Days</label><input id="deliveryDays" pInputText
+              formControlName="deliveryDays" placeholder="e.g. 3-5 days" /></div>
+          <div class="field"><label for="replacementWindow">Replacement Window</label><input id="replacementWindow"
+              pInputText formControlName="replacementWindow" placeholder="e.g. 7 days" /></div>
+          <div class="field"><label for="deliveryCode">Delivery Code</label><input id="deliveryCode" pInputText
+              formControlName="deliveryCode" placeholder="e.g. DEL-ZONE-01" /></div>
+          <div class="field">
+            <app-manageable-select label="Delivery Partner" entityName="Delivery Partner"
+              [options]="options.deliveryPartners()" [value]="form.get('deliveryPartner')!.value"
+              (valueChange)="form.patchValue({ deliveryPartner: $event })" (add)="options.addDeliveryPartner($event)"
+              (rename)="options.renameDeliveryPartner($event.from, $event.to)"
+              (remove)="options.deleteDeliveryPartner($event)" />
+          </div>
+          <div class="field">
+            <app-manageable-select label="Delivery Zone" entityName="Delivery Zone" [options]="options.deliveryZones()"
+              [value]="form.get('deliveryZone')!.value" (valueChange)="form.patchValue({ deliveryZone: $event })"
+              (add)="options.addDeliveryZone($event)" (rename)="options.renameDeliveryZone($event.from, $event.to)"
+              (remove)="options.deleteDeliveryZone($event)" />
+          </div>
+          <div class="field">
+            <label>Delivery Charge Method</label>
+            <p-select [options]="deliveryChargeMethodOptions" formControlName="deliveryChargeMethod" optionLabel="label"
+              optionValue="value" placeholder="Select method" [showClear]="true" appendTo="body"
+              panelStyleClass="catalog-filter-panel" [checkmark]="false" scrollHeight="240px" />
+          </div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <label for="expressDelivery">Express Delivery</label>
+            <p>Offer express delivery for this product</p>
+          </div>
+          <p-toggleswitch formControlName="expressDelivery" inputId="expressDelivery" />
+        </div>
+        <div class="setting-row">
+          <div>
+            <label for="installationRequired">Installation Required</label>
+            <p>Product requires professional installation</p>
+          </div>
+          <p-toggleswitch formControlName="installationRequired" inputId="installationRequired" />
+        </div>
+        @if (form.get('installationRequired')!.value) {
+        <div class="field">
+          <label>Installation Charge (₹)</label>
+          <p-inputNumber formControlName="installationCharge" mode="currency" currency="INR" locale="en-IN" />
+        </div>
+        }
+        <div class="setting-row">
+          <div>
+            <label for="deliveryConfirmationOtp">Delivery Confirmation OTP</label>
+            <p>Require OTP confirmation at delivery</p>
+          </div>
+          <p-toggleswitch formControlName="deliveryConfirmationOtp" inputId="deliveryConfirmationOtp" />
+        </div>
+        <div class="setting-row">
+          <div>
+            <label for="serialImeiCaptureAtDelivery">Serial/IMEI Capture at Delivery</label>
+            <p>Capture serial or IMEI when product is delivered</p>
+          </div>
+          <p-toggleswitch formControlName="serialImeiCaptureAtDelivery" inputId="serialImeiCaptureAtDelivery" />
+        </div>
+      </section>
+      }
+
+      @case (6) {
+      @if (hideEmiStep()) {
+      <section class="section-card">
+        <div class="section-card__head">
+          <div>
+            <h3>EMI is configured by an admin</h3>
+            <p>Save this product for approval. An admin will decide whether EMI is required and configure plans before
+              it becomes visible to customers.</p>
+          </div>
+        </div>
+      </section>
+      } @else {
+      @if (effectiveSellingPrice() <= 0) { <div class="alert-list">
+        <div class="alert-list__item--warn">
+          <strong>Selling price required for EMI calculations</strong>
+          <p>Go to Step 5 (Pricing) and enter the Selling Price.</p>
+        </div>
     </div>
+    }
+    <section class="section-card">
+      <div class="section-card__head">
+        <div>
+          <h3>EMI Product Configuration</h3>
+          <p>Default charges and approval rules for this product.</p>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <label for="emiEnabled">EMI Enable / Disable</label>
+          <p>Master switch to allow EMI purchase for this product</p>
+        </div>
+        <p-toggleswitch formControlName="emiEnabled" inputId="emiEnabled" />
+      </div>
+
+      <div class="field">
+        <label>Default Down Payment Percentage (%)</label>
+        <p-inputNumber formControlName="defaultDownPaymentPercent" suffix="%" />
+        <small class="field-hint">Product-wise default down payment used for EMI applications</small>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Min Customer Down Payment (₹)</label>
+          <p-inputNumber formControlName="minCustomerDownPayment" mode="currency" currency="INR" locale="en-IN" />
+        </div>
+        <div class="field">
+          <label>Max Down Payment (₹)</label>
+          <p-inputNumber formControlName="maxDownPayment" mode="currency" currency="INR" locale="en-IN" />
+        </div>
+        <div class="field">
+          <label>Service Charge Method</label>
+          <p-select [options]="serviceChargeMethodOptions" formControlName="serviceChargeMethod" optionLabel="label"
+            optionValue="value" placeholder="Select method" [showClear]="true" appendTo="body"
+            panelStyleClass="catalog-filter-panel" [checkmark]="false" scrollHeight="240px" />
+        </div>
+        <div class="field">
+          <label>Documentation Charge (₹)</label>
+          <p-inputNumber formControlName="documentationCharge" mode="currency" currency="INR" locale="en-IN" />
+        </div>
+        <div class="field">
+          <label>Verification Charge (₹)</label>
+          <p-inputNumber formControlName="verificationCharge" mode="currency" currency="INR" locale="en-IN" />
+        </div>
+        <div class="field">
+          <label for="firstEmiDueAfter">First EMI Due After (days)</label>
+          <input id="firstEmiDueAfter" pInputText formControlName="firstEmiDueAfter" placeholder="e.g. 30"
+            inputmode="numeric" />
+        </div>
+        <div class="field">
+          <label for="gracePeriod">Grace Period (days)</label>
+          <input id="gracePeriod" pInputText formControlName="gracePeriod" placeholder="e.g. 7" inputmode="numeric" />
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <label for="downPaymentEditableAtApproval">Down Payment Editable at Approval</label>
+          <p>Allow changing down payment during loan approval</p>
+        </div>
+        <p-toggleswitch formControlName="downPaymentEditableAtApproval" inputId="downPaymentEditableAtApproval" />
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-card__head">
+        <div>
+          <h3>EMI Plan Table</h3>
+          <p>{{ emiPlansArr.length }} option(s)</p>
+        </div>
+        <button pButton type="button" icon="pi pi-plus" label="Add EMI Option" (click)="openAddEmiModal()"></button>
+      </div>
+      @if (emiPlansArr.length === 0) {
+      <div class="empty-hint empty-hint--tall">
+        <i class="pi pi-credit-card" aria-hidden="true"></i>
+        <div>
+          <strong>No EMI options configured</strong>
+          <p>Use + Add EMI Option to create plans with any tenure.</p>
+        </div>
+      </div>
+      } @else {
+      <div class="table-wrap">
+        <table class="emi-table">
+          <thead>
+            <tr>
+              <th>Enable</th>
+              <th>Plan Name</th>
+              <th>EMI Duration</th>
+              <th>Down Payment</th>
+              <th>EMI Principal</th>
+              <th>Service Charge</th>
+              <th>Delivery Charge</th>
+              <th>Down Payment (Upfront)</th>
+              <th>Total Payable</th>
+              <th>Monthly EMI</th>
+              <th>Min Eligibility</th>
+              <th>Customer Visibility</th>
+              <th>Edit</th>
+              <th>Delete</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (ctrl of emiPlansArr.controls; track $index; let i = $index) {
+            <tr [formGroup]="asGroup(ctrl)" [class.is-disabled]="!asGroup(ctrl).get('enabled')!.value">
+              <td><p-toggleswitch formControlName="enabled" [inputId]="'emi-enabled-' + i" /></td>
+              <td>{{ display(asGroup(ctrl).get('planName')!.value) }}</td>
+              <td>{{ display(asGroup(ctrl).get('months')!.value) }}</td>
+              <td>{{ money(asGroup(ctrl).get('downPayment')!.value) }}</td>
+              <td>{{ effectiveSellingPrice() > 0 ? inr(emiRowCalcs(i).balanceAmount) : '—' }}</td>
+              <td>{{ money(asGroup(ctrl).get('serviceCharge')!.value) }}</td>
+              <td>{{ money(asGroup(ctrl).get('deliveryCharge')!.value) }}</td>
+              <td>{{ effectiveSellingPrice() > 0 ? inr(emiRowCalcs(i).upfrontPayment) : '—' }}</td>
+              <td>{{ effectiveSellingPrice() > 0 ? inr(emiRowCalcs(i).totalPayable) : '—' }}</td>
+              <td>{{ effectiveSellingPrice() > 0 && asGroup(ctrl).get('months')!.value ? inr(emiRowCalcs(i).monthlyEmi)
+                : '—' }}</td>
+              <td>{{ money(asGroup(ctrl).get('minEligibilityAmount')!.value) }}</td>
+              <td>{{ asGroup(ctrl).get('customerVisibility')!.value === 'visible' ? 'Visible' : 'Hidden' }}</td>
+              <td><button pButton type="button" size="small" [text]="true" label="Edit"
+                  (click)="openEditEmiModal(i)"></button></td>
+              <td><button pButton type="button" size="small" [text]="true" severity="danger" label="Delete"
+                  (click)="removeEmiPlan(i)"></button></td>
+            </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      }
+    </section>
+
+    <p-dialog [header]="emiEditing()?.planName ? 'Edit EMI Option' : 'Add EMI Option'" [visible]="emiModalOpen()"
+      (visibleChange)="!$event && closeEmiModal()" [modal]="true" [draggable]="false" appendTo="body"
+      styleClass="admin-dialog" [style]="{ width: 'min(640px, calc(100vw - 2rem))' }">
+      @if (emiEditing(); as plan) {
+      <div class="field">
+        <label>Plan Name</label>
+        <input pInputText [ngModel]="plan.planName" [ngModelOptions]="{standalone: true}"
+          (ngModelChange)="updateEmiDraft({ planName: $event })" placeholder="e.g. Standard 18 Month" />
+      </div>
+      <div class="field">
+        <label>EMI Duration (Months)</label>
+        <input pInputText [ngModel]="plan.months" [ngModelOptions]="{standalone: true}"
+          (ngModelChange)="updateEmiDraft({ months: $event })" placeholder="Any value — 3, 5, 11, 18…"
+          inputmode="numeric" />
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Down Payment (₹)</label>
+          <input pInputText [ngModel]="plan.downPayment" [ngModelOptions]="{standalone: true}"
+            (ngModelChange)="updateEmiDraft({ downPayment: $event })" inputmode="decimal" />
+        </div>
+        <div class="field">
+          <label>Service Charge (₹)</label>
+          <input pInputText [ngModel]="plan.serviceCharge" [ngModelOptions]="{standalone: true}"
+            (ngModelChange)="updateEmiDraft({ serviceCharge: $event })" inputmode="decimal" />
+        </div>
+        <div class="field">
+          <label>Delivery Charge (₹)</label>
+          <input pInputText [ngModel]="plan.deliveryCharge" [ngModelOptions]="{standalone: true}"
+            (ngModelChange)="updateEmiDraft({ deliveryCharge: $event })" inputmode="decimal" />
+        </div>
+        <div class="field">
+          <label>Minimum Eligibility Amount (₹)</label>
+          <input pInputText [ngModel]="plan.minEligibilityAmount" [ngModelOptions]="{standalone: true}"
+            (ngModelChange)="updateEmiDraft({ minEligibilityAmount: $event })" inputmode="decimal" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Customer Visibility</label>
+        <p-select [options]="emiVisibilityOptions" [ngModel]="plan.customerVisibility"
+          [ngModelOptions]="{standalone: true}" (ngModelChange)="updateEmiDraft({ customerVisibility: $event })"
+          optionLabel="label" optionValue="value" appendTo="body" panelStyleClass="catalog-filter-panel"
+          [checkmark]="false" />
+      </div>
+      <div class="setting-row">
+        <div>
+          <label>Enable this EMI option</label>
+        </div>
+        <p-toggleswitch [ngModel]="plan.enabled" [ngModelOptions]="{standalone: true}"
+          (ngModelChange)="updateEmiDraft({ enabled: $event })" />
+      </div>
+      @if (emiModalCalcs() && effectiveSellingPrice() > 0) {
+      <section class="section-card calc-card">
+        <h3>Auto Calculated Preview</h3>
+        <dl>
+          <div>
+            <dt>Service Charge</dt>
+            <dd>{{ inr(plan.serviceCharge || 0) }}</dd>
+          </div>
+          <div>
+            <dt>Delivery Charge</dt>
+            <dd>{{ inr(plan.deliveryCharge || 0) }}</dd>
+          </div>
+          <div>
+            <dt>EMI Principal</dt>
+            <dd>{{ inr(emiModalCalcs()!.loanAmount) }}</dd>
+          </div>
+          <div>
+            <dt>Monthly EMI</dt>
+            <dd>{{ plan.months ? inr(emiModalCalcs()!.monthlyEmi) : '—' }}</dd>
+          </div>
+          <div>
+            <dt>Down Payment (Upfront)</dt>
+            <dd>{{ inr(emiModalCalcs()!.upfrontPayment) }}</dd>
+          </div>
+          <div>
+            <dt>Total Payable</dt>
+            <dd>{{ inr(emiModalCalcs()!.totalPayable) }}</dd>
+          </div>
+        </dl>
+      </section>
+      } @else {
+      <p class="muted">Set Selling Price in Step 5 (Pricing) to preview calculated values.</p>
+      }
+      }
+      <ng-template pTemplate="footer">
+        <button pButton type="button" [rounded]="true" severity="secondary" [outlined]="true" label="Cancel"
+          (click)="closeEmiModal()"></button>
+        <button pButton type="button" [rounded]="true" label="Save Option" (click)="saveEmiModal()"></button>
+      </ng-template>
+    </p-dialog>
+    }
+    }
+
+    @case (7) {
+    <section class="section-card">
+      <div class="field">
+        <label for="slug">Slug</label>
+        <input id="slug" pInputText formControlName="slug" placeholder="product-url-slug" />
+        <small class="field-hint">URL-friendly identifier for the product page</small>
+      </div>
+      <div class="field">
+        <label for="metaTitle">Meta Title</label>
+        <input id="metaTitle" pInputText formControlName="metaTitle" maxlength="60"
+          placeholder="Page title for search results" />
+        <small class="field-hint">{{ (form.get('metaTitle')!.value || '').length }}/60 characters</small>
+      </div>
+      <div class="field">
+        <label for="metaDescription">Meta Description</label>
+        <textarea id="metaDescription" pTextarea formControlName="metaDescription" rows="3" maxlength="160"
+          placeholder="Brief description for search results"></textarea>
+        <small class="field-hint">{{ (form.get('metaDescription')!.value || '').length }}/160 characters</small>
+      </div>
+      <div class="field">
+        <label for="keywords">Keywords</label>
+        <input id="keywords" pInputText formControlName="keywords" placeholder="smartphone, samsung, galaxy, 5g" />
+        <small class="field-hint">Comma-separated keywords for search indexing</small>
+      </div>
+    </section>
+    @if (form.get('metaTitle')!.value) {
+    <section class="section-card seo-preview">
+      <p class="subsection-label">Search Preview</p>
+      <p class="seo-preview__title">{{ form.get('metaTitle')!.value }}</p>
+      <p class="seo-preview__url">{{ slugPreview() }}</p>
+      <p class="seo-preview__desc">{{ form.get('metaDescription')!.value || form.get('shortDescription')!.value || 'No
+        description provided.' }}</p>
+    </section>
+    }
+    }
+
+    @case (8) {
+    <section class="live-panel">
+      <button type="button" class="live-panel__head" (click)="liveCollapsed.set(!liveCollapsed())">
+        <div>
+          <h3>Live Product Calculation</h3>
+          <p>Margin {{ display(form.get('margin')!.value) }} · Complete {{ overallCompleteness() }}%</p>
+        </div>
+        <i class="pi" [class.pi-chevron-up]="!liveCollapsed()" [class.pi-chevron-down]="liveCollapsed()"></i>
+      </button>
+      @if (!liveCollapsed()) {
+      <div class="live-panel__body">
+        <p class="subsection-label">Cash Sale Summary</p>
+        <dl>
+          <div>
+            <dt>Customer Pays</dt>
+            <dd>{{ inr(liveCalc().sellingPrice) }}</dd>
+          </div>
+          <div>
+            <dt>Landing Cost</dt>
+            <dd>{{ inr(liveCalc().landingCost) }}</dd>
+          </div>
+          <div>
+            <dt>Margin</dt>
+            <dd>{{ display(form.get('margin')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>Discount</dt>
+            <dd>{{ display(form.get('discount')!.value) }}</dd>
+          </div>
+        </dl>
+        <p class="subsection-label">Selected EMI Plan Breakdown</p>
+        @if (selectedEmi() && selectedEmiCalcs(); as emi) {
+        <dl>
+          <div>
+            <dt>Plan</dt>
+            <dd>{{ selectedEmi()!.planName || selectedEmi()!.months + ' months' }}</dd>
+          </div>
+          <div>
+            <dt>Down Payment</dt>
+            <dd>{{ money(selectedEmi()!.downPayment) }}</dd>
+          </div>
+          <div>
+            <dt>Service Charge</dt>
+            <dd>{{ inr(selectedEmi()!.serviceCharge || 0) }}</dd>
+          </div>
+          <div>
+            <dt>Delivery Charge</dt>
+            <dd>{{ inr(selectedEmi()!.deliveryCharge || 0) }}</dd>
+          </div>
+          <div>
+            <dt>EMI Principal</dt>
+            <dd>{{ inr(emi.loanAmount) }}</dd>
+          </div>
+          <div>
+            <dt>Monthly EMI</dt>
+            <dd>{{ inr(emi.monthlyEmi) }}</dd>
+          </div>
+          <div>
+            <dt>Total Payable</dt>
+            <dd>{{ inr(emi.totalPayable) }}</dd>
+          </div>
+        </dl>
+        } @else {
+        <p class="muted">No EMI plan selected — enable a visible plan in the EMI step</p>
+        }
+        @if (liveAlerts().length) {
+        <ul class="alert-list">
+          @for (alert of liveAlerts(); track alert.id) {
+          <li [class.alert-list__item--error]="alert.severity === 'error'"
+            [class.alert-list__item--warn]="alert.severity === 'warning'">
+            {{ alert.message }}
+          </li>
+          }
+        </ul>
+        }
+        <p class="subsection-label">Product Completeness</p>
+        <ul class="completeness">
+          @for (section of completeness(); track section.key) {
+          <li>
+            <span>{{ section.label }}</span>
+            <strong>{{ section.percent }}%</strong>
+          </li>
+          }
+        </ul>
+      </div>
+      }
+    </section>
 
     <div class="review-grid">
       <section class="review-card">
-        <header><h3>Descriptions</h3></header>
+        <header>
+          <h3>Basic Information</h3>
+          <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit"
+            (click)="goToStep(0)"></button>
+        </header>
         <dl>
-          <div><dt>Short description</dt><dd>{{ display(form.get('shortDescription')!.value) }}</dd></div>
-          <div><dt>Overview</dt><dd>{{ display(form.get('description')!.value) }}</dd></div>
-          <div><dt>Product video</dt><dd>{{ display(form.get('productVideoUrl')!.value) }}</dd></div>
+          <div>
+            <dt>Product Name</dt>
+            <dd>{{ display(form.get('productName')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>SKU</dt>
+            <dd>{{ display(form.get('sku')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>Dealer</dt>
+            <dd>{{ display(selectedDealer(0)?.dealerName) }}</dd>
+          </div>
+          <div>
+            <dt>Colour / Size / Variant</dt>
+            <dd>{{ display(form.get('colourSizeVariant')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>Product Video URL</dt>
+            <dd>{{ display(form.get('productVideoUrl')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>Stock Quantity</dt>
+            <dd>{{ display(form.get('availableStock')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>Serial/IMEI Tracking</dt>
+            <dd>{{ display(form.get('serialImeiTracking')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>Specifications</dt>
+            <dd>{{ specificationsArr.length }} items</dd>
+          </div>
+          <div>
+            <dt>About this item</dt>
+            <dd>{{ aboutThisItemArr.length }} items</dd>
+          </div>
+          <div>
+            <dt>Features</dt>
+            <dd>{{ featuresArr.length }} items</dd>
+          </div>
+          <div>
+            <dt>Box Contents</dt>
+            <dd>{{ boxContentsArr.length }} items</dd>
+          </div>
         </dl>
       </section>
 
       <section class="review-card">
-        <header><h3>Catalogue lists</h3></header>
+        <header>
+          <h3>Category</h3>
+          <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit"
+            (click)="goToStep(1)"></button>
+        </header>
         <dl>
-          <div><dt>Specifications</dt><dd>{{ specificationsArr.length }} items</dd></div>
-          <div><dt>Features</dt><dd>{{ featuresArr.length }} items</dd></div>
-          <div><dt>About this item</dt><dd>{{ aboutThisItemArr.length }} items</dd></div>
-          <div><dt>Box Contents</dt><dd>{{ boxContentsArr.length }} items</dd></div>
-          <div><dt>Variants</dt><dd>{{ variantsArr.length }}</dd></div>
-          <div><dt>Gallery images</dt><dd>{{ galleryImagesArr.length }}</dd></div>
-        </dl>
-        @if (featuresArr.length) {
-          <ul class="preview-list">
-            @for (ctrl of featuresArr.controls; track $index) {
-              @if (display(ctrl.value) !== '—') {
-                <li>{{ display(ctrl.value) }}</li>
-              }
-            }
-          </ul>
-        }
-        @if (boxContentsArr.length) {
-          <p class="subsection-label">Box Contents</p>
-          <ul class="preview-list">
-            @for (ctrl of boxContentsArr.controls; track $index) {
-              @if (display(ctrl.value) !== '—') {
-                <li>{{ display(ctrl.value) }}</li>
-              }
-            }
-          </ul>
-        }
-        @if (aboutThisItemArr.length) {
-          <p class="subsection-label">About this item</p>
-          <ul class="preview-list">
-            @for (ctrl of aboutThisItemArr.controls; track $index) {
-              @if (display(ctrl.value) !== '—') {
-                <li>{{ display(ctrl.value) }}</li>
-              }
-            }
-          </ul>
-        }
-        @if (specificationsArr.length) {
-          <p class="subsection-label">Specifications</p>
-          <ul class="preview-list">
-            @for (spec of specificationsArr.controls; track $index) {
-              <li>{{ display(asGroup(spec).get('key')!.value) }}: {{ display(asGroup(spec).get('value')!.value) }}</li>
-            }
-          </ul>
-        }
-      </section>
-
-      <section class="review-card">
-        <header><h3>Pricing &amp; inventory</h3></header>
-        <dl>
-          <div><dt>MRP</dt><dd>{{ display(form.get('mrp')!.value) }}</dd></div>
-          <div><dt>Selling price</dt><dd>{{ display(form.get('sellingPrice')!.value) }}</dd></div>
-          <div><dt>Purchase price</dt><dd>{{ display(form.get('purchasePrice')!.value) }}</dd></div>
-          <div><dt>Available stock</dt><dd>{{ display(form.get('availableStock')!.value) }}</dd></div>
-          <div><dt>Warehouse</dt><dd>{{ display(form.get('warehouse')!.value) }}</dd></div>
-          <div><dt>Dealer</dt><dd>{{ display(selectedDealer(0)?.dealerName) }}</dd></div>
+          <div>
+            <dt>Path</dt>
+            <dd>{{ selectedPath() || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Brand</dt>
+            <dd>{{ display(form.get('brand')!.value) }}</dd>
+          </div>
         </dl>
       </section>
 
       <section class="review-card">
-        <header><h3>Delivery &amp; EMI</h3></header>
+        <header>
+          <h3>Variants</h3>
+          <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit"
+            (click)="goToStep(2)"></button>
+        </header>
         <dl>
-          @if (hideEmiStep()) {
-            <div><dt>Delivery</dt><dd>Admin will configure after approval</dd></div>
-            <div><dt>EMI</dt><dd>Admin will decide after approval</dd></div>
-          } @else {
-            <div><dt>Delivery days</dt><dd>{{ display(form.get('deliveryDays')!.value) }}</dd></div>
-            <div><dt>Delivery charges</dt><dd>{{ display(form.get('deliveryCharges')!.value) }}</dd></div>
-            <div><dt>Express</dt><dd>{{ display(form.get('expressDelivery')!.value) }}</dd></div>
-            <div><dt>EMI enabled</dt><dd>{{ display(form.get('emiEnabled')!.value) }}</dd></div>
-            <div><dt>EMI plans</dt><dd>{{ emiPlansArr.length }}</dd></div>
+          <div>
+            <dt>Mode</dt>
+            <dd>{{ form.get('variantsEnabled')!.value ? variantsArr.length + ' variants' : 'Normal Product (Single SKU)'
+              }}</dd>
+          </div>
+        </dl>
+        @if (variantsArr.length) {
+        <ul class="review-list">
+          @for (ctrl of variantsArr.controls; track variantId(ctrl)) {
+          <li>{{ asGroup(ctrl).get('name')!.value }} · {{ display(asGroup(ctrl).get('sku')!.value) }}</li>
           }
+        </ul>
+        }
+      </section>
+
+      <section class="review-card">
+        <header>
+          <h3>Images</h3>
+          <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit"
+            (click)="goToStep(3)"></button>
+        </header>
+        @if (previewUrls().length === 0) {
+        <p class="muted">No image URLs entered.</p>
+        } @else {
+        <div class="review-thumbs">
+          @for (src of previewUrls(); track src) {
+          <img [src]="mediaSrc(src)" alt="" />
+          }
+        </div>
+        }
+      </section>
+
+      <section class="review-card">
+        <header>
+          <h3>Pricing</h3>
+          <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit"
+            (click)="goToStep(4)"></button>
+        </header>
+        <dl>
+          <div>
+            <dt>MRP</dt>
+            <dd>{{ inr(form.get('mrp')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>Selling price</dt>
+            <dd>{{ inr(form.get('sellingPrice')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>Purchase price</dt>
+            <dd>{{ inr(form.get('purchasePrice')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>GST</dt>
+            <dd>{{ display(form.get('gst')!.value) }}</dd>
+          </div>
         </dl>
       </section>
 
       <section class="review-card">
-        <header><h3>SEO</h3></header>
+        <header>
+          <h3>Delivery</h3>
+          @if (!hideEmiStep()) {
+          <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit"
+            (click)="goToStep(5)"></button>
+          }
+        </header>
+        @if (hideEmiStep()) {
+        <p>An admin will configure delivery after you submit this product for approval.</p>
+        } @else {
         <dl>
-          <div><dt>Slug</dt><dd>{{ display(form.get('slug')!.value) }}</dd></div>
-          <div><dt>Meta title</dt><dd>{{ display(form.get('metaTitle')!.value) }}</dd></div>
-          <div><dt>Meta description</dt><dd>{{ display(form.get('metaDescription')!.value) }}</dd></div>
+          <div>
+            <dt>Weight</dt>
+            <dd>{{ display(form.get('weight')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>Charges</dt>
+            <dd>{{ inr(form.get('deliveryCharges')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>Days</dt>
+            <dd>{{ display(form.get('deliveryDays')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>Express</dt>
+            <dd>{{ display(form.get('expressDelivery')!.value) }}</dd>
+          </div>
+        </dl>
+        }
+      </section>
+
+      <section class="review-card">
+        <header>
+          <h3>EMI</h3>
+          @if (!hideEmiStep()) {
+          <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit"
+            (click)="goToStep(6)"></button>
+          }
+        </header>
+        @if (hideEmiStep()) {
+        <p>An admin will decide whether this product requires EMI after you submit it for approval.</p>
+        } @else {
+        <dl>
+          <div>
+            <dt>Enabled</dt>
+            <dd>{{ display(form.get('emiEnabled')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>Plans</dt>
+            <dd>{{ emiPlansArr.length }}</dd>
+          </div>
+        </dl>
+        }
+      </section>
+
+      @if (!hideSeoStep()) {
+      <section class="review-card">
+        <header>
+          <h3>SEO</h3>
+          <button pButton type="button" size="small" [text]="true" icon="pi pi-pencil" label="Edit"
+            (click)="goToStep(7)"></button>
+        </header>
+        <dl>
+          <div>
+            <dt>Slug</dt>
+            <dd>{{ display(form.get('slug')!.value) }}</dd>
+          </div>
+          <div>
+            <dt>Meta title</dt>
+            <dd>{{ display(form.get('metaTitle')!.value) }}</dd>
+          </div>
         </dl>
       </section>
+      }
     </div>
 
-    <ng-template pTemplate="footer">
-      <button
-        pButton
-        type="button"
-        [rounded]="true"
-        severity="secondary"
-        [outlined]="true"
-        label="Close"
-        (click)="closePreview()"
-      ></button>
-    </ng-template>
-  </p-dialog>
+    <section class="ready">
+      <div>
+        @if (showPublishButton()) {
+        <h3>Ready to Publish</h3>
+        <p>Save as draft to keep working, or publish to make this product active in the catalogue.</p>
+        } @else {
+        <h3>Ready for Approval</h3>
+        <p>Preview your product, then save for approval. An admin will decide EMI and approve it before customers can
+          see it.</p>
+        }
+      </div>
+      <div class="form-header__actions">
+        <button pButton type="button" severity="secondary" [outlined]="true" icon="pi pi-eye" label="Preview"
+          [disabled]="submitting()" (click)="openPreview()"></button>
+        @if (showPublishButton()) {
+        <button pButton type="button" severity="secondary" [outlined]="true" label="Save Draft"
+          [disabled]="submitting()" [loading]="submittingKind() === 'draft'" (click)="save('draft')"></button>
+        <button pButton type="button" label="Publish Product" [disabled]="submitting()"
+          [loading]="submittingKind() === 'active'" (click)="save('active')"></button>
+        } @else {
+        <button pButton type="button" severity="secondary" [outlined]="true" label="Save Draft"
+          [disabled]="submitting()" [loading]="submittingKind() === 'draft'" (click)="save('draft')"></button>
+        @if (showSaveForApproval()) {
+        <button pButton type="button" icon="pi pi-send" label="Save for Approval" [disabled]="submitting()"
+          [loading]="submittingKind() === 'pending_approval'" (click)="save('pending_approval')"></button>
+        }
+        }
+      </div>
+    </section>
+    }
+    }
+  </div>
+
+  <div class="wizard__nav">
+    <button pButton type="button" severity="secondary" [outlined]="true" icon="pi pi-arrow-left" label="Back"
+      [disabled]="activeStep() === 0" (click)="back()"></button>
+    @if (activeStep() === steps.length - 1) {
+    <div class="wizard__nav-end">
+      <button pButton type="button" severity="secondary" [outlined]="true" icon="pi pi-eye" label="Preview"
+        [disabled]="submitting()" (click)="openPreview()"></button>
+      @if (showPublishButton()) {
+      <button pButton type="button" severity="secondary" [outlined]="true" icon="pi pi-save" label="Save Draft"
+        [disabled]="submitting()" [loading]="submittingKind() === 'draft'" (click)="save('draft')"></button>
+      <button pButton type="button" icon="pi pi-check" label="Publish Product" [disabled]="submitting()"
+        [loading]="submittingKind() === 'active'" (click)="save('active')"></button>
+      } @else {
+      <button pButton type="button" severity="secondary" [outlined]="true" icon="pi pi-save" label="Save Draft"
+        [disabled]="submitting()" [loading]="submittingKind() === 'draft'" (click)="save('draft')"></button>
+      @if (showSaveForApproval()) {
+      <button pButton type="button" icon="pi pi-send" label="Save for Approval" [disabled]="submitting()"
+        [loading]="submittingKind() === 'pending_approval'" (click)="save('pending_approval')"></button>
+      }
+      }
+    </div>
+    } @else {
+    <button pButton type="button" icon="pi pi-arrow-right" iconPos="right" label="Next" (click)="next()"></button>
+    }
+  </div>
+</div>
+</div>
+
+<p-dialog header="Add Product Type" [visible]="productTypeAddOpen()" (visibleChange)="productTypeAddOpen.set($event)"
+  [modal]="true" [draggable]="false" appendTo="body" styleClass="admin-dialog"
+  [style]="{ width: 'min(440px, calc(100vw - 2rem))' }">
+  <div class="field">
+    <label for="productTypeName">Product Type Name</label>
+    <input id="productTypeName" pInputText [ngModel]="productTypeDraft()" (ngModelChange)="productTypeDraft.set($event)"
+      [ngModelOptions]="{ standalone: true }" placeholder="e.g. Gaming Chair"
+      (keydown.enter)="$event.preventDefault(); submitAddProductType()" />
+  </div>
+  <ng-template pTemplate="footer">
+    <button pButton type="button" [rounded]="true" severity="secondary" [outlined]="true" label="Cancel"
+      [disabled]="productTypeSaving()" (click)="productTypeAddOpen.set(false)"></button>
+    <button pButton type="button" [rounded]="true" icon="pi pi-plus" label="Add Product Type"
+      [loading]="productTypeSaving()" [disabled]="productTypeSaving()" (click)="submitAddProductType()"></button>
+  </ng-template>
+</p-dialog>
+
+<p-dialog header="Product Preview" [visible]="previewOpen()" (visibleChange)="previewOpen.set($event)" [modal]="true"
+  [draggable]="false" [dismissableMask]="true" appendTo="body" styleClass="admin-dialog product-preview-dialog"
+  [style]="{ width: 'min(920px, calc(100vw - 2rem))' }" [contentStyle]="{ 'max-height': '75vh', overflow: 'auto' }">
+  <p class="preview-banner">Preview only — this does not save, submit, or publish the product.</p>
+
+  <div class="preview-hero">
+    <div class="preview-gallery">
+      @if (previewUrls()[0]; as src) {
+      <img [src]="mediaSrc(src)" [alt]="display(form.get('productName')!.value)" />
+      } @else {
+      <div class="preview-gallery__empty"><i class="pi pi-image"></i><span>No image</span></div>
+      }
+    </div>
+    <div class="preview-summary">
+      <h2>{{ display(form.get('productName')!.value) }}</h2>
+      <dl>
+        <div>
+          <dt>Short name</dt>
+          <dd>{{ display(form.get('shortName')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Product type</dt>
+          <dd>{{ display(form.get('productType')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Brand</dt>
+          <dd>{{ display(form.get('brand')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Model number</dt>
+          <dd>{{ display(form.get('modelNumber')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>SKU</dt>
+          <dd>{{ display(form.get('sku')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Barcode</dt>
+          <dd>{{ display(form.get('barcode')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>HSN</dt>
+          <dd>{{ display(form.get('hsnCode')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Manufacturer</dt>
+          <dd>{{ display(form.get('manufacturer')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Warranty</dt>
+          <dd>{{ display(form.get('warranty')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Condition</dt>
+          <dd>{{ display(form.get('productCondition')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Colour / Size / Variant</dt>
+          <dd>{{ display(form.get('colourSizeVariant')!.value) }}</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="review-grid">
+    <section class="review-card">
+      <header>
+        <h3>Descriptions</h3>
+      </header>
+      <dl>
+        <div>
+          <dt>Short description</dt>
+          <dd>{{ display(form.get('shortDescription')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Overview</dt>
+          <dd>{{ display(form.get('description')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Product video</dt>
+          <dd>{{ display(form.get('productVideoUrl')!.value) }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="review-card">
+      <header>
+        <h3>Catalogue lists</h3>
+      </header>
+      <dl>
+        <div>
+          <dt>Specifications</dt>
+          <dd>{{ specificationsArr.length }} items</dd>
+        </div>
+        <div>
+          <dt>Features</dt>
+          <dd>{{ featuresArr.length }} items</dd>
+        </div>
+        <div>
+          <dt>About this item</dt>
+          <dd>{{ aboutThisItemArr.length }} items</dd>
+        </div>
+        <div>
+          <dt>Box Contents</dt>
+          <dd>{{ boxContentsArr.length }} items</dd>
+        </div>
+        <div>
+          <dt>Variants</dt>
+          <dd>{{ variantsArr.length }}</dd>
+        </div>
+        <div>
+          <dt>Gallery images</dt>
+          <dd>{{ galleryImagesArr.length }}</dd>
+        </div>
+      </dl>
+      @if (featuresArr.length) {
+      <ul class="preview-list">
+        @for (ctrl of featuresArr.controls; track $index) {
+        @if (display(ctrl.value) !== '—') {
+        <li>{{ display(ctrl.value) }}</li>
+        }
+        }
+      </ul>
+      }
+      @if (boxContentsArr.length) {
+      <p class="subsection-label">Box Contents</p>
+      <ul class="preview-list">
+        @for (ctrl of boxContentsArr.controls; track $index) {
+        @if (display(ctrl.value) !== '—') {
+        <li>{{ display(ctrl.value) }}</li>
+        }
+        }
+      </ul>
+      }
+      @if (aboutThisItemArr.length) {
+      <p class="subsection-label">About this item</p>
+      <ul class="preview-list">
+        @for (ctrl of aboutThisItemArr.controls; track $index) {
+        @if (display(ctrl.value) !== '—') {
+        <li>{{ display(ctrl.value) }}</li>
+        }
+        }
+      </ul>
+      }
+      @if (specificationsArr.length) {
+      <p class="subsection-label">Specifications</p>
+      <ul class="preview-list">
+        @for (spec of specificationsArr.controls; track $index) {
+        <li>{{ display(asGroup(spec).get('key')!.value) }}: {{ display(asGroup(spec).get('value')!.value) }}</li>
+        }
+      </ul>
+      }
+    </section>
+
+    <section class="review-card">
+      <header>
+        <h3>Pricing &amp; inventory</h3>
+      </header>
+      <dl>
+        <div>
+          <dt>MRP</dt>
+          <dd>{{ display(form.get('mrp')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Selling price</dt>
+          <dd>{{ display(form.get('sellingPrice')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Purchase price</dt>
+          <dd>{{ display(form.get('purchasePrice')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Available stock</dt>
+          <dd>{{ display(form.get('availableStock')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Warehouse</dt>
+          <dd>{{ display(form.get('warehouse')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Dealer</dt>
+          <dd>{{ display(selectedDealer(0)?.dealerName) }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="review-card">
+      <header>
+        <h3>Delivery &amp; EMI</h3>
+      </header>
+      <dl>
+        @if (hideEmiStep()) {
+        <div>
+          <dt>Delivery</dt>
+          <dd>Admin will configure after approval</dd>
+        </div>
+        <div>
+          <dt>EMI</dt>
+          <dd>Admin will decide after approval</dd>
+        </div>
+        } @else {
+        <div>
+          <dt>Delivery days</dt>
+          <dd>{{ display(form.get('deliveryDays')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Delivery charges</dt>
+          <dd>{{ display(form.get('deliveryCharges')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Express</dt>
+          <dd>{{ display(form.get('expressDelivery')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>EMI enabled</dt>
+          <dd>{{ display(form.get('emiEnabled')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>EMI plans</dt>
+          <dd>{{ emiPlansArr.length }}</dd>
+        </div>
+        }
+      </dl>
+    </section>
+
+    @if (!hideSeoStep()) {
+    <section class="review-card">
+      <header>
+        <h3>SEO</h3>
+      </header>
+      <dl>
+        <div>
+          <dt>Slug</dt>
+          <dd>{{ display(form.get('slug')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Meta title</dt>
+          <dd>{{ display(form.get('metaTitle')!.value) }}</dd>
+        </div>
+        <div>
+          <dt>Meta description</dt>
+          <dd>{{ display(form.get('metaDescription')!.value) }}</dd>
+        </div>
+      </dl>
+    </section>
+    }
+  </div>
+
+  <ng-template pTemplate="footer">
+    <button pButton type="button" [rounded]="true" severity="secondary" [outlined]="true" label="Close"
+      (click)="closePreview()"></button>
+  </ng-template>
+</p-dialog>
 }
