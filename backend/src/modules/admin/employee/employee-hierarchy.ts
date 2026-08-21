@@ -46,7 +46,7 @@ export function hasOrgWideEmployeeAccess(userId: string): boolean {
   return String(user.role ?? '') === 'admin';
 }
 
-function loadUserContact(userId: string): {
+export function loadUserContact(userId: string): { // CHANGED: added `export`
   user: any | null;
   email: string;
   mobile: string;

@@ -62,10 +62,13 @@ export function generateSkuFromModelNumber(
   return allocateSkuWithNumericSuffix(base, existingSkus);
 }
 
+// NEW: cap each segment before joining, so the base stays short.
+const SEGMENT_MAX_LEN = 4;
+
 function buildFallbackSkuBase(source: ProductSkuSource): string {
   const namePart = String(source.shortName ?? '').trim() || String(source.productName ?? '').trim();
   const segments = [source.brand, source.productType, namePart, source.category, source.subCategory]
-    .map((v) => sanitizeSkuBase(String(v ?? '')))
+    .map((v) => sanitizeSkuBase(String(v ?? '')).slice(0, SEGMENT_MAX_LEN)) // CHANGED: added .slice(0, SEGMENT_MAX_LEN)
     .filter(Boolean);
 
   const deduped: string[] = [];
@@ -74,7 +77,7 @@ function buildFallbackSkuBase(source: ProductSkuSource): string {
   }
 
   let base = deduped.join('-');
-  const MAX_BASE = 48;
+  const MAX_BASE = 20; // CHANGED: was 48
   while (base.length > MAX_BASE && deduped.length > 1) {
     deduped.pop();
     base = deduped.join('-');
@@ -90,13 +93,17 @@ function buildFallbackSkuBase(source: ProductSkuSource): string {
  * Generate a unique SKU from available product fields.
  * Prefers model number (existing behaviour). Falls back to other form fields, then `PROD`.
  */
+// NEW: same cap used for the fallback base, applied to long model numbers.
+const MAX_MODEL_NUMBER_LEN = 20;
+
 export function generateProductSku(
   source: ProductSkuSource,
   existingSkus: string[] = getMockExistingSkus(),
 ): string {
   const modelNumber = String(source.modelNumber ?? '').trim();
   if (modelNumber) {
-    return allocateSkuWithNumericSuffix(modelNumber, existingSkus);
+    const modelBase = modelNumber.slice(0, MAX_MODEL_NUMBER_LEN); // NEW line
+    return allocateSkuWithNumericSuffix(modelBase, existingSkus); // CHANGED: modelNumber -> modelBase
   }
 
   const base = buildFallbackSkuBase(source);

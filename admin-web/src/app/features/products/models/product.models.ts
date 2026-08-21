@@ -724,6 +724,8 @@ export interface Product {
   warranty?: string;
   hsnCode?: string;
   manufacturer?: string;
+  creatorId?: string; // NEW
+  creatorName?: string; // NEW
   createdAt?: string;
   updatedAt?: string;
   specifications?: unknown;

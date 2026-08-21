@@ -1,315 +1,227 @@
 <app-page-header title="Products" subtitle="Manage your complete LoanEx product catalogue" />
 
 @if (!loading() && !error()) {
-  <section class="stats" aria-label="Catalogue summary">
-    <app-stat-card label="Total Products" [value]="stats().total" icon="pi-box" accent="#4f46e5" />
-    <app-stat-card label="Active Products" [value]="stats().active" icon="pi-check-circle" accent="#16a34a" />
-    <app-stat-card label="Pending Approval" [value]="stats().pending" icon="pi-clock" accent="#d97706" />
-    <app-stat-card label="Out of Stock" [value]="stats().out" icon="pi-times-circle" accent="#dc2626" />
-  </section>
+<section class="stats" aria-label="Catalogue summary">
+  <app-stat-card label="Total Products" [value]="stats().total" icon="pi-box" accent="#4f46e5" />
+  <app-stat-card label="Active Products" [value]="stats().active" icon="pi-check-circle" accent="#16a34a" />
+  <app-stat-card label="Pending Approval" [value]="stats().pending" icon="pi-clock" accent="#d97706" />
+  <app-stat-card label="Out of Stock" [value]="stats().out" icon="pi-times-circle" accent="#dc2626" />
+</section>
 }
 
 <div class="toolbar">
   <label class="search">
     <i class="pi pi-search" aria-hidden="true"></i>
-    <input
-      type="search"
-      placeholder="Search by name, SKU or brand"
-      [ngModel]="searchTerm()"
-      (ngModelChange)="searchTerm.set($event); resetPage()"
-    />
+    <input type="search" placeholder="Search by name, SKU or brand" [ngModel]="searchTerm()"
+      (ngModelChange)="searchTerm.set($event); resetPage()" />
   </label>
 
-  <button
-    *appCan="'products.create'"
-    class="toolbar__add"
-    type="button"
-    (click)="new()"
-  >
+  <button *appCan="'products.create'" class="toolbar__add" type="button" (click)="new()">
     <i class="pi pi-plus" aria-hidden="true"></i>
     New Product
   </button>
 
-  <p-select
-    [options]="categoryOptions()"
-    [ngModel]="categoryFilter()"
-    (ngModelChange)="categoryFilter.set($event); resetPage()"
-    optionLabel="label"
-    optionValue="value"
-    placeholder="Category"
-    styleClass="catalog-filter"
-    panelStyleClass="catalog-filter-panel"
-    appendTo="body"
-    [checkmark]="false"
-    scrollHeight="240px"
-  />
-  <p-select
-    [options]="statusOptions"
-    [ngModel]="statusFilter()"
-    (ngModelChange)="statusFilter.set($event); resetPage()"
-    optionLabel="label"
-    optionValue="value"
-    placeholder="Status"
-    styleClass="catalog-filter"
-    panelStyleClass="catalog-filter-panel"
-    appendTo="body"
-    [checkmark]="false"
-    scrollHeight="240px"
-  />
-  <p-select
-    [options]="stockOptions"
-    [ngModel]="stockFilter()"
-    (ngModelChange)="stockFilter.set($event); resetPage()"
-    optionLabel="label"
-    optionValue="value"
-    placeholder="Stock"
-    styleClass="catalog-filter"
-    panelStyleClass="catalog-filter-panel"
-    appendTo="body"
-    [checkmark]="false"
-    scrollHeight="240px"
-  />
+  <p-select [options]="categoryOptions()" [ngModel]="categoryFilter()"
+    (ngModelChange)="categoryFilter.set($event); resetPage()" optionLabel="label" optionValue="value"
+    placeholder="Category" styleClass="catalog-filter" panelStyleClass="catalog-filter-panel" appendTo="body"
+    [checkmark]="false" scrollHeight="240px" />
+  <p-select [options]="statusOptions" [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event); resetPage()"
+    optionLabel="label" optionValue="value" placeholder="Status" styleClass="catalog-filter"
+    panelStyleClass="catalog-filter-panel" appendTo="body" [checkmark]="false" scrollHeight="240px" />
+  <p-select [options]="stockOptions" [ngModel]="stockFilter()" (ngModelChange)="stockFilter.set($event); resetPage()"
+    optionLabel="label" optionValue="value" placeholder="Stock" styleClass="catalog-filter"
+    panelStyleClass="catalog-filter-panel" appendTo="body" [checkmark]="false" scrollHeight="240px" />
 
   @if (hasActiveFilters()) {
-    <button
-      class="toolbar__clear"
-      type="button"
-      (click)="clearFilters()"
-    >
-      <i class="pi pi-filter-slash" aria-hidden="true"></i>
-      Clear
-    </button>
+  <button class="toolbar__clear" type="button" (click)="clearFilters()">
+    <i class="pi pi-filter-slash" aria-hidden="true"></i>
+    Clear
+  </button>
   }
 </div>
 
 @if (loading()) {
-  <app-branded-loader message="Loading Products..." />
+<app-branded-loader message="Loading Products..." />
 } @else if (error()) {
-  <app-error-state [message]="error()!" (retry)="load()" />
+<app-error-state [message]="error()!" (retry)="load()" />
 } @else if (filtered().length === 0) {
-  <app-empty-state
-    icon="pi-box"
-    title="No products found"
-    description="Try adjusting your search or filters, or add a new product."
-  />
+<app-empty-state icon="pi-box" title="No products found"
+  description="Try adjusting your search or filters, or add a new product." />
 } @else {
-  <div class="table-shell">
-    <p-table
-      [value]="paged()"
-      dataKey="id"
-      [rowHover]="true"
-      styleClass="catalog-table"
-    >
-      <ng-template pTemplate="header">
-        <tr>
-          <th>Product</th>
-          <th>Category</th>
-          <th>Price</th>
-          <th>Stock</th>
-          <th>Status</th>
-          <th class="actions-col">Actions</th>
-        </tr>
-      </ng-template>
-      <ng-template pTemplate="body" let-product>
-        <tr>
-          <td>
-            <div class="product-cell">
-              @if (thumb(product); as src) {
-                <img [src]="src" [alt]="product.name" />
-              } @else {
-                <div class="product-cell__placeholder" aria-hidden="true"><i class="pi pi-box"></i></div>
-              }
-              <div class="product-cell__meta">
-                <div class="product-cell__name">{{ product.name }}</div>
-                @if (product.brand) {
-                  <div class="product-cell__brand">{{ product.brand }}</div>
-                }
-                <div class="product-cell__sku">SKU {{ product.sku || '—' }}</div>
-              </div>
-            </div>
-          </td>
-          <td class="category-cell">{{ categoryName(product) }}</td>
-          <td class="price-cell">{{ product.price | currency: 'INR' : 'symbol' : '1.0-0' }}</td>
-          <td>
-            <div class="stock-cell">
-              <span class="stock-qty">{{ stockQty(product) | number }}</span>
-              <span class="stock-pill" [attr.data-state]="stockState(product)">{{ stockLabel(product) }}</span>
-            </div>
-          </td>
-          <td><app-status-badge [status]="product.status" /></td>
-          <td>
-            <div class="row-actions">
-              <button
-                type="button"
-                class="act act--view"
-                pTooltip="View product"
-                [tooltipOptions]="actionTooltip"
-                (click)="view(product)"
-              >
-                <i class="pi pi-eye" aria-hidden="true"></i>
-                View
-              </button>
-              <button
-                *appCan="'products.edit'"
-                type="button"
-                class="act act--edit"
-                pTooltip="Edit product"
-                [tooltipOptions]="actionTooltip"
-                (click)="edit(product)"
-              >
-                <i class="pi pi-pencil" aria-hidden="true"></i>
-                Edit
-              </button>
-              @if (isPendingApproval(product) && canApproveProducts()) {
-                <button
-                  *appCan="'products.edit'"
-                  type="button"
-                  class="act act--approve"
-                  pTooltip="Review EMI and approve"
-                  [tooltipOptions]="actionTooltip"
-                  (click)="view(product)"
-                >
-                  <i class="pi pi-check" aria-hidden="true"></i>
-                  Review
-                </button>
-              }
-              <button
-                *appCan="'products.delete'"
-                type="button"
-                class="act act--delete"
-                pTooltip="Delete product"
-                [tooltipOptions]="actionTooltip"
-                (click)="askDelete(product)"
-              >
-                <i class="pi pi-trash" aria-hidden="true"></i>
-                Delete
-              </button>
-            </div>
-          </td>
-        </tr>
-      </ng-template>
-    </p-table>
-  </div>
-
-  <div class="card-list" aria-label="Product list">
-    @for (product of paged(); track product.id) {
-      <article class="product-card">
-        <div class="product-card__top">
-          @if (thumb(product); as src) {
+<div class="table-shell">
+  <p-table [value]="paged()" dataKey="id" [rowHover]="true" styleClass="catalog-table">
+    <ng-template pTemplate="header">
+      <tr>
+        <th>Product</th>
+        <th>Category</th>
+        <th>Price</th>
+        <th>Stock</th>
+        <th>Status</th>
+        <th>Creator</th>
+        <th class="actions-col">Actions</th>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-product>
+      <tr>
+        <td>
+          <div class="product-cell">
+            @if (thumb(product); as src) {
             <img [src]="src" [alt]="product.name" />
-          } @else {
+            } @else {
             <div class="product-cell__placeholder" aria-hidden="true"><i class="pi pi-box"></i></div>
-          }
-          <div class="product-cell__meta">
-            <div class="product-cell__name">{{ product.name }}</div>
-            @if (product.brand) {
-              <div class="product-cell__brand">{{ product.brand }}</div>
             }
-            <div class="product-cell__sku">SKU {{ product.sku || '—' }}</div>
+            <div class="product-cell__meta">
+              <div class="product-cell__name">{{ product.name }}</div>
+              @if (product.brand) {
+              <div class="product-cell__brand">{{ product.brand }}</div>
+              }
+              <div class="product-cell__sku">SKU {{ product.sku || '—' }}</div>
+            </div>
           </div>
-          <app-status-badge [status]="product.status" />
-        </div>
-        <dl class="product-card__facts">
-          <div>
-            <dt>Category</dt>
-            <dd>{{ categoryName(product) }}</dd>
+        </td>
+        <td class="category-cell">{{ categoryName(product) }}</td>
+        <td class="price-cell">{{ product.price | currency: 'INR' : 'symbol' : '1.0-0' }}</td>
+        <td>
+          <div class="stock-cell">
+            <span class="stock-qty">{{ stockQty(product) | number }}</span>
+            <span class="stock-pill" [attr.data-state]="stockState(product)">{{ stockLabel(product) }}</span>
           </div>
-          <div>
-            <dt>Price</dt>
-            <dd>{{ product.price | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
-          </div>
-          <div>
-            <dt>Stock</dt>
-            <dd>
-              {{ stockQty(product) | number }}
-              <span class="stock-pill" [attr.data-state]="stockState(product)">{{ stockLabel(product) }}</span>
-            </dd>
-          </div>
-        </dl>
-        <div class="row-actions row-actions--card">
-          <button type="button" class="act act--view" (click)="view(product)">
-            <i class="pi pi-eye" aria-hidden="true"></i> View
-          </button>
-          <button *appCan="'products.edit'" type="button" class="act act--edit" (click)="edit(product)">
-            <i class="pi pi-pencil" aria-hidden="true"></i> Edit
-          </button>
-          @if (isPendingApproval(product) && canApproveProducts()) {
-            <button
-              *appCan="'products.edit'"
-              type="button"
-              class="act act--approve"
-              (click)="view(product)"
-            >
-              <i class="pi pi-check" aria-hidden="true"></i> Review
+        </td>
+        <td><app-status-badge [status]="product.status" /></td>
+        <td>{{ product.creatorName || '—' }}</td>
+        <td>
+          <div class="row-actions">
+            <button type="button" class="act act--view" pTooltip="View product" [tooltipOptions]="actionTooltip"
+              (click)="view(product)">
+              <i class="pi pi-eye" aria-hidden="true"></i>
+              View
             </button>
-          }
-          <button *appCan="'products.delete'" type="button" class="act act--delete" (click)="askDelete(product)">
-            <i class="pi pi-trash" aria-hidden="true"></i> Delete
-          </button>
-        </div>
-      </article>
+            <button *appCan="'products.edit'" type="button" class="act act--edit" pTooltip="Edit product"
+              [tooltipOptions]="actionTooltip" (click)="edit(product)">
+              <i class="pi pi-pencil" aria-hidden="true"></i>
+              Edit
+            </button>
+            @if (isPendingApproval(product) && canApproveProducts()) {
+            <button *appCan="'products.edit'" type="button" class="act act--approve" pTooltip="Review EMI and approve"
+              [tooltipOptions]="actionTooltip" (click)="view(product)">
+              <i class="pi pi-check" aria-hidden="true"></i>
+              Review
+            </button>
+            }
+            <button *appCan="'products.delete'" type="button" class="act act--delete" pTooltip="Delete product"
+              [tooltipOptions]="actionTooltip" (click)="askDelete(product)">
+              <i class="pi pi-trash" aria-hidden="true"></i>
+              Delete
+            </button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<div class="card-list" aria-label="Product list">
+  @for (product of paged(); track product.id) {
+  <article class="product-card">
+    <div class="product-card__top">
+      @if (thumb(product); as src) {
+      <img [src]="src" [alt]="product.name" />
+      } @else {
+      <div class="product-cell__placeholder" aria-hidden="true"><i class="pi pi-box"></i></div>
+      }
+      <div class="product-cell__meta">
+        <div class="product-cell__name">{{ product.name }}</div>
+        @if (product.brand) {
+        <div class="product-cell__brand">{{ product.brand }}</div>
+        }
+        <div class="product-cell__sku">SKU {{ product.sku || '—' }}</div>
+      </div>
+      <app-status-badge [status]="product.status" />
+    </div>
+    <dl class="product-card__facts">
+      <div>
+        <dt>Category</dt>
+        <dd>{{ categoryName(product) }}</dd>
+      </div>
+      <div>
+        <dt>Price</dt>
+        <dd>{{ product.price | currency: 'INR' : 'symbol' : '1.0-0' }}</dd>
+      </div>
+      <div>
+        <dt>Stock</dt>
+        <dd>
+          {{ stockQty(product) | number }}
+          <span class="stock-pill" [attr.data-state]="stockState(product)">{{ stockLabel(product) }}</span>
+        </dd>
+      </div>
+      <div>
+        <dt>Creator</dt>
+        <dd>{{ product.creatorName || '—' }}</dd>
+      </div>
+    </dl>
+    <div class="row-actions row-actions--card">
+      <button type="button" class="act act--view" (click)="view(product)">
+        <i class="pi pi-eye" aria-hidden="true"></i> View
+      </button>
+      <button *appCan="'products.edit'" type="button" class="act act--edit" (click)="edit(product)">
+        <i class="pi pi-pencil" aria-hidden="true"></i> Edit
+      </button>
+      @if (isPendingApproval(product) && canApproveProducts()) {
+      <button *appCan="'products.edit'" type="button" class="act act--approve" (click)="view(product)">
+        <i class="pi pi-check" aria-hidden="true"></i> Review
+      </button>
+      }
+      <button *appCan="'products.delete'" type="button" class="act act--delete" (click)="askDelete(product)">
+        <i class="pi pi-trash" aria-hidden="true"></i> Delete
+      </button>
+    </div>
+  </article>
+  }
+</div>
+
+<footer class="pager">
+  <p class="pager__meta">
+    Showing <strong>{{ pageFrom() }}–{{ pageTo() }}</strong> of
+    <strong>{{ filtered().length }}</strong> products
+  </p>
+
+  <div class="pager__nav" role="navigation" aria-label="Pagination">
+    <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(1)"
+      aria-label="First page">
+      <i class="pi pi-angle-double-left"></i>
+    </button>
+    <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)"
+      aria-label="Previous page">
+      <i class="pi pi-angle-left"></i>
+    </button>
+    @for (page of pageNumbers(); track page) {
+    <button type="button" class="pager__btn" [class.pager__btn--active]="page === currentPage()"
+      (click)="goToPage(page)">
+      {{ page }}
+    </button>
     }
+    <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()"
+      (click)="goToPage(currentPage() + 1)" aria-label="Next page">
+      <i class="pi pi-angle-right"></i>
+    </button>
+    <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()"
+      (click)="goToPage(totalPages())" aria-label="Last page">
+      <i class="pi pi-angle-double-right"></i>
+    </button>
   </div>
 
-  <footer class="pager">
-    <p class="pager__meta">
-      Showing <strong>{{ pageFrom() }}–{{ pageTo() }}</strong> of
-      <strong>{{ filtered().length }}</strong> products
-    </p>
-
-    <div class="pager__nav" role="navigation" aria-label="Pagination">
-      <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(1)" aria-label="First page">
-        <i class="pi pi-angle-double-left"></i>
-      </button>
-      <button type="button" class="pager__btn" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" aria-label="Previous page">
-        <i class="pi pi-angle-left"></i>
-      </button>
-      @for (page of pageNumbers(); track page) {
-        <button
-          type="button"
-          class="pager__btn"
-          [class.pager__btn--active]="page === currentPage()"
-          (click)="goToPage(page)"
-        >
-          {{ page }}
-        </button>
-      }
-      <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" aria-label="Next page">
-        <i class="pi pi-angle-right"></i>
-      </button>
-      <button type="button" class="pager__btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" aria-label="Last page">
-        <i class="pi pi-angle-double-right"></i>
-      </button>
-    </div>
-
-    <div class="pager__size">
-      <span>Rows</span>
-      <p-select
-        [options]="pageSizeOptions"
-        [ngModel]="pageSize()"
-        (ngModelChange)="changePageSize($event)"
-        optionLabel="label"
-        optionValue="value"
-        styleClass="catalog-filter pager-filter"
-        panelStyleClass="catalog-filter-panel"
-        appendTo="body"
-      />
-    </div>
-  </footer>
+  <div class="pager__size">
+    <span>Rows</span>
+    <p-select [options]="pageSizeOptions" [ngModel]="pageSize()" (ngModelChange)="changePageSize($event)"
+      optionLabel="label" optionValue="value" styleClass="catalog-filter pager-filter"
+      panelStyleClass="catalog-filter-panel" appendTo="body" />
+  </div>
+</footer>
 }
 
-<p-dialog
-  [visible]="!!deleteTarget()"
-  [modal]="true"
-  [draggable]="false"
-  [closable]="!deleting()"
-  [closeOnEscape]="!deleting()"
-  [dismissableMask]="!deleting()"
-  appendTo="body"
-  styleClass="admin-dialog delete-dialog"
-  [style]="{ width: 'min(440px, calc(100vw - 2rem))' }"
-  (visibleChange)="!$event && cancelDelete()"
->
+<p-dialog [visible]="!!deleteTarget()" [modal]="true" [draggable]="false" [closable]="!deleting()"
+  [closeOnEscape]="!deleting()" [dismissableMask]="!deleting()" appendTo="body" styleClass="admin-dialog delete-dialog"
+  [style]="{ width: 'min(440px, calc(100vw - 2rem))' }" (visibleChange)="!$event && cancelDelete()">
   <ng-template pTemplate="header">
     <div class="delete-dialog__head">
       <span class="delete-dialog__icon" aria-hidden="true"><i class="pi pi-exclamation-triangle"></i></span>
@@ -318,36 +230,21 @@
   </ng-template>
 
   @if (deleteTarget(); as product) {
-    <p class="delete-dialog__copy">
-      Are you sure you want to delete this product? This action cannot be undone.
-    </p>
-    <div class="delete-dialog__product">
-      <strong>{{ product.name }}</strong>
-      @if (product.sku) {
-        <span>SKU {{ product.sku }}</span>
-      }
-    </div>
+  <p class="delete-dialog__copy">
+    Are you sure you want to delete this product? This action cannot be undone.
+  </p>
+  <div class="delete-dialog__product">
+    <strong>{{ product.name }}</strong>
+    @if (product.sku) {
+    <span>SKU {{ product.sku }}</span>
+    }
+  </div>
   }
 
   <ng-template pTemplate="footer">
-    <button
-      pButton
-      type="button"
-      label="Cancel"
-      severity="secondary"
-      [outlined]="true"
-      [disabled]="deleting()"
-      (click)="cancelDelete()"
-    ></button>
-    <button
-      pButton
-      type="button"
-      label="Delete Product"
-      severity="danger"
-      icon="pi pi-trash"
-      [loading]="deleting()"
-      [disabled]="deleting()"
-      (click)="confirmDelete()"
-    ></button>
+    <button pButton type="button" label="Cancel" severity="secondary" [outlined]="true" [disabled]="deleting()"
+      (click)="cancelDelete()"></button>
+    <button pButton type="button" label="Delete Product" severity="danger" icon="pi pi-trash" [loading]="deleting()"
+      [disabled]="deleting()" (click)="confirmDelete()"></button>
   </ng-template>
 </p-dialog>

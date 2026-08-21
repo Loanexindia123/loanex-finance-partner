@@ -17,6 +17,7 @@ import {
   type ProductCreatorScope,
 } from '../utils/product-ownership';
 import { loadEmployeeRecordsForHierarchy } from '../../admin/employee/employee.service';
+import { loadUserContact } from '../../admin/employee/employee-hierarchy'; // NEW
 import {
   applyEmployeeEmiCreateDefaults,
   assertCatalogEmiReadyForPublish,
@@ -473,7 +474,11 @@ function mapProduct(
     liveReviewCount > 0
       ? Math.round(liveAverageRating * 10) / 10
       : Math.round(toNumber(product.rating) * 10) / 10;
-  const reviewCount = liveReviewCount > 0 ? liveReviewCount : product.totalReviews;
+    const reviewCount = liveReviewCount > 0 ? liveReviewCount : product.totalReviews;
+
+  // NEW: resolve creatorId -> display name via the existing employee-hierarchy helper.
+  const creatorId = String((product as any).creatorId ?? '').trim();
+  const creatorName = creatorId ? loadUserContact(creatorId).displayName : null;
 
   return {
     ...product,
@@ -494,6 +499,8 @@ function mapProduct(
     stockStatus: stockState(toNumber(product.stock)),
     inStock,
     sku: product.sku,
+    creatorId: creatorId || null, // NEW
+    creatorName, // NEW
     thumbnail: product.image,
     imageUrl: product.image,
     images,

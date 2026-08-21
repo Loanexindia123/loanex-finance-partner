@@ -188,6 +188,7 @@ export class ProductDetail {
       field('Colour / Size / Variant', wizard.colourSizeVariant),
       field('Serial / IMEI tracking', yesNo(wizard.serialImeiTracking)),
       field('Status', product.status),
+      field('Created by', product.creatorName), // NEW
       field('Created', formatDate(product.createdAt)),
       field('Updated', formatDate(product.updatedAt)),
     ]);
