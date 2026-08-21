@@ -3,7 +3,8 @@ import {
   View, Text, StyleSheet, ScrollView, Pressable,
   Dimensions, ActivityIndicator, Alert, Share,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { AppImage } from '../../components/ui/AppImage';
+import { withMediaSize, prefetchMediaUrls } from '../../utils/mediaUrl';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +17,11 @@ import { addToWishlist, removeFromWishlist, isInWishlist } from '../../services/
 import { Product } from '../../types';
 
 const W = Dimensions.get('window').width;
+const H = Dimensions.get('window').height;
+/** Fallback before natural size is known (matches prior gallery height). */
+const GALLERY_HEIGHT_FALLBACK = 300;
+const GALLERY_HEIGHT_MIN = 220;
+const GALLERY_HEIGHT_MAX = Math.round(H * 0.65);
 
 const TRUST_BADGES = [
   { id: 'delivery', icon: 'local-shipping', title: 'Free Delivery', subtitle: 'Fast & Reliable' },
@@ -46,6 +52,8 @@ export default function ProductDetailScreen() {
   const [selectedPlanMonths, setSelectedPlanMonths] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'specs' | 'qa' | 'returns'>('overview');
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
+  /** Natural width/height ratio (w/h) keyed by hero URI — drives dynamic gallery height. */
+  const [heroAspectByUrl, setHeroAspectByUrl] = useState<Record<string, number>>({});
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -117,6 +125,40 @@ export default function ProductDetailScreen() {
     if (selectedVariant?.images?.length) return selectedVariant.images;
     return product?.images?.length ? product.images : [];
   }, [selectedVariant, product]);
+
+  const fullGallery = useMemo(
+    () => allImages.map((url) => withMediaSize(url, 'full')),
+    [allImages],
+  );
+  const thumbGallery = useMemo(
+    () => allImages.map((url) => withMediaSize(url, 'thumb')),
+    [allImages],
+  );
+
+  useEffect(() => {
+    if (!fullGallery.length) return;
+    // Prefetch full hero + nearby slides; thumbs are tiny and load with the strip.
+    prefetchMediaUrls([
+      fullGallery[activePhoto],
+      fullGallery[activePhoto + 1],
+      fullGallery[activePhoto - 1],
+      ...thumbGallery,
+    ]);
+  }, [fullGallery, thumbGallery, activePhoto]);
+
+  const galleryHeight = useMemo(() => {
+    const url = fullGallery[activePhoto];
+    const aspect = url ? heroAspectByUrl[url] : undefined;
+    if (!aspect || aspect <= 0) return GALLERY_HEIGHT_FALLBACK;
+    const raw = Math.round(W / aspect);
+    return Math.min(GALLERY_HEIGHT_MAX, Math.max(GALLERY_HEIGHT_MIN, raw));
+  }, [fullGallery, activePhoto, heroAspectByUrl]);
+
+  const handleHeroImageLoad = (url: string, width: number, height: number) => {
+    if (!url || width <= 0 || height <= 0) return;
+    const next = width / height;
+    setHeroAspectByUrl((prev) => (prev[url] === next ? prev : { ...prev, [url]: next }));
+  };
 
   const emiPlans = useMemo(() => {
     const raw = product?.emiPlans ?? [];
@@ -242,8 +284,8 @@ export default function ProductDetailScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}>
 
-        {/* Product Photo Gallery */}
-        <View style={s.gallery}>
+        {/* Product Photo Gallery — height follows active image aspect ratio */}
+        <View style={[s.gallery, { height: galleryHeight }]}>
           {allImages.length > 0 ? (
             <>
               <ScrollView
@@ -251,9 +293,21 @@ export default function ProductDetailScreen() {
                 horizontal pagingEnabled showsHorizontalScrollIndicator={false}
                 onMomentumScrollEnd={e => setActivePhoto(Math.round(e.nativeEvent.contentOffset.x / W))}
               >
-                {allImages.map((url: string, i: number) => (
-                  <View key={i} style={{ width: W, height: 300 }}>
-                    <Image source={{ uri: url }} style={{ flex: 1 }} contentFit="cover" transition={200} />
+                {fullGallery.map((url: string, i: number) => (
+                  <View key={url || i} style={{ width: W, height: galleryHeight, justifyContent: 'center', alignItems: 'center' }}>
+                    <AppImage
+                      uri={url}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="contain"
+                      transition={200}
+                      priority={i === activePhoto ? 'high' : 'low'}
+                      onLoad={(e) => {
+                        const src = e?.source;
+                        if (src?.width && src?.height) {
+                          handleHeroImageLoad(url, src.width, src.height);
+                        }
+                      }}
+                    />
                   </View>
                 ))}
               </ScrollView>
@@ -265,7 +319,7 @@ export default function ProductDetailScreen() {
               )}
             </>
           ) : (
-            <View style={{ width: W, height: 300, backgroundColor: Colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: W, height: galleryHeight, backgroundColor: Colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
               <MaterialIcons name="image-not-supported" size={48} color={Colors.border} />
             </View>
           )}
@@ -276,10 +330,10 @@ export default function ProductDetailScreen() {
           <View style={s.thumbRow}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, gap: Spacing.sm }}>
-              {allImages.map((url: string, i: number) => (
+              {thumbGallery.map((url: string, i: number) => (
                 <Pressable key={i} style={[s.thumb, i === activePhoto && s.thumbOn]}
                   onPress={() => { setActivePhoto(i); scrollRef.current?.scrollTo({ x: W * i, animated: true }); }}>
-                  <Image source={{ uri: url }} style={{ flex: 1 }} contentFit="cover" />
+                  <AppImage uri={url} style={{ flex: 1 }} contentFit="cover" />
                 </Pressable>
               ))}
             </ScrollView>
@@ -453,7 +507,7 @@ export default function ProductDetailScreen() {
                   <Text style={s.sumVal}>₹{Number(activePlan.deliveryCharge || 0).toLocaleString('en-IN')}</Text>
                 </View>
                 <View style={s.sumRow}>
-                  <Text style={s.sumLabel}>Loan Amount</Text>
+                  <Text style={s.sumLabel}>Principal Amount</Text>
                   <Text style={s.sumVal}>₹{(activePlan.loanAmount ?? (displayPrice - (activePlan.downPaymentAmount ?? activePlan.downPayment))).toLocaleString('en-IN')}</Text>
                 </View>
                 <View style={s.sumRow}>
@@ -611,7 +665,7 @@ const s = StyleSheet.create({
   headerTitle: { flex: 1, fontSize: Fonts.md, fontWeight: Fonts.bold, color: Colors.textPrimary },
   badge: { position: 'absolute', top: -2, right: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.error, alignItems: 'center', justifyContent: 'center' },
   badgeTxt: { color: '#fff', fontSize: 9, fontWeight: Fonts.bold },
-  gallery: { height: 300, backgroundColor: Colors.surfaceAlt, position: 'relative' },
+  gallery: { backgroundColor: Colors.surfaceAlt, position: 'relative', overflow: 'hidden' },
   discBadge: { position: 'absolute', top: 12, left: 12, backgroundColor: Colors.error, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, zIndex: 10 },
   discTxt: { color: '#fff', fontSize: Fonts.xs, fontWeight: Fonts.bold },
   dots: { position: 'absolute', bottom: 10, width: '100%', flexDirection: 'row', justifyContent: 'center', gap: 5 },

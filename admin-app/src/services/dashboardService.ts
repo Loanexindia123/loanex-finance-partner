@@ -2,6 +2,11 @@ import api from './api';
 import { getProducts } from './productService';
 import { getAllOrders } from './orderService';
 import { getAllEmiApplications } from './emiService';
+import { listAgents } from './agentService';
+import { listDealers } from './dealerService';
+import { listLeads } from './leadService';
+import { listEmployees } from './employeeService';
+import { getRbacState } from '../auth/rbacStore';
 
 export interface DashboardStats {
   totalProducts: number;
@@ -15,10 +20,20 @@ export interface DashboardStats {
   pendingApprovalProducts?: number;
   approvedProducts?: number;
   rejectedProducts?: number;
+  totalAgents?: number;
+  totalDealers?: number;
+  totalLeads?: number;
+  totalEmployees?: number;
 }
 
+/** Dealer + Agent dashboard — counts come from server-scoped list APIs. */
 export const getDealerDashboardStats = async (): Promise<DashboardStats> => {
-  const productList = await getProducts({ limit: 1000, status: 'all' }).catch(() => []);
+  const [productList, agents, dealers, leads] = await Promise.all([
+    getProducts({ limit: 1000, status: 'all' }).catch(() => []),
+    listAgents().catch(() => []),
+    listDealers().catch(() => []),
+    listLeads().catch(() => []),
+  ]);
   const statusOf = (p: any) => String(p.status ?? '').toLowerCase();
   return {
     totalProducts: productList.length,
@@ -32,6 +47,62 @@ export const getDealerDashboardStats = async (): Promise<DashboardStats> => {
     pendingApprovalProducts: productList.filter((p: any) => statusOf(p) === 'pending_approval').length,
     approvedProducts: productList.filter((p: any) => statusOf(p) === 'active').length,
     rejectedProducts: productList.filter((p: any) => statusOf(p) === 'rejected').length,
+    totalAgents: agents.length,
+    totalDealers: dealers.length,
+    totalLeads: leads.length,
+  };
+};
+
+/**
+ * Employee dashboard — only records created by the logged-in employee.
+ * List APIs are already server-scoped; we further filter by creator/onboardedBy.
+ */
+export const getEmployeeDashboardStats = async (): Promise<DashboardStats> => {
+  const userId = String(getRbacState().user?.id ?? '').trim();
+  const [productList, agents, dealers, employees] = await Promise.all([
+    getProducts({ limit: 1000, status: 'all' }).catch(() => []),
+    listAgents().catch(() => []),
+    listDealers().catch(() => []),
+    listEmployees().catch(() => []),
+  ]);
+
+  const ownProducts = productList.filter(
+    (p: any) => !userId || String(p.creatorId ?? '').trim() === userId,
+  );
+  const ownDealers = dealers.filter(
+    (d) => !userId || String(d.creatorId ?? '').trim() === userId,
+  );
+  const ownAgents = agents.filter(
+    (a) =>
+      !userId ||
+      String(a.creatorId ?? '').trim() === userId ||
+      String((a as any).createdById ?? '').trim() === userId,
+  );
+
+  // Direct creates: onboardedById is viewer userId or one of their own employee row ids.
+  const selfEmployeeIds = new Set(
+    employees
+      .filter((e) => String(e.userId ?? '').trim() === userId)
+      .map((e) => e.id)
+      .filter(Boolean),
+  );
+  const parentKeys = new Set([userId, ...selfEmployeeIds].filter(Boolean));
+  const ownEmployees = employees.filter((e) => {
+    if (selfEmployeeIds.has(e.id)) return false;
+    return parentKeys.has(String(e.onboardedById ?? '').trim());
+  });
+
+  return {
+    totalProducts: ownProducts.length,
+    totalOrders: 0,
+    pendingOrders: 0,
+    totalEmiApplications: 0,
+    pendingEmiApplications: 0,
+    totalRevenue: 0,
+    recentOrders: [],
+    totalAgents: ownAgents.length,
+    totalDealers: ownDealers.length,
+    totalEmployees: ownEmployees.length,
   };
 };
 
@@ -51,7 +122,6 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
     const orderList = orders.status === 'fulfilled' ? orders.value : [];
     const emiList = emiApplications.status === 'fulfilled' ? emiApplications.value : [];
 
-    // Calculate stats
     const pendingOrders = orderList.filter(
       (o: any) =>
         o.status === 'pending' ||
@@ -66,19 +136,10 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
       (e: any) => e.status === 'pending' || e.status === 'under_review'
     );
 
-    // Revenue = value of paid orders, regardless of delivery stage. An order
-    // counts once its payment is successful (Razorpay/EMI/COD paid), not only
-    // after it is marked delivered — otherwise the dashboard shows ₹0 until
-    // the parcel ships. The backend admin list emits paymentStatus
-    // ('SUCCESS'/'PENDING'), which mapBackendOrderToFrontend carries onto
-    // Order.paymentStatus. (For EMI orders this is the full order value even
-    // when only the down payment has been collected — GMV of paid orders.)
     const isPaid = (o: any) => {
       const ps = String(o.paymentStatus ?? o.payment_status ?? '').toUpperCase();
       return ps === 'SUCCESS' || ps === 'PAID';
     };
-    // Dedupe by order id first — mirror/retry artifacts can leave duplicate
-    // rows for the same order, which would otherwise inflate the total.
     const seen = new Set<string>();
     const totalRevenue = orderList
       .filter((o: any) => {
@@ -89,7 +150,6 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
       })
       .reduce((sum: number, o: any) => sum + (o.totalAmount || o.orderAmount || 0), 0);
 
-    // Get recent orders (last 10, sorted by date)
     const recentOrders = [...orderList]
       .sort((a: any, b: any) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime())
       .slice(0, 10);

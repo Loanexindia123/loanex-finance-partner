@@ -18,7 +18,7 @@ import { EmptyState } from '../../../../shared/components/empty-state/empty-stat
 import { StatusBadge } from '../../../../shared/components/status-badge/status-badge';
 import { StatCard } from '../../../../shared/components/stat-card/stat-card';
 import { CanDirective } from '../../../../shared/directives/can.directive';
-import { AuthService } from '../../../../core/services/auth.service';
+import { RbacService } from '../../../../core/services/rbac.service';
 import { ProductService } from '../../services/product.service';
 import {
   Category,
@@ -57,7 +57,7 @@ import {
 })
 export class ProductList {
   private readonly products = inject(ProductService);
-  private readonly auth = inject(AuthService);
+  private readonly rbac = inject(RbacService);
   private readonly router = inject(Router);
   private readonly messages = inject(MessageService);
 
@@ -263,12 +263,19 @@ export class ProductList {
     return String(product.status).toLowerCase() === 'pending_approval';
   }
 
+  /** Employee / Dealer / Agent cannot edit approved (active) products. */
+  isApprovedLocked(product: Product): boolean {
+    return this.rbac.isApprovedProductLocked(product.status);
+  }
+
+  /** Edit only when RBAC allows and the product is not approval-locked. */
+  canEditProduct(product: Product): boolean {
+    return this.rbac.can('products.edit') && !this.isApprovedLocked(product);
+  }
+
   /** Employees can submit for approval but cannot publish. */
   canApproveProducts(): boolean {
-    const role = String(this.auth.user()?.roleName ?? '')
-      .trim()
-      .toLowerCase();
-    return role !== 'employee';
+    return !this.rbac.isEmployee();
   }
 
   askDelete(product: Product): void {

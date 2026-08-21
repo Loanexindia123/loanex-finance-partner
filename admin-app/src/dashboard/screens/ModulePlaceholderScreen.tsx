@@ -5,6 +5,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
+import { SafeHeader } from '../../components/layout/SafeHeader';
 import { useTheme } from '../../theme/useTheme';
 import { authCardStyle, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -35,14 +36,14 @@ export function ModulePlaceholderScreen({ navigation, route }: Props) {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.safeArea} edges={[]}>
+      <SafeHeader style={styles.header}>
         <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{title}</Text>
         <View style={styles.backButton} />
-      </View>
+      </SafeHeader>
 
       <View style={styles.container}>
         <View style={styles.card}>

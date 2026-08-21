@@ -52,12 +52,17 @@ const freelancerCoreSchema = z.object({
   occupation: optionalString,
 
   currentAddress: optionalString,
+  city: optionalString,
+  state: optionalString,
   pincode: optionalString,
   googleLocation: optionalString,
   preferredWorkArea: optionalString,
   workMode: optionalString,
   emergencyContactName: optionalString,
   emergencyContactMobile: optionalString,
+
+  /** Server sets this for dealer-created agents; client value is ignored. */
+  dealerId: optionalString,
 
   profilePhoto: optionalString,
   aadhaarFront: optionalString,

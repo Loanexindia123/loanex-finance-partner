@@ -9,6 +9,16 @@ import { jsonDb } from '../../../config/json-db';
 import { hasOrgWideEmployeeAccess } from '../employee/employee-hierarchy';
 import type { CreateDealerBody, UpdateDealerBody } from './dealer.validator';
 import { isDealerApproved, isDealerAuthUser, provisionDealerAccount } from './dealer-account';
+import { isEmployeeRoleUser } from '../employee/employee-account';
+import { isRestrictedCatalogUser } from '../../product/utils/product-emi';
+import {
+  isAgentAuthUser,
+  resolveIsAgentUserId,
+} from '../freelancer-agent/agent-account';
+import {
+  collectDealerAgentUserIds,
+  resolveFieldActor,
+} from '../hierarchy/field-actor';
 
 const COLLECTION = 'dealers';
 
@@ -50,6 +60,12 @@ export interface DealerRecord {
   creatorType: string;
   creatorId: string;
   creatorName: string;
+  /**
+   * Parent dealer profile id when an Agent creates this dealer.
+   * Empty for staff-created root dealers. Never a nested dealer tree —
+   * always the creating agent's parent dealer.
+   */
+  dealerId: string;
   status: 'active' | 'inactive';
   formStatus: 'draft' | 'pending' | 'approved' | 'rejected' | 'hold';
   dealer_address: string;
@@ -143,6 +159,7 @@ function buildRecord(row: any): DealerRecord {
     creatorType: String(row.creatorType ?? '').trim(),
     creatorId: String(row.creatorId ?? '').trim(),
     creatorName: String(row.creatorName ?? '').trim(),
+    dealerId: String(row.dealerId ?? '').trim(),
     status: row.status === 'inactive' ? 'inactive' : 'active',
     formStatus:
       formStatus === 'pending' ||
@@ -218,6 +235,8 @@ function bodyToPayload(body: CreateDealerBody | UpdateDealerBody): Omit<DealerRe
     creatorType: body.creatorType?.trim() || '',
     creatorId: body.creatorId?.trim() || '',
     creatorName: body.creatorName?.trim() || '',
+    // Never trust client dealerId — service sets parent ownership for agent-created dealers.
+    dealerId: '',
     status: body.status ?? 'active',
     formStatus: body.formStatus ?? 'draft',
     dealer_address: shopAddress,
@@ -294,6 +313,42 @@ function canAccessDealer(dealer: DealerRecord, actor: DealerActor): boolean {
   return owner === actor.userId;
 }
 
+/**
+ * Field-actor visibility:
+ * - Dealer: own profile + dealers created by self/own agents (parent dealerId match)
+ * - Agent: only dealers they created
+ */
+async function canAccessDealerForActor(
+  dealer: DealerRecord,
+  actorUserId: string,
+): Promise<boolean> {
+  const actor = resolveActor(actorUserId);
+  if (canAccessDealer(dealer, actor)) return true;
+
+  const field = await resolveFieldActor(actorUserId);
+  if (!field) return false;
+
+  if (field.kind === 'dealer') {
+    // Child dealers created under this dealer (by agents) — not the dealer's own profile.
+    if (field.dealerId && str(dealer.dealerId) === field.dealerId) return true;
+    const agentUserIds = collectDealerAgentUserIds(field.dealerId);
+    if (agentUserIds.has(str(dealer.creatorId))) return true;
+    return false;
+  }
+
+  if (field.kind === 'agent') {
+    return str(dealer.creatorId) === field.userId;
+  }
+
+  return false;
+}
+
+async function assertCanAccessForActor(dealer: DealerRecord, actorUserId: string): Promise<void> {
+  if (!(await canAccessDealerForActor(dealer, actorUserId))) {
+    throw new ForbiddenError('You do not have access to this dealer');
+  }
+}
+
 function assertCanAccess(dealer: DealerRecord, actor: DealerActor): void {
   if (!canAccessDealer(dealer, actor)) {
     throw new ForbiddenError('You do not have access to this dealer');
@@ -306,9 +361,11 @@ export class DealerService {
     options?: { approvedOnly?: boolean },
   ): Promise<DealerRecord[]> {
     await ensureReady();
-    const actor = resolveActor(actorUserId);
     const all = (jsonDb.findMany(COLLECTION, {}) as any[]).map(buildRecord);
-    const scoped = actor.orgWide ? all : all.filter((d) => canAccessDealer(d, actor));
+    const scoped: DealerRecord[] = [];
+    for (const d of all) {
+      if (await canAccessDealerForActor(d, actorUserId)) scoped.push(d);
+    }
     // Product catalog / pickers: only dealers that passed approval (formStatus or
     // verificationStatus). Masters list omits this flag so pending stays visible.
     if (options?.approvedOnly) {
@@ -328,7 +385,7 @@ export class DealerService {
       throw new NotFoundError('Dealer not found');
     }
     const record = buildRecord(existing);
-    assertCanAccess(record, resolveActor(actorUserId));
+    await assertCanAccessForActor(record, actorUserId);
     return record;
   }
 
@@ -343,13 +400,27 @@ export class DealerService {
     }
 
     const actor = resolveActor(actorUserId);
+    const field = await resolveFieldActor(actorUserId);
+    const isAgent = Boolean(field?.kind === 'agent') || isAgentAuthUser(actorUser);
+
+    // Agents and Employees may create dealers but cannot approve — force pending/draft.
+    let formStatus = body.formStatus ?? 'draft';
+    let verificationStatus = body.verificationStatus ?? 'pending';
+    const cannotApprove = isAgent || isEmployeeRoleUser(actorUserId);
+    if (cannotApprove) {
+      if (formStatus === 'approved') formStatus = 'pending';
+      if (verificationStatus === 'approved') verificationStatus = 'pending';
+    }
+
     const payload = {
       id: body.id?.trim() || randomUUID(),
-      ...bodyToPayload(body),
+      ...bodyToPayload({ ...body, formStatus, verificationStatus }),
       // Creator always from authenticated session — never trust client owner fields.
       creatorId: actor.userId,
       creatorName: actor.displayName,
-      creatorType: str(body.creatorType) || 'Employee',
+      creatorType: isAgent ? 'Agent' : str(body.creatorType) || 'Employee',
+      // Parent dealer for agent-created dealers (ownership tree).
+      dealerId: isAgent ? str(field?.dealerId) : '',
     };
 
     if (jsonDb.findOne(COLLECTION, { id: payload.id })) {
@@ -373,18 +444,52 @@ export class DealerService {
     }
 
     const existingRecord = buildRecord(existing);
-    const actor = resolveActor(actorUserId);
-    assertCanAccess(existingRecord, actor);
+    await assertCanAccessForActor(existingRecord, actorUserId);
+
+    const field = await resolveFieldActor(actorUserId);
+    const isAgent = field?.kind === 'agent' || (await resolveIsAgentUserId(actorUserId));
+
+    // Approved dealers are read-only for Employee / Dealer / Agent.
+    if (
+      isRestrictedCatalogUser(actorUserId) &&
+      String(existingRecord.formStatus ?? '')
+        .trim()
+        .toLowerCase() === 'approved'
+    ) {
+      throw new ForbiddenError('Approved dealers cannot be edited.');
+    }
 
     if (findDuplicateCode(body.dealerCode, trimmed)) {
       throw new ConflictError('Dealer Code already exists');
     }
 
-    const updates = bodyToPayload(body);
+    // Agents and Employees cannot approve dealers.
+    let formStatus = body.formStatus ?? existingRecord.formStatus;
+    let verificationStatus = body.verificationStatus ?? existingRecord.verificationStatus;
+    const cannotApprove = isAgent || isEmployeeRoleUser(actorUserId);
+    if (cannotApprove) {
+      if (formStatus === 'approved') formStatus = existingRecord.formStatus === 'approved' ? 'approved' : 'pending';
+      if (verificationStatus === 'approved') {
+        verificationStatus =
+          existingRecord.verificationStatus === 'approved' ? 'approved' : 'pending';
+      }
+      if (existingRecord.formStatus !== 'approved' && body.formStatus === 'approved') {
+        throw new ForbiddenError('Only Admin can approve dealers');
+      }
+      if (
+        existingRecord.verificationStatus !== 'approved' &&
+        body.verificationStatus === 'approved'
+      ) {
+        throw new ForbiddenError('Only Admin can approve dealers');
+      }
+    }
+
+    const updates = bodyToPayload({ ...body, formStatus, verificationStatus });
     // Ownership is immutable after create.
     updates.creatorId = existingRecord.creatorId;
     updates.creatorName = existingRecord.creatorName;
     updates.creatorType = existingRecord.creatorType || updates.creatorType;
+    updates.dealerId = existingRecord.dealerId;
     // Never trust client userId — only provisioner may set it.
     updates.userId = existingRecord.userId;
 
@@ -427,7 +532,13 @@ export class DealerService {
     }
 
     const dealer = buildRecord(existing);
-    assertCanAccess(dealer, resolveActor(actorUserId));
+    await assertCanAccessForActor(dealer, actorUserId);
+
+    // Agents cannot delete protected (approved) dealers.
+    const field = await resolveFieldActor(actorUserId);
+    if (field?.kind === 'agent' && isDealerApproved(dealer)) {
+      throw new ForbiddenError('Approved dealers cannot be deleted');
+    }
 
     const blockers = collectDeleteBlockers(dealer);
     if (blockers.length > 0) {

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { AppImage } from '../components/ui/AppImage';
+import { withMediaSize } from '../utils/mediaUrl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { getWishlist, removeFromWishlist } from '../services/wishlistService';
@@ -65,7 +66,7 @@ export default function WishlistScreen() {
               style={styles.item}
               onPress={() => router.push(`/product/${item.productId}`)}
             >
-              <Image source={{ uri: item.product?.image }} style={styles.img} contentFit="cover" />
+              <AppImage uri={withMediaSize(item.product?.image, 'card')} style={styles.img} contentFit="cover" />
               <View style={styles.info}>
                 <Text style={styles.brand}>{item.product?.brand}</Text>
                 <Text style={styles.name} numberOfLines={2}>{item.product?.name}</Text>

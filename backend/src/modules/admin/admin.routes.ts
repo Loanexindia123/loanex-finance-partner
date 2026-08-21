@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { authenticate } from '../../common/middleware/authenticate';
 import {
+  forbidEmployeeRole,
   requireAnyPermission,
   requireAnyPermissionOrDealer,
   requirePermission,
+  requirePermissionOrDealer,
 } from '../../common/middleware/require-permission';
 import { validateRequest } from '../../common/middleware/validate';
 import { asyncHandler } from '../../common/utils/async-handler';
@@ -46,6 +48,11 @@ import {
   rejectFreelancerAgentBodySchema,
   updateFreelancerAgentBodySchema,
 } from './freelancer-agent/freelancer-agent.validator';
+import { leadController } from './lead/lead.controller';
+import {
+  createLeadBodySchema,
+  updateLeadBodySchema,
+} from './lead/lead.validator';
 
 export const adminRouter = Router();
 
@@ -69,7 +76,12 @@ adminRouter.patch(
   asyncHandler(settingsController.updateCodMaxAmount),
 );
 
-adminRouter.get('/users', requirePermission('users.view'), asyncHandler(adminController.listUsers));
+adminRouter.get(
+  '/users',
+  forbidEmployeeRole(),
+  requirePermission('users.view'),
+  asyncHandler(adminController.listUsers),
+);
 adminRouter.get(
   '/staff',
   requireAnyPermission(
@@ -82,14 +94,30 @@ adminRouter.get(
   ),
   asyncHandler(adminController.listStaff),
 );
-adminRouter.post('/users', requirePermission('users.create'), asyncHandler(adminController.createUser));
-adminRouter.patch('/users/:id', requirePermission('users.edit'), asyncHandler(adminController.updateUser));
-adminRouter.delete('/users/:id', requirePermission('users.delete'), asyncHandler(adminController.deleteUser));
+adminRouter.post(
+  '/users',
+  forbidEmployeeRole(),
+  requirePermission('users.create'),
+  asyncHandler(adminController.createUser),
+);
+adminRouter.patch(
+  '/users/:id',
+  forbidEmployeeRole(),
+  requirePermission('users.edit'),
+  asyncHandler(adminController.updateUser),
+);
+adminRouter.delete(
+  '/users/:id',
+  forbidEmployeeRole(),
+  requirePermission('users.delete'),
+  asyncHandler(adminController.deleteUser),
+);
 
 adminRouter.get('/kyc', requirePermission('customers.view'), asyncHandler(adminController.listKyc));
 
 adminRouter.get(
   '/users/:id/activity',
+  forbidEmployeeRole(),
   requirePermission('users.view'),
   asyncHandler(adminController.listUserActivity),
 );
@@ -233,25 +261,26 @@ adminRouter.delete(
 );
 
 // —— Dealers (dedicated: validation + GET by id; same /admin/dealers contract) ——
+// Agents may create/list dealers they own; Dealers may list child-agent dealers.
 adminRouter.get(
   '/dealers',
-  requirePermission('masters.view'),
+  requireAnyPermissionOrDealer('masters.view'),
   asyncHandler(dealerController.list),
 );
 adminRouter.post(
   '/dealers',
-  requirePermission('masters.create'),
+  requireAnyPermissionOrDealer('masters.create'),
   validateRequest(createDealerBodySchema),
   asyncHandler(dealerController.create),
 );
 adminRouter.get(
   '/dealers/:id',
-  requirePermission('masters.view'),
+  requireAnyPermissionOrDealer('masters.view'),
   asyncHandler(dealerController.getById),
 );
 adminRouter.put(
   '/dealers/:id',
-  requirePermission('masters.edit'),
+  requireAnyPermissionOrDealer('masters.edit'),
   validateRequest(updateDealerBodySchema),
   asyncHandler(dealerController.update),
 );
@@ -331,9 +360,10 @@ adminRouter.delete(
 );
 
 // —— Freelancer / Growing Partner onboarding (dedicated collection; not employees) ——
+// Dealers may list/create/edit only their own agents via the same endpoints (scoped in service).
 adminRouter.get(
   '/freelancer-agents',
-  requirePermission('freelancers.view'),
+  requirePermissionOrDealer('freelancers.view'),
   asyncHandler(freelancerAgentController.list),
 );
 adminRouter.get(
@@ -343,18 +373,18 @@ adminRouter.get(
 );
 adminRouter.post(
   '/freelancer-agents',
-  requirePermission('freelancers.create'),
+  requirePermissionOrDealer('freelancers.create'),
   validateRequest(createFreelancerAgentBodySchema),
   asyncHandler(freelancerAgentController.create),
 );
 adminRouter.get(
   '/freelancer-agents/:id',
-  requirePermission('freelancers.view'),
+  requirePermissionOrDealer('freelancers.view'),
   asyncHandler(freelancerAgentController.getById),
 );
 adminRouter.put(
   '/freelancer-agents/:id',
-  requirePermission('freelancers.edit'),
+  requirePermissionOrDealer('freelancers.edit'),
   validateRequest(updateFreelancerAgentBodySchema),
   asyncHandler(freelancerAgentController.update),
 );
@@ -371,11 +401,41 @@ adminRouter.post(
 );
 adminRouter.delete(
   '/freelancer-agents/:id',
-  requirePermission('freelancers.delete'),
+  requirePermissionOrDealer('freelancers.delete'),
   asyncHandler(freelancerAgentController.remove),
 );
 
+// —— Leads (Dealer/Agent field module) ——
+adminRouter.get(
+  '/leads',
+  requireAnyPermissionOrDealer('masters.view'),
+  asyncHandler(leadController.list),
+);
+adminRouter.post(
+  '/leads',
+  requireAnyPermissionOrDealer('masters.create'),
+  validateRequest(createLeadBodySchema),
+  asyncHandler(leadController.create),
+);
+adminRouter.get(
+  '/leads/:id',
+  requireAnyPermissionOrDealer('masters.view'),
+  asyncHandler(leadController.getById),
+);
+adminRouter.put(
+  '/leads/:id',
+  requireAnyPermissionOrDealer('masters.edit'),
+  validateRequest(updateLeadBodySchema),
+  asyncHandler(leadController.update),
+);
+adminRouter.delete(
+  '/leads/:id',
+  requirePermission('masters.delete'),
+  asyncHandler(leadController.remove),
+);
+
 // —— Master data (other collections; branches + dealers + product_types handled above) ——
+// Brands/categories: Dealers and Agents need catalogue masters for product create.
 for (const collection of [
   'suppliers',
   'warehouses',
@@ -391,10 +451,22 @@ for (const collection of [
   'product_variants',
   'product_variant_attributes',
 ] as const) {
-  adminRouter.get(`/${collection}`, requirePermission('masters.view'), asyncHandler(adminController.listMaster));
-  adminRouter.post(`/${collection}`, requirePermission('masters.create'), asyncHandler(adminController.createMaster));
-  adminRouter.put(`/${collection}/:id`, requirePermission('masters.edit'), asyncHandler(adminController.updateMaster));
-  adminRouter.delete(`/${collection}/:id`, requirePermission('masters.delete'), asyncHandler(adminController.deleteMaster));
+  const isCatalogueMaster = collection === 'brands' || collection === 'sub_categories';
+  const viewGuard = isCatalogueMaster
+    ? requireAnyPermissionOrDealer('masters.view', 'products.view')
+    : requirePermission('masters.view');
+  const createGuard = isCatalogueMaster
+    ? requireAnyPermissionOrDealer('masters.create', 'products.create')
+    : requirePermission('masters.create');
+  const editGuard = isCatalogueMaster
+    ? requireAnyPermissionOrDealer('masters.edit', 'products.edit')
+    : requirePermission('masters.edit');
+  const deleteGuard = requirePermission('masters.delete');
+
+  adminRouter.get(`/${collection}`, viewGuard, asyncHandler(adminController.listMaster));
+  adminRouter.post(`/${collection}`, createGuard, asyncHandler(adminController.createMaster));
+  adminRouter.put(`/${collection}/:id`, editGuard, asyncHandler(adminController.updateMaster));
+  adminRouter.delete(`/${collection}/:id`, deleteGuard, asyncHandler(adminController.deleteMaster));
 }
 
 // —— Careers job openings (Admin Mobile App) ——

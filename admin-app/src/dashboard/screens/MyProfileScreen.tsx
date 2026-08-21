@@ -14,12 +14,13 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Card } from '../../components/ui/Card';
 import { DetailRow } from '../../components/ui/DetailRow';
 import { SectionTitle } from '../../components/ui/SectionTitle';
+import { SafeHeader } from '../../components/layout/SafeHeader';
 import { getMe, User } from '../../services/authService';
 import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/useTheme';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import { isDealer } from '../../auth/rbacStore';
+import { isFieldActor } from '../../auth/rbacStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MyProfile'>;
 
@@ -28,7 +29,7 @@ export function MyProfileScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [profile, setProfile] = React.useState<User | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const dealerTabRoot = isDealer() && !navigation.canGoBack();
+  const dealerTabRoot = isFieldActor() && !navigation.canGoBack();
 
   useFocusEffect(
     useCallback(() => {
@@ -51,7 +52,7 @@ export function MyProfileScreen({ navigation }: Props) {
       navigation.goBack();
       return;
     }
-    if (isDealer()) {
+    if (isFieldActor()) {
       navigation.navigate('DealerTabs', { screen: 'Dashboard' });
       return;
     }
@@ -70,8 +71,8 @@ export function MyProfileScreen({ navigation }: Props) {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.safeArea} edges={[]}>
+      <SafeHeader style={styles.header}>
         {dealerTabRoot ? (
           <View style={styles.backButton} />
         ) : (
@@ -81,7 +82,7 @@ export function MyProfileScreen({ navigation }: Props) {
         )}
         <Text style={styles.headerTitle}>My Profile</Text>
         <View style={styles.backButton} />
-      </View>
+      </SafeHeader>
 
       <ScrollView
         contentContainerStyle={styles.scroll}

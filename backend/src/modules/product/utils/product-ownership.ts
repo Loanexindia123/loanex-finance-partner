@@ -6,6 +6,10 @@ import {
   type ViewerIdentity,
 } from '../../admin/employee/employee-hierarchy';
 import type { EmployeeRecord } from '../../admin/employee/employee.service';
+import {
+  collectDealerAgentUserIds,
+  resolveFieldActor,
+} from '../../admin/hierarchy/field-actor';
 
 function str(value: unknown): string {
   return String(value ?? '').trim();
@@ -15,6 +19,10 @@ export interface ProductCreatorScope {
   orgWide: boolean;
   /** Creator ids the actor may access (self + descendant user/employee ids). */
   allowedCreatorIds: Set<string>;
+  /** Optional dealer profile id — products stamped with this dealerId are visible to the dealer. */
+  dealerId?: string;
+  /** When true, dealerId match alone is enough (Dealer actor). Agents require creatorId match. */
+  allowDealerIdMatch?: boolean;
 }
 
 /**
@@ -61,13 +69,35 @@ export function resolveProductCreatorScopeFromViewer(
 }
 
 /**
- * Resolve product creator scope for an authenticated staff user.
- * `loadEmployees` is injected so this module stays free of jsonDb side effects.
+ * Resolve product creator scope for an authenticated staff/field user.
+ * Dealers see own + child-agent products; Agents see only self-created.
  */
 export async function resolveProductCreatorScope(
   actorUserId: string,
   loadEmployees: () => Promise<EmployeeRecord[]>,
 ): Promise<ProductCreatorScope> {
+  const field = await resolveFieldActor(actorUserId);
+  if (field?.kind === 'agent') {
+    return {
+      orgWide: false,
+      allowedCreatorIds: new Set([field.userId].filter(Boolean)),
+      dealerId: field.dealerId || undefined,
+      allowDealerIdMatch: false,
+    };
+  }
+  if (field?.kind === 'dealer') {
+    const ids = new Set<string>([field.userId].filter(Boolean));
+    for (const uid of collectDealerAgentUserIds(field.dealerId)) {
+      ids.add(uid);
+    }
+    return {
+      orgWide: false,
+      allowedCreatorIds: ids,
+      dealerId: field.dealerId || undefined,
+      allowDealerIdMatch: true,
+    };
+  }
+
   const all = await loadEmployees();
   const viewer = resolveViewerIdentity(str(actorUserId), all);
   return resolveProductCreatorScopeFromViewer(viewer, all);
@@ -76,19 +106,25 @@ export async function resolveProductCreatorScope(
 /**
  * Hierarchy visibility for a product creator.
  * Legacy products with no creatorId: Super Admin (orgWide) only.
+ * Dealer tree: also match product.dealerId when stamped.
  */
 export function canAccessProductByCreator(
-  product: { creatorId?: string | null },
+  product: { creatorId?: string | null; dealerId?: string | null },
   scope: ProductCreatorScope,
 ): boolean {
   if (scope.orgWide) return true;
   const owner = str(product.creatorId);
+  if (owner && scope.allowedCreatorIds.has(owner)) return true;
+  if (scope.allowDealerIdMatch && scope.dealerId) {
+    const productDealerId = str(product.dealerId);
+    if (productDealerId && productDealerId === scope.dealerId) return true;
+  }
   if (!owner) return false;
-  return scope.allowedCreatorIds.has(owner);
+  return false;
 }
 
 export function assertCanAccessProductByCreator(
-  product: { creatorId?: string | null },
+  product: { creatorId?: string | null; dealerId?: string | null },
   scope: ProductCreatorScope,
 ): void {
   if (!canAccessProductByCreator(product, scope)) {
@@ -106,4 +142,5 @@ export function stripClientOwnershipFields(data: Record<string, any>): void {
   delete data.userId;
   delete data.employeeId;
   delete data.dealerId;
+  delete data.agentId;
 }

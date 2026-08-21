@@ -4,10 +4,17 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "ng build",
+    "build": "ng build --configuration production",
+    "build:prod": "ng build --configuration production",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "serve:ssr:LoanEx": "node dist/LoanEx/server/server.mjs"
+    "serve:ssr:LoanEx": "node dist/LoanEx/server/server.mjs",
+    "preview": "npx --yes serve dist/LoanEx/browser -l 4400",
+    "deploy": "npx --yes vercel --prod",
+    "deploy:preview": "npx --yes vercel"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "prettier": {
     "printWidth": 100,

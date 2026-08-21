@@ -1,19 +1,27 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ButtonModule } from 'primeng/button';
+import { TagModule } from 'primeng/tag';
 import { PageHeader } from '../../../../shared/components/page-header/page-header';
 import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
 import { ErrorState } from '../../../../shared/components/error-state/error-state';
 import { StatusBadge } from '../../../../shared/components/status-badge/status-badge';
-import { CanDirective } from '../../../../shared/directives/can.directive';
+import { RbacService } from '../../../../core/services/rbac.service';
 import { EmployeeService } from '../../services/employee.service';
 import { DOCUMENT_FIELDS, Employee } from '../../models/employee.models';
 
 @Component({
   selector: 'app-employee-view',
   standalone: true,
-  imports: [ButtonModule, PageHeader, BrandedLoader, ErrorState, StatusBadge, CanDirective],
+  imports: [
+    ButtonModule,
+    TagModule,
+    PageHeader,
+    BrandedLoader,
+    ErrorState,
+    StatusBadge,
+  ],
   templateUrl: './employee-view.html',
   styleUrl: './employee-view.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -22,12 +30,21 @@ export class EmployeeView {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly employees = inject(EmployeeService);
+  private readonly rbac = inject(RbacService);
 
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly employee = signal<Employee | null>(null);
   readonly documentFields = DOCUMENT_FIELDS;
   readonly id = this.route.snapshot.paramMap.get('id') ?? '';
+
+  readonly isApprovedLocked = computed(() =>
+    this.rbac.isApprovedFormLocked(this.employee()?.formStatus),
+  );
+
+  readonly canEditRecord = computed(
+    () => this.rbac.can('users.edit') && !this.isApprovedLocked(),
+  );
 
   constructor() {
     this.load();
@@ -46,7 +63,7 @@ export class EmployeeView {
         this.employee.set(employee);
         this.loading.set(false);
       },
-      error: (err) => {
+      error: (err: unknown) => {
         this.loading.set(false);
         this.error.set(this.extractMessage(err));
       },
@@ -80,9 +97,10 @@ export class EmployeeView {
 
   private extractMessage(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
-      const body = err.error as { message?: string; error?: string } | null;
-      return body?.message || body?.error || err.message || 'Request failed';
+      const body = err.error as { message?: string } | null;
+      return body?.message || err.message || 'Request failed';
     }
-    return err instanceof Error ? err.message : 'Request failed';
+    if (err instanceof Error) return err.message;
+    return 'Request failed';
   }
 }

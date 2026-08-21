@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { AppImage } from '../components/ui/AppImage';
+import { withMediaSize } from '../utils/mediaUrl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { useOrders } from '../hooks/useOrders';
@@ -72,7 +73,7 @@ function OrderCard({ order }: { order: Order }) {
       {/* Items preview */}
       {order.items.slice(0, 2).map(item => (
         <View key={item.productId} style={styles.itemRow}>
-          <Image source={{ uri: item.image }} style={styles.itemImg} contentFit="cover" transition={200} />
+          <AppImage uri={withMediaSize(item.image, 'card')} style={styles.itemImg} contentFit="cover" transition={200} />
           <View style={{ flex: 1 }}>
             <Text style={styles.itemName} numberOfLines={1}>{item.productName}</Text>
             <Text style={styles.itemMeta}>Qty: {item.quantity}</Text>

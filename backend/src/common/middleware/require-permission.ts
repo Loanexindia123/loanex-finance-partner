@@ -2,6 +2,8 @@ import { NextFunction, Response } from 'express';
 import { ForbiddenError } from '../errors/app-error';
 import { rolesService } from '../../modules/rbac/roles.service';
 import { resolveIsDealerUserId } from '../../modules/admin/dealer/dealer-account';
+import { resolveIsAgentUserId } from '../../modules/admin/freelancer-agent/agent-account';
+import { isEmployeeRoleUser } from '../../modules/admin/employee/employee-account';
 import type { AuthenticatedRequest } from './authenticate';
 
 /**
@@ -33,16 +35,16 @@ export function requireAnyPermission(...needed: string[]) {
 }
 
 /**
- * Product write access for Dealer APK without granting Admin Web permissions.
- * Dealers keep an empty role permission set; this only opens create/edit.
+ * Product/dealer/agent write access for Dealer/Agent APK without Admin Web permissions.
+ * Field roles keep an empty permission set; this only opens create/edit/view.
  */
 export function requirePermissionOrDealer(permission: string) {
   return requireAnyPermissionOrDealer(permission);
 }
 
 /**
- * Same as requireAnyPermission, but Dealers (empty role permissions) are allowed
- * through so dealer-app catalogue masters can call admin master APIs.
+ * Same as requireAnyPermission, but Dealers and Agents (empty role permissions)
+ * are allowed through so the admin-app field APIs work.
  */
 export function requireAnyPermissionOrDealer(...needed: string[]) {
   return async (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
@@ -55,7 +57,29 @@ export function requireAnyPermissionOrDealer(...needed: string[]) {
         next();
         return;
       }
+      if (await resolveIsAgentUserId(req.user.sub)) {
+        next();
+        return;
+      }
       await requireAnyPermission(...needed)(req, _res, next);
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+/**
+ * Staff Users (/admin/users) is Admin/Super Admin only.
+ * Employees keep users.* for Employee Onboarding (/admin/employees), not portal user admin.
+ */
+export function forbidEmployeeRole() {
+  return (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
+    try {
+      if (isEmployeeRoleUser(req.user?.sub)) {
+        next(new ForbiddenError('Employees cannot manage Staff Users'));
+        return;
+      }
+      next();
     } catch (err) {
       next(err);
     }

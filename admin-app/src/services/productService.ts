@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import api from './api';
 
 export interface Product {
@@ -111,6 +112,9 @@ export const deleteProduct = async (productId: string): Promise<void> => {
 /**
  * Upload a product image (Admin Web: POST /products/images).
  * Accepts a local file URI from the image picker (deferred until save).
+ *
+ * Web must append a real File/Blob — RN { uri, name, type } is ignored by browsers,
+ * which caused multer to return "Image file is required."
  */
 export const uploadProductImage = async (file: {
   uri: string;
@@ -118,17 +122,40 @@ export const uploadProductImage = async (file: {
   type: string;
 }): Promise<{ id: string; url: string; fileName: string }> => {
   const body = new FormData();
-  // React Native FormData file shape (uri/name/type)
-  body.append('image', {
-    uri: file.uri,
-    name: file.name,
-    type: file.type,
-  } as unknown as Blob);
+  const fileName = file.name || `image-${Date.now()}.jpg`;
+  const mimeType = file.type?.startsWith('image/') ? file.type : 'image/jpeg';
+
+  if (Platform.OS === 'web') {
+    const blobRes = await fetch(file.uri);
+    if (!blobRes.ok) {
+      throw new Error('Could not read the selected image.');
+    }
+    const blob = await blobRes.blob();
+    const type = mimeType || blob.type || 'image/jpeg';
+    body.append('image', new File([blob], fileName, { type }));
+  } else {
+    // React Native FormData file shape (uri/name/type)
+    body.append('image', {
+      uri: file.uri,
+      name: fileName,
+      type: mimeType,
+    } as unknown as Blob);
+  }
 
   const response = await api.post('/products/images', body, {
-    // Override default application/json so RN sets multipart boundary correctly
     headers: { 'Content-Type': 'multipart/form-data' },
-    transformRequest: [(data) => data],
+    transformRequest: [
+      (data, headers) => {
+        // Drop forced Content-Type so the runtime can set multipart boundary.
+        if (headers && typeof (headers as { delete?: (key: string) => void }).delete === 'function') {
+          (headers as { delete: (key: string) => void }).delete('Content-Type');
+        } else if (headers) {
+          delete (headers as Record<string, unknown>)['Content-Type'];
+          delete (headers as Record<string, unknown>)['content-type'];
+        }
+        return data;
+      },
+    ],
   });
   return response.data.data;
 };

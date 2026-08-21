@@ -16,6 +16,12 @@ export const EMPLOYEE_ROLE_PERMISSIONS: string[] = [
   'masters.view',
   'masters.create',
   'masters.edit',
+  'users.view',
+  'users.create',
+  'users.edit',
+  'freelancers.view',
+  'freelancers.create',
+  'freelancers.edit',
 ];
 
 function str(value: unknown): string {
@@ -43,6 +49,35 @@ export async function ensureEmployeeRole(): Promise<{ id: string; name: string }
     role = jsonDb.findOne('roles', { name: EMPLOYEE_ROLE_NAME }) as any;
   }
   if (role?.id) {
+    // Keep seeded Employee permissions in sync (create dealers/agents/employees; never approve).
+    const current = Array.isArray(role.permissions) ? role.permissions : [];
+    const missing = EMPLOYEE_ROLE_PERMISSIONS.filter((p) => !current.includes(p));
+    const extraApprove = current.filter(
+      (p: string) =>
+        p === 'freelancers.approve' ||
+        p === 'freelancers.reject' ||
+        p === 'products.delete',
+    );
+    if (missing.length > 0 || extraApprove.length > 0) {
+      const next = [
+        ...new Set([
+          ...current.filter(
+            (p: string) =>
+              p !== 'freelancers.approve' &&
+              p !== 'freelancers.reject',
+          ),
+          ...EMPLOYEE_ROLE_PERMISSIONS,
+        ]),
+      ];
+      const now = new Date().toISOString();
+      await jsonDb.updateAwaited('roles', { id: role.id }, {
+        permissions: next,
+        description:
+          'Employee portal: own products, dealers, employees, agents and product masters (no approvals)',
+        updated_at: now,
+        updatedAt: now,
+      });
+    }
     return { id: String(role.id), name: String(role.name ?? EMPLOYEE_ROLE_NAME) };
   }
 
@@ -50,7 +85,8 @@ export async function ensureEmployeeRole(): Promise<{ id: string; name: string }
   const created = await jsonDb.insertAwaited('roles', {
     id: EMPLOYEE_ROLE_ID,
     name: EMPLOYEE_ROLE_NAME,
-    description: 'Employee portal: products, product masters and own dealers',
+    description:
+      'Employee portal: own products, dealers, employees, agents and product masters (no approvals)',
     permissions: [...EMPLOYEE_ROLE_PERMISSIONS],
     is_system: false,
     isSystem: false,
@@ -60,6 +96,17 @@ export async function ensureEmployeeRole(): Promise<{ id: string; name: string }
     updatedAt: now,
   });
   return { id: String(created.id), name: EMPLOYEE_ROLE_NAME };
+}
+
+/** True when the auth user is assigned the Employee RBAC role. */
+export function isEmployeeRoleUser(userId: string | undefined): boolean {
+  if (!userId) return false;
+  const user = jsonDb.findOne('users', { id: userId }) as any;
+  if (!user) return false;
+  const roleId = user.role_id ?? user.roleId;
+  if (!roleId) return false;
+  const role = jsonDb.findOne('roles', { id: roleId }) as any;
+  return String(role?.name ?? '').trim().toLowerCase() === 'employee';
 }
 
 function findUserByEmailOrMobile(email: string, mobile: string): any | null {

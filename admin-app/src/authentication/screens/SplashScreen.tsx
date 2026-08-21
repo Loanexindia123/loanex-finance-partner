@@ -7,7 +7,7 @@ import { authColors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { getToken, getStoredUser, getMe, clearAuth } from '../../services/authService';
-import { setRbacUser, isDealer } from '../../auth/rbacStore';
+import { setRbacUser, homeRouteName } from '../../auth/rbacStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
@@ -37,10 +37,8 @@ export function SplashScreen({ navigation }: Props) {
           });
           if (fresh.mustChangePassword) {
             navigation.replace('ChangePassword', { forced: true });
-          } else if (isDealer()) {
-            navigation.replace('DealerTabs');
           } else {
-            navigation.replace('Dashboard');
+            navigation.replace(homeRouteName());
           }
           return;
         } catch {

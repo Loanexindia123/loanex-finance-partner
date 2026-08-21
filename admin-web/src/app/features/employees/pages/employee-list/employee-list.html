@@ -95,17 +95,18 @@
                 <i class="pi pi-eye" aria-hidden="true"></i>
                 <span class="act__label">View</span>
               </button>
-              <button
-                *appCan="'users.edit'"
-                type="button"
-                class="act act--edit"
-                pTooltip="Continue onboarding"
-                [tooltipOptions]="actionTooltip"
-                (click)="edit(employee)"
-              >
-                <i class="pi pi-pencil" aria-hidden="true"></i>
-                <span class="act__label">Edit</span>
-              </button>
+              @if (canEditEmployee(employee)) {
+                <button
+                  type="button"
+                  class="act act--edit"
+                  pTooltip="Continue onboarding"
+                  [tooltipOptions]="actionTooltip"
+                  (click)="edit(employee)"
+                >
+                  <i class="pi pi-pencil" aria-hidden="true"></i>
+                  <span class="act__label">Edit</span>
+                </button>
+              }
               <button
                 *appCan="'users.delete'"
                 type="button"

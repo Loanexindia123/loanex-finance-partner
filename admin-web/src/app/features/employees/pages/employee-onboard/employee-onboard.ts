@@ -27,6 +27,7 @@ import { apiUrl } from '../../../../core/config/api.config';
 import { ApiEnvelope } from '../../../../core/models/api.models';
 import { unwrapApi } from '../../../../core/rxjs/unwrap-api';
 import { AuthService } from '../../../../core/services/auth.service';
+import { RbacService } from '../../../../core/services/rbac.service';
 import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
 import { StaffUserService } from '../../../masters/services/staff-user.service';
 import { ProductService } from '../../../products/services/product.service';
@@ -90,6 +91,7 @@ export class EmployeeOnboard {
   private readonly branchesApi = inject(BranchService);
   private readonly products = inject(ProductService);
   private readonly auth = inject(AuthService);
+  private readonly rbac = inject(RbacService);
   private readonly http = inject(HttpClient);
   private readonly messages = inject(MessageService);
   private readonly destroyRef = inject(DestroyRef);
@@ -523,6 +525,16 @@ export class EmployeeOnboard {
     this.loading.set(true);
     this.employees.getById(this.employeeId).subscribe({
       next: (employee) => {
+        if (this.rbac.isApprovedFormLocked(employee.formStatus)) {
+          this.loading.set(false);
+          this.messages.add({
+            severity: 'warn',
+            summary: 'Employee locked',
+            detail: 'This employee has been approved and can no longer be edited.',
+          });
+          void this.router.navigate(['/employees', this.employeeId]);
+          return;
+        }
         this.form.patchValue({
           ...employee,
           employeeId: employee.employeeId || generateEmployeeId(),

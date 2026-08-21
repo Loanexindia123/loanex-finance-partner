@@ -15,6 +15,7 @@ import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { colors } from '../../../theme/colors';
 import { radius, spacing } from '../../../theme/spacing';
+import { resolveMediaUrl } from '../../../utils/resolveMediaUrl';
 
 interface ProductPreviewModalProps {
   visible: boolean;
@@ -30,6 +31,7 @@ export function ProductPreviewModal({ visible, product, onClose, onEdit }: Produ
   if (!product) return null;
 
   const formatPrice = (price: number) => `₹${price.toLocaleString('en-IN')}`;
+  const imageUri = resolveMediaUrl(product.imageUrl);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
@@ -43,8 +45,8 @@ export function ProductPreviewModal({ visible, product, onClose, onEdit }: Produ
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={[styles.hero, isTablet && styles.heroTablet]}>
-            {product.imageUrl ? (
-              <Image source={{ uri: product.imageUrl }} style={styles.heroImage} />
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={styles.heroImage} />
             ) : (
               <View style={styles.heroPlaceholder}>
                 <Text style={{ fontSize: 64 }}>📦</Text>

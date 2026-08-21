@@ -4,9 +4,16 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "ng build",
+    "build": "ng build --configuration production",
+    "build:prod": "ng build --configuration production",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "preview": "npx --yes serve dist/admin-web/browser -l 4300",
+    "deploy": "npx --yes vercel --prod",
+    "deploy:preview": "npx --yes vercel"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "prettier": {
     "printWidth": 100,

@@ -34,8 +34,15 @@
       <h2>{{ row.fullName || 'Untitled draft' }}</h2>
       <p class="agent-id">Agent / Growing Partner ID: <strong>{{ agentCode() }}</strong></p>
       <p>{{ row.agentType || 'Growing Partner' }} · Incentive / Commission · Not an employee</p>
+      @if (isApprovedLocked()) {
+        <p class="lock-hint">This agent has been approved and can no longer be edited.</p>
+      }
     </div>
-    <app-status-badge [status]="row.formStatus" />
+    @if (isApprovedLocked()) {
+      <p-tag value="Approved (Locked)" severity="success" />
+    } @else {
+      <app-status-badge [status]="row.formStatus" />
+    }
   </div>
 
   <div class="review-grid">

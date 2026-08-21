@@ -1,6 +1,7 @@
 import { BadRequestError } from '../../../common/errors/app-error';
 import { jsonDb } from '../../../config/json-db';
 import { isDealerUserId } from '../../admin/dealer/dealer-account';
+import { isAgentUserId } from '../../admin/freelancer-agent/agent-account';
 
 /** Catalog EMI columns on `products`. Not loan/application EMI. */
 export const PRODUCT_EMI_COLUMN_KEYS = [
@@ -92,9 +93,24 @@ export function isDealerUser(userId: string | undefined): boolean {
   return isDealerUserId(userId);
 }
 
-/** Employee and Dealer share catalog restrictions: no EMI config, no publish. */
+export function isAgentUser(userId: string | undefined): boolean {
+  return isAgentUserId(userId);
+}
+
+/** Employee, Dealer, and Agent share catalog restrictions: no EMI config, no publish. */
 export function isRestrictedCatalogUser(userId: string | undefined): boolean {
-  return isEmployeeUser(userId) || isDealerUser(userId);
+  return isEmployeeUser(userId) || isDealerUser(userId) || isAgentUser(userId);
+}
+
+/**
+ * Approved (active) products are read-only for restricted catalog users.
+ * Admin / Super Admin pass actorIsRestricted=false and remain editable.
+ */
+export function isApprovedProductEditLocked(
+  status: string | undefined | null,
+  actorIsRestricted: boolean,
+): boolean {
+  return actorIsRestricted && String(status ?? '').trim().toLowerCase() === 'active';
 }
 
 function isUsableCatalogEmiPlan(plan: any): boolean {

@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Modal,
   useWindowDimensions,
-  SafeAreaView,
   Alert,
   BackHandler,
   Platform,
@@ -19,11 +18,14 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Product } from '../types/product';
 import { ProductCard } from '../components/ProductCard';
 import { Chip } from '../../../components/ui/Chip';
+import { AppHeader } from '../../../components/layout/AppHeader';
+import { Screen } from '../../../components/layout/Screen';
 import { colors } from '../../../theme/colors';
 import { radius, shadow, spacing } from '../../../theme/spacing';
 import { RootStackParamList } from '../../../navigation/types';
 import { getProducts, deleteProduct } from '../../../services/productService';
-import { useRbac, can, isDealer } from '../../../auth/rbacStore';
+import { useRbac, can, isApprovedProductLocked, isFieldActor } from '../../../auth/rbacStore';
+import { resolveProductImageUrl } from '../../../utils/resolveMediaUrl';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProductList'>;
 
@@ -43,7 +45,7 @@ export function ProductListScreen({ navigation }: Props) {
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const rbac = useRbac();
-  const dealerTabRoot = isDealer() && !navigation.canGoBack();
+  const dealerTabRoot = isFieldActor() && !navigation.canGoBack();
 
   const fetchProducts = async () => {
     try {
@@ -60,7 +62,7 @@ export function ProductListScreen({ navigation }: Props) {
         mrp: Number(p.mrp) || Number(p.price) || 0,
         stock: p.stock || 0,
         status: p.status || 'active',
-        imageUrl: p.image || null,
+        imageUrl: resolveProductImageUrl(p) || null,
       }));
       setProducts(mappedProducts);
     } catch (e) {
@@ -136,7 +138,7 @@ export function ProductListScreen({ navigation }: Props) {
       navigation.goBack();
       return;
     }
-    if (isDealer()) {
+    if (isFieldActor()) {
       navigation.navigate('DealerTabs', { screen: 'Dashboard' });
       return;
     }
@@ -146,7 +148,7 @@ export function ProductListScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       const onHardwareBackPress = () => {
-        if (isDealer() && !navigation.canGoBack()) {
+        if (isFieldActor() && !navigation.canGoBack()) {
           return true;
         }
         if (navigation.canGoBack()) {
@@ -162,9 +164,9 @@ export function ProductListScreen({ navigation }: Props) {
   );
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen edges="none">
       <View style={styles.container}>
-        <View style={styles.header}>
+        <AppHeader>
           <View style={styles.headerRow}>
             {dealerTabRoot ? (
               <View style={styles.backBtn} />
@@ -193,7 +195,7 @@ export function ProductListScreen({ navigation }: Props) {
               </TouchableOpacity>
             ) : null}
           </View>
-        </View>
+        </AppHeader>
 
         <View style={styles.searchSection}>
           <View style={styles.searchWrap}>
@@ -275,7 +277,7 @@ export function ProductListScreen({ navigation }: Props) {
                 product={item}
                 onView={() => navigation.navigate('ProductDetails', { productId: item.id })}
                 onEdit={
-                  can('products.edit')
+                  can('products.edit') && !isApprovedProductLocked(item.status)
                     ? () =>
                         navigation.navigate('AddProduct', {
                           mode: 'edit',
@@ -305,7 +307,7 @@ export function ProductListScreen({ navigation }: Props) {
           onClose={() => setShowSort(false)}
         />
       </View>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -393,16 +395,7 @@ function SortModal({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 3,
-    borderBottomColor: colors.accent,
-  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',

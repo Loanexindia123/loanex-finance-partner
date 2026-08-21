@@ -44,8 +44,8 @@ export function LoginScreen({ navigation }: Props) {
       if (user.mustChangePassword) {
         navigation.replace('ChangePassword', { forced: true });
       } else {
-        const { isDealer } = require('../../auth/rbacStore');
-        navigation.replace(isDealer() ? 'DealerTabs' : 'Dashboard');
+        const { homeRouteName } = require('../../auth/rbacStore');
+        navigation.replace(homeRouteName());
       }
     } catch (err: any) {
       setError(err.message || 'Invalid Credentials');

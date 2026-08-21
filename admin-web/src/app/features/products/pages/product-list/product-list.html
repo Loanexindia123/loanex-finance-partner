@@ -96,11 +96,13 @@
               <i class="pi pi-eye" aria-hidden="true"></i>
               View
             </button>
-            <button *appCan="'products.edit'" type="button" class="act act--edit" pTooltip="Edit product"
-              [tooltipOptions]="actionTooltip" (click)="edit(product)">
+            @if (canEditProduct(product)) {
+            <button type="button" class="act act--edit" pTooltip="Edit product" [tooltipOptions]="actionTooltip"
+              (click)="edit(product)">
               <i class="pi pi-pencil" aria-hidden="true"></i>
               Edit
             </button>
+            }
             @if (isPendingApproval(product) && canApproveProducts()) {
             <button *appCan="'products.edit'" type="button" class="act act--approve" pTooltip="Review EMI and approve"
               [tooltipOptions]="actionTooltip" (click)="view(product)">
@@ -163,9 +165,11 @@
       <button type="button" class="act act--view" (click)="view(product)">
         <i class="pi pi-eye" aria-hidden="true"></i> View
       </button>
-      <button *appCan="'products.edit'" type="button" class="act act--edit" (click)="edit(product)">
+      @if (canEditProduct(product)) {
+      <button type="button" class="act act--edit" (click)="edit(product)">
         <i class="pi pi-pencil" aria-hidden="true"></i> Edit
       </button>
+      }
       @if (isPendingApproval(product) && canApproveProducts()) {
       <button *appCan="'products.edit'" type="button" class="act act--approve" (click)="view(product)">
         <i class="pi pi-check" aria-hidden="true"></i> Review

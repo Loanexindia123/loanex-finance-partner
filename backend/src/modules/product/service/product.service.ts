@@ -21,6 +21,7 @@ import { loadUserContact } from '../../admin/employee/employee-hierarchy'; // NE
 import {
   applyEmployeeEmiCreateDefaults,
   assertCatalogEmiReadyForPublish,
+  isApprovedProductEditLocked,
   isRestrictedCatalogUser,
   restoreEmployeeEmiFromExisting,
   stripEmployeeDeliveryFromPayload,
@@ -715,6 +716,8 @@ export class ProductService {
     },
   ) {
     let allowedCreatorIds: Set<string> | undefined;
+    let dealerId: string | undefined;
+    let allowDealerIdMatch: boolean | undefined;
     // Customer catalog must never be scoped by employee hierarchy.
     if (!options?.forceCustomerVisible && options?.actorUserId) {
       const scope = await resolveProductCreatorScope(
@@ -723,6 +726,8 @@ export class ProductService {
       );
       if (!scope.orgWide) {
         allowedCreatorIds = scope.allowedCreatorIds;
+        dealerId = scope.dealerId;
+        allowDealerIdMatch = scope.allowDealerIdMatch;
       }
     }
 
@@ -730,6 +735,8 @@ export class ProductService {
       productRepository.list(query, {
         forceCustomerVisible: options?.forceCustomerVisible,
         allowedCreatorIds,
+        dealerId,
+        allowDealerIdMatch,
       }),
       productRepository.getDistinctFilters(),
     ]);
@@ -1023,6 +1030,16 @@ export class ProductService {
     }
     // Creator always from authenticated session — ignore client spoofing.
     mapped.creatorId = creatorId;
+    // Stamp parent dealerId for Dealer/Agent ownership tree (server-resolved).
+    try {
+      const { resolveFieldActor } = await import('../../admin/hierarchy/field-actor');
+      const field = await resolveFieldActor(creatorId);
+      if (field?.dealerId) {
+        mapped.dealerId = field.dealerId;
+      }
+    } catch {
+      /* non-fatal — creatorId scope still applies */
+    }
     if (actorIsRestricted) {
       applyEmployeeEmiCreateDefaults(mapped);
     }
@@ -1041,6 +1058,12 @@ export class ProductService {
 
     await this.assertStaffProductAccess(existing, actorUserId, true);
     const actorIsRestricted = isRestrictedCatalogUser(actorUserId);
+
+    // Approved (active) products are read-only for Employee / Dealer / Agent.
+    // Admin and Super Admin remain unrestricted. Do not alter approval flow.
+    if (isApprovedProductEditLocked(existing.status, actorIsRestricted)) {
+      throw new ForbiddenError('Approved products cannot be edited.');
+    }
 
     // Status-only updates (approve / reject) must not re-run the full wizard mapper.
     const providedKeys = Object.keys(data ?? {}).filter((key) => data[key] !== undefined);

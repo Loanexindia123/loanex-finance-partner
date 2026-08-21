@@ -7,9 +7,11 @@ import { PageHeader } from '../../../../shared/components/page-header/page-heade
 import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
 import { StatusBadge } from '../../../../shared/components/status-badge/status-badge';
 import { CanDirective } from '../../../../shared/directives/can.directive';
+import { RbacService } from '../../../../core/services/rbac.service';
 import { DealerService } from '../../services/dealer.service';
 import { Dealer } from '../../models/dealer.models';
 import { DialogModule } from 'primeng/dialog';
+import { TagModule } from 'primeng/tag';
 
 const AVATAR_TONES = [
   { bg: '#eef2ff', color: '#4338ca' },
@@ -83,7 +85,16 @@ const DOCUMENT_FIELDS: Array<{ key: keyof Dealer; label: string }> = [
 @Component({
   selector: 'app-dealer-view',
   standalone: true,
-  imports: [DatePipe, ButtonModule, DialogModule, PageHeader, BrandedLoader, StatusBadge, CanDirective],
+  imports: [
+    DatePipe,
+    ButtonModule,
+    DialogModule,
+    TagModule,
+    PageHeader,
+    BrandedLoader,
+    StatusBadge,
+    CanDirective,
+  ],
   templateUrl: './dealer-view.html',
   styleUrl: './dealer-view.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -92,6 +103,7 @@ export class DealerView {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly dealers = inject(DealerService);
+  private readonly rbac = inject(RbacService);
   private readonly messages = inject(MessageService);
 
   readonly loading = signal(true);
@@ -106,6 +118,14 @@ export class DealerView {
   readonly commercialFields = COMMERCIAL_FIELDS;
   readonly creatorFields = CREATOR_FIELDS;
   readonly documentFields = DOCUMENT_FIELDS;
+
+  readonly isApprovedLocked = computed(() =>
+    this.rbac.isApprovedFormLocked(this.dealer()?.formStatus),
+  );
+
+  readonly canEditRecord = computed(
+    () => this.rbac.can('masters.edit') && !this.isApprovedLocked(),
+  );
 
   readonly completion = computed(() => {
     const d = this.dealer();

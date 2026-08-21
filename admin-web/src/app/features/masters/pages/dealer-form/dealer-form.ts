@@ -25,6 +25,7 @@ import { MultiSelectModule } from 'primeng/multiselect';
 import { ButtonModule } from 'primeng/button';
 import { MessageService } from 'primeng/api';
 import { AuthService } from '../../../../core/services/auth.service';
+import { RbacService } from '../../../../core/services/rbac.service';
 import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
 import { DealerService } from '../../services/dealer.service';
 import { StaffUser, StaffUserService } from '../../services/staff-user.service';
@@ -108,6 +109,7 @@ export class DealerForm {
   private readonly dealers = inject(DealerService);
   private readonly staffUsers = inject(StaffUserService);
   private readonly auth = inject(AuthService);
+  private readonly rbac = inject(RbacService);
   private readonly products = inject(ProductService);
   private readonly wizard = inject(WizardOptionsService);
   private readonly messages = inject(MessageService);
@@ -216,6 +218,16 @@ export class DealerForm {
       this.loading.set(true);
       this.dealers.getById(this.dealerId).subscribe({
         next: (dealer) => {
+          if (this.rbac.isApprovedFormLocked(dealer.formStatus)) {
+            this.loading.set(false);
+            this.messages.add({
+              severity: 'warn',
+              summary: 'Dealer locked',
+              detail: 'This dealer has been approved and can no longer be edited.',
+            });
+            void this.router.navigate(['/masters/dealers', this.dealerId]);
+            return;
+          }
           this.form.patchValue({
             ...dealer,
             categoryDepartments: this.splitCategories(dealer.categoryDepartment),

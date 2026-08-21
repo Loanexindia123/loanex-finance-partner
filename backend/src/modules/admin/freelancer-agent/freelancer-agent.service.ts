@@ -14,9 +14,17 @@ import type {
 } from './freelancer-agent.validator';
 import {
   AGENT_ID_PLACEHOLDER,
+  AADHAAR_PATTERN,
+  ACCOUNT_NUMBER_PATTERN,
+  AGENT_TYPES,
   ApprovalHistoryEntry,
+  IFSC_PATTERN,
+  MOBILE_PATTERN,
+  PAN_PATTERN,
   PAYOUT_BASIS,
+  PINCODE_PATTERN,
   POLICY_VERSION,
+  WORK_MODES,
   bool,
   canEditFormStatus,
   canSubmitFormStatus,
@@ -35,10 +43,24 @@ import {
   str,
   stringList,
 } from './freelancer-agent.util';
+import { isDealerUserId, resolveIsDealerUserId } from '../dealer/dealer-account';
+import {
+  findLinkedAgentByUserId,
+  isAgentApproved,
+  isAgentUserId,
+  provisionAgentAccount,
+  resolveIsAgentUserId,
+} from './agent-account';
 import {
   canViewAgent,
+  filterAgentCreatedAgents,
+  filterDealerAgents,
   filterVisibleAgents,
+  isAgentOwnedAgent,
+  isDealerOwnedAgent,
+  resolveDealerIdForActor,
   resolveFreelancerViewer,
+  resolveParentDealerIdForAgent,
 } from './freelancer-agent-visibility';
 
 const COLLECTION = 'freelancer_agents';
@@ -64,8 +86,14 @@ export interface FreelancerAgentRecord {
   education: string;
   occupation: string;
   currentAddress: string;
+  city: string;
+  state: string;
   pincode: string;
   googleLocation: string;
+  /** Set server-side when a Dealer/Agent creates the agent. Empty for staff-created agents. */
+  dealerId: string;
+  /** Linked agent login user id. Set only by provisioner on approval. */
+  userId: string;
   preferredWorkArea: string;
   workMode: string;
   emergencyContactName: string;
@@ -194,8 +222,12 @@ function buildRecord(row: any): FreelancerAgentRecord {
     education: str(row.education),
     occupation: str(row.occupation),
     currentAddress: str(row.currentAddress),
+    city: str(row.city),
+    state: str(row.state),
     pincode: normalizePincode(row.pincode),
     googleLocation: str(row.googleLocation),
+    dealerId: str(row.dealerId),
+    userId: str(row.userId ?? row.user_id),
     preferredWorkArea: str(row.preferredWorkArea),
     workMode: str(row.workMode),
     emergencyContactName: str(row.emergencyContactName),
@@ -269,6 +301,7 @@ function bodyToPayload(
   | 'updatedAt'
   | 'status'
   | 'formStatus'
+  | 'userId'
 > {
   const aadhaarFront = str(body.aadhaarFront);
   const aadhaarBack = str(body.aadhaarBack);
@@ -288,8 +321,12 @@ function bodyToPayload(
     education: str(body.education),
     occupation: str(body.occupation),
     currentAddress: str(body.currentAddress),
+    city: str((body as { city?: string }).city),
+    state: str((body as { state?: string }).state),
     pincode: normalizePincode(body.pincode),
     googleLocation: str(body.googleLocation),
+    // Never trust client-provided dealerId; service overwrites for dealers.
+    dealerId: '',
     preferredWorkArea: str(body.preferredWorkArea),
     workMode: str(body.workMode),
     emergencyContactName: str(body.emergencyContactName),
@@ -320,6 +357,154 @@ function bodyToPayload(
     policyAcceptedAt: policyAccepted ? str(body.policyAcceptedAt) || nowIso() : '',
     policyVersion: policyAccepted ? str(body.policyVersion) || POLICY_VERSION : '',
   };
+}
+
+function assertDealerAgentFields(fields: {
+  fullName: string;
+  mobile: string;
+  whatsapp: string;
+  email: string;
+  gender: string;
+  dateOfBirth: string;
+  currentAddress: string;
+  pincode: string;
+  preferredWorkArea: string;
+  workMode: string;
+  emergencyContactMobile: string;
+  profilePhoto: string;
+  aadhaarFront: string;
+  aadhaarBack: string;
+  aadhaarNumber: string;
+  panCard: string;
+  panNumber: string;
+  cancelledCheque: string;
+  signature: string;
+  agentType: string;
+  preferredDepartments: string[];
+  allowedWork: string[];
+  accountNumber: string;
+  confirmAccountNumber: string;
+  ifscCode: string;
+  policyAccepted: boolean;
+}): void {
+  const requiredStrings: Array<[keyof typeof fields, string]> = [
+    ['fullName', 'Full Name'],
+    ['mobile', 'Mobile Number'],
+    ['dateOfBirth', 'Date of Birth'],
+    ['currentAddress', 'Current Address'],
+    ['pincode', 'Pincode'],
+    ['preferredWorkArea', 'Preferred Work Area'],
+    ['workMode', 'Work Mode'],
+    ['profilePhoto', 'Profile Photo'],
+    ['aadhaarFront', 'Aadhaar Front'],
+    ['aadhaarBack', 'Aadhaar Back'],
+    ['panCard', 'PAN Card'],
+    ['cancelledCheque', 'Cancelled Cheque'],
+    ['signature', 'Signature'],
+    ['agentType', 'Agent Type'],
+    ['accountNumber', 'Account Number'],
+    ['ifscCode', 'IFSC Code'],
+  ];
+  for (const [key, label] of requiredStrings) {
+    const value = fields[key];
+    if (typeof value !== 'string' || !value.trim()) {
+      throw new BadRequestError(`${label} is required`);
+    }
+  }
+  if (!fields.preferredDepartments.length) {
+    throw new BadRequestError('Preferred Department is required');
+  }
+  if (!fields.allowedWork.length) {
+    throw new BadRequestError('Allowed Work is required');
+  }
+  if (!fields.policyAccepted) {
+    throw new BadRequestError('Policy acceptance is required');
+  }
+  if (!MOBILE_PATTERN.test(fields.mobile)) {
+    throw new BadRequestError('Enter a valid 10-digit mobile number');
+  }
+  if (fields.whatsapp && !MOBILE_PATTERN.test(fields.whatsapp)) {
+    throw new BadRequestError('Enter a valid 10-digit WhatsApp number');
+  }
+  if (fields.emergencyContactMobile && !MOBILE_PATTERN.test(fields.emergencyContactMobile)) {
+    throw new BadRequestError('Enter a valid 10-digit emergency mobile number');
+  }
+  if (fields.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email)) {
+    throw new BadRequestError('Enter a valid email address');
+  }
+  if (!PINCODE_PATTERN.test(fields.pincode)) {
+    throw new BadRequestError('Enter a valid 6-digit Indian pincode');
+  }
+  if (!(WORK_MODES as readonly string[]).includes(fields.workMode)) {
+    throw new BadRequestError('Select a valid work mode');
+  }
+  if (!(AGENT_TYPES as readonly string[]).includes(fields.agentType)) {
+    throw new BadRequestError('Select a valid agent type');
+  }
+  if (fields.panNumber && !PAN_PATTERN.test(fields.panNumber)) {
+    throw new BadRequestError('Enter a valid PAN (e.g. ABCDE1234F)');
+  }
+  if (fields.aadhaarNumber && !AADHAAR_PATTERN.test(fields.aadhaarNumber)) {
+    throw new BadRequestError('Enter a valid 12-digit Aadhaar number');
+  }
+  if (!ACCOUNT_NUMBER_PATTERN.test(fields.accountNumber)) {
+    throw new BadRequestError('Account number must be 8–18 digits');
+  }
+  if (fields.confirmAccountNumber !== fields.accountNumber) {
+    throw new BadRequestError('Account number and confirmation must match');
+  }
+  if (!IFSC_PATTERN.test(fields.ifscCode)) {
+    throw new BadRequestError('Enter a valid IFSC code (e.g. SBIN0001234)');
+  }
+}
+
+type FieldAgentActorContext =
+  | { kind: 'dealer'; dealerId: string; agentId: string }
+  | { kind: 'agent'; dealerId: string; agentId: string };
+
+async function resolveFieldAgentActorContext(
+  actorUserId: string,
+): Promise<FieldAgentActorContext | null> {
+  if (await resolveIsAgentUserId(actorUserId)) {
+    const dealerId = await resolveParentDealerIdForAgent(actorUserId);
+    const linked = findLinkedAgentByUserId(actorUserId);
+    return { kind: 'agent', dealerId, agentId: str(linked?.id) };
+  }
+  if (await resolveIsDealerUserId(actorUserId)) {
+    const dealerId = await resolveDealerIdForActor(actorUserId);
+    // Allow dealer actor even if dealer profile link is temporarily missing —
+    // ownership still scopes by creatorId / createdById === actor.
+    return { kind: 'dealer', dealerId, agentId: '' };
+  }
+  return null;
+}
+
+async function assertCanAccessAgent(
+  all: FreelancerAgentRecord[],
+  record: FreelancerAgentRecord,
+  actorUserId: string,
+): Promise<void> {
+  const fieldCtx = await resolveFieldAgentActorContext(actorUserId);
+  if (fieldCtx?.kind === 'dealer') {
+    const owned = filterDealerAgents(all, fieldCtx.dealerId, actorUserId).some(
+      (row) => row.id === record.id,
+    );
+    if (!owned) {
+      throw new ForbiddenError('You do not have access to this agent');
+    }
+    return;
+  }
+  if (fieldCtx?.kind === 'agent') {
+    const owned = isAgentOwnedAgent(record, actorUserId, fieldCtx.agentId);
+    if (!owned) {
+      throw new ForbiddenError('You do not have access to this agent');
+    }
+    return;
+  }
+  const viewer = await resolveFreelancerViewer(actorUserId);
+  if (!canViewAgent(all, viewer, record.id)) {
+    throw new ForbiddenError('You do not have access to this freelancer record');
+  }
 }
 
 async function ensureReady(): Promise<void> {
@@ -412,9 +597,17 @@ function toPublicList(record: FreelancerAgentRecord) {
     agentIdIssued: Boolean(record.agentId && record.formStatus === 'approved'),
     fullName: record.fullName,
     mobile: record.mobile,
+    email: record.email,
+    gender: record.gender,
+    dateOfBirth: record.dateOfBirth,
+    city: record.city,
+    state: record.state,
+    pincode: record.pincode,
     creatorType: record.creatorType,
     creatorId: record.creatorId,
     creatorName: record.creatorName,
+    dealerId: record.dealerId,
+    userId: record.userId,
     agentType: record.agentType,
     assignedManager: record.assignedManager,
     assignedManagerId: record.assignedManagerId,
@@ -423,6 +616,7 @@ function toPublicList(record: FreelancerAgentRecord) {
     formStatus: record.formStatus,
     status: record.status,
     payoutBasis: record.payoutBasis,
+    profilePhoto: record.profilePhoto,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   };
@@ -444,11 +638,25 @@ export class FreelancerAgentService {
   async list(actorUserId: string) {
     await ensureReady();
     const all = loadAllRecords();
+    const fieldCtx = await resolveFieldAgentActorContext(actorUserId);
+    if (fieldCtx?.kind === 'dealer') {
+      return sortByUpdated(filterDealerAgents(all, fieldCtx.dealerId, actorUserId)).map(
+        toPublicList,
+      );
+    }
+    if (fieldCtx?.kind === 'agent') {
+      return sortByUpdated(
+        filterAgentCreatedAgents(all, actorUserId, fieldCtx.agentId),
+      ).map(toPublicList);
+    }
     const viewer = await resolveFreelancerViewer(actorUserId);
     return sortByUpdated(filterVisibleAgents(all, viewer)).map(toPublicList);
   }
 
   async listCreators(actorUserId: string, type?: string): Promise<FreelancerCreatorOption[]> {
+    if (await resolveIsDealerUserId(actorUserId) || await resolveIsAgentUserId(actorUserId)) {
+      throw new ForbiddenError('Dealers cannot list agent creators');
+    }
     const creatorType = str(type) || 'Employee';
     if (creatorType === 'Direct') return [];
 
@@ -491,15 +699,97 @@ export class FreelancerAgentService {
     if (!existing) throw new NotFoundError('Freelancer / growing partner record not found');
     const record = buildRecord(existing);
     const all = loadAllRecords();
-    const viewer = await resolveFreelancerViewer(actorUserId);
-    if (!canViewAgent(all, viewer, record.id)) {
-      throw new ForbiddenError('You do not have access to this freelancer record');
-    }
-    return toPublicDetail(record, canSeePayout);
+    await assertCanAccessAgent(all, record, actorUserId);
+    const dealerViewing = Boolean(await resolveFieldAgentActorContext(actorUserId));
+    return toPublicDetail(record, canSeePayout || dealerViewing);
   }
 
   async create(body: CreateFreelancerAgentBody, actor: ActorContext) {
     await ensureReady();
+    const fieldCtx = await resolveFieldAgentActorContext(actor.id);
+
+    if (fieldCtx) {
+      const payloadFields = bodyToPayload(body);
+      const confirmAccountNumber = normalizeAccount(
+        (body as { confirmAccountNumber?: string }).confirmAccountNumber ?? body.accountNumber,
+      );
+      // Same approval workflow as Admin Web — dealer/agent submits; admin approves / issues Agent ID.
+      const formStatus = str(body.formStatus) === 'pending_approval' ? 'pending_approval' : 'draft';
+      if (formStatus === 'pending_approval') {
+        assertDealerAgentFields({
+          fullName: payloadFields.fullName,
+          mobile: payloadFields.mobile,
+          whatsapp: payloadFields.whatsapp,
+          email: payloadFields.email,
+          gender: payloadFields.gender,
+          dateOfBirth: payloadFields.dateOfBirth,
+          currentAddress: payloadFields.currentAddress,
+          pincode: payloadFields.pincode,
+          preferredWorkArea: payloadFields.preferredWorkArea,
+          workMode: payloadFields.workMode,
+          emergencyContactMobile: payloadFields.emergencyContactMobile,
+          profilePhoto: payloadFields.profilePhoto,
+          aadhaarFront: payloadFields.aadhaarFront,
+          aadhaarBack: payloadFields.aadhaarBack,
+          aadhaarNumber: payloadFields.aadhaarNumber,
+          panCard: payloadFields.panCard,
+          panNumber: payloadFields.panNumber,
+          cancelledCheque: payloadFields.cancelledCheque,
+          signature: payloadFields.signature,
+          agentType: payloadFields.agentType,
+          preferredDepartments: payloadFields.preferredDepartments,
+          allowedWork: payloadFields.allowedWork,
+          accountNumber: payloadFields.accountNumber,
+          confirmAccountNumber,
+          ifscCode: payloadFields.ifscCode,
+          policyAccepted: payloadFields.policyAccepted,
+        });
+      }
+
+      const parentDealerId = fieldCtx.dealerId || '';
+      const record: FreelancerAgentRecord = {
+        id: str(body.id) || randomUUID(),
+        agentId: '',
+        ...payloadFields,
+        creatorType: 'Direct',
+        creatorId: actor.id,
+        creatorName: actor.name,
+        assignedManagerId: payloadFields.assignedManagerId || actor.id,
+        assignedManager: payloadFields.assignedManager || actor.name,
+        dealerId: parentDealerId,
+        userId: '',
+        status: 'inactive',
+        formStatus,
+        createdBy: actor.name,
+        createdById: actor.id,
+        updatedBy: actor.name,
+        updatedById: actor.id,
+        approvedBy: '',
+        approvedById: '',
+        approvedAt: '',
+        rejectedBy: '',
+        rejectedById: '',
+        rejectedAt: '',
+        rejectionReason: '',
+        approvalHistory: [
+          {
+            action: formStatus === 'pending_approval' ? 'submitted' : 'created',
+            byId: actor.id,
+            byName: actor.name,
+            at: nowIso(),
+            note: fieldCtx.kind === 'agent' ? 'Agent-created agent' : 'Dealer-created agent',
+          },
+        ],
+      };
+
+      if (jsonDb.findOne(COLLECTION, { id: record.id })) {
+        throw new ConflictError('Freelancer record id already exists');
+      }
+      assertNoDuplicates(record);
+      const created = jsonDb.insert(COLLECTION, record);
+      return toPublicDetail(buildRecord(created), true);
+    }
+
     const formStatus = str(body.formStatus) === 'pending_approval' ? 'pending_approval' : 'draft';
     if (formStatus === 'pending_approval' && !canSubmitFormStatus('draft')) {
       throw new BadRequestError('This record cannot be submitted for approval');
@@ -507,11 +797,23 @@ export class FreelancerAgentService {
 
     const payloadFields = bodyToPayload(body);
     const creator = resolveCreator(body, actor);
+    // Ownership always from session when client did not pick a referrer (Direct).
+    // Employee/Dealer Phase: creatorId = logged-in actor for visibility + dashboard.
+    const ownership =
+      creator.creatorType === 'Direct' || !creator.creatorId
+        ? {
+            creatorType: creator.creatorType === 'Direct' ? 'Employee' : creator.creatorType,
+            creatorId: actor.id,
+            creatorName: actor.name,
+          }
+        : creator;
     const record: FreelancerAgentRecord = {
       id: str(body.id) || randomUUID(),
       agentId: '',
       ...payloadFields,
-      ...creator,
+      ...ownership,
+      dealerId: '',
+      userId: '',
       status: 'inactive',
       formStatus,
       createdBy: actor.name,
@@ -556,10 +858,90 @@ export class FreelancerAgentService {
 
     const current = buildRecord(existing);
     const all = loadAllRecords();
-    const viewer = await resolveFreelancerViewer(actor.id);
-    if (!canViewAgent(all, viewer, current.id)) {
-      throw new ForbiddenError('You do not have access to this freelancer record');
+    await assertCanAccessAgent(all, current, actor.id);
+
+    const fieldCtx = await resolveFieldAgentActorContext(actor.id);
+    if (fieldCtx) {
+      if (!canEditFormStatus(current.formStatus)) {
+        throw new BadRequestError('Only draft or rejected records can be edited');
+      }
+
+      const payloadFields = bodyToPayload(body);
+      const confirmAccountNumber = normalizeAccount(
+        (body as { confirmAccountNumber?: string }).confirmAccountNumber ?? body.accountNumber,
+      );
+      const nextStatus = str(body.formStatus) === 'pending_approval' ? 'pending_approval' : 'draft';
+      if (nextStatus === 'pending_approval') {
+        assertDealerAgentFields({
+          fullName: payloadFields.fullName,
+          mobile: payloadFields.mobile,
+          whatsapp: payloadFields.whatsapp,
+          email: payloadFields.email,
+          gender: payloadFields.gender,
+          dateOfBirth: payloadFields.dateOfBirth,
+          currentAddress: payloadFields.currentAddress,
+          pincode: payloadFields.pincode,
+          preferredWorkArea: payloadFields.preferredWorkArea,
+          workMode: payloadFields.workMode,
+          emergencyContactMobile: payloadFields.emergencyContactMobile,
+          profilePhoto: payloadFields.profilePhoto,
+          aadhaarFront: payloadFields.aadhaarFront,
+          aadhaarBack: payloadFields.aadhaarBack,
+          aadhaarNumber: payloadFields.aadhaarNumber,
+          panCard: payloadFields.panCard,
+          panNumber: payloadFields.panNumber,
+          cancelledCheque: payloadFields.cancelledCheque,
+          signature: payloadFields.signature,
+          agentType: payloadFields.agentType,
+          preferredDepartments: payloadFields.preferredDepartments,
+          allowedWork: payloadFields.allowedWork,
+          accountNumber: payloadFields.accountNumber,
+          confirmAccountNumber,
+          ifscCode: payloadFields.ifscCode,
+          policyAccepted: payloadFields.policyAccepted,
+        });
+      }
+
+      const next: FreelancerAgentRecord = {
+        ...current,
+        ...payloadFields,
+        id: current.id,
+        agentId: '',
+        userId: current.userId,
+        creatorType: 'Direct',
+        creatorId: current.creatorId || actor.id,
+        creatorName: current.creatorName || actor.name,
+        assignedManagerId: payloadFields.assignedManagerId || current.assignedManagerId || actor.id,
+        assignedManager: payloadFields.assignedManager || current.assignedManager || actor.name,
+        dealerId: current.dealerId || fieldCtx.dealerId,
+        formStatus: nextStatus,
+        status: 'inactive',
+        createdBy: current.createdBy,
+        createdById: current.createdById,
+        updatedBy: actor.name,
+        updatedById: actor.id,
+        approvedBy: '',
+        approvedById: '',
+        approvedAt: '',
+        rejectedBy: nextStatus === 'draft' ? current.rejectedBy : '',
+        rejectedById: nextStatus === 'draft' ? current.rejectedById : '',
+        rejectedAt: nextStatus === 'draft' ? current.rejectedAt : '',
+        rejectionReason: nextStatus === 'draft' ? current.rejectionReason : '',
+        approvalHistory: appendHistory(current.approvalHistory, {
+          action: nextStatus === 'pending_approval' ? 'submitted' : 'draft_saved',
+          byId: actor.id,
+          byName: actor.name,
+          at: nowIso(),
+          note: fieldCtx.kind === 'agent' ? 'Agent update' : 'Dealer update',
+        }),
+      };
+
+      assertNoDuplicates(next, current.id);
+      const updated = jsonDb.update(COLLECTION, { id: trimmed }, next);
+      if (!updated) throw new NotFoundError('Freelancer / growing partner record not found');
+      return toPublicDetail(buildRecord(updated), true);
     }
+
     if (!canEditFormStatus(current.formStatus)) {
       throw new BadRequestError('Only draft or rejected records can be edited');
     }
@@ -574,6 +956,7 @@ export class FreelancerAgentService {
       ...creator,
       id: current.id,
       agentId: '',
+      dealerId: current.dealerId,
       formStatus: nextStatus,
       status: 'inactive',
       createdBy: current.createdBy,
@@ -606,6 +989,13 @@ export class FreelancerAgentService {
 
   async approve(id: string, actor: ActorContext) {
     await ensureReady();
+    if (isDealerUserId(actor.id) || isAgentUserId(actor.id)) {
+      throw new ForbiddenError('Dealers and Agents cannot approve agents');
+    }
+    const { isEmployeeRoleUser } = await import('../employee/employee-account');
+    if (isEmployeeRoleUser(actor.id)) {
+      throw new ForbiddenError('Only Admin can approve agents');
+    }
     const trimmed = str(id);
     if (!trimmed) throw new BadRequestError('Freelancer agent id is required');
     const existing = jsonDb.findOne(COLLECTION, { id: trimmed });
@@ -613,10 +1003,7 @@ export class FreelancerAgentService {
 
     const current = buildRecord(existing);
     const all = loadAllRecords();
-    const viewer = await resolveFreelancerViewer(actor.id);
-    if (!canViewAgent(all, viewer, current.id)) {
-      throw new ForbiddenError('You do not have access to this freelancer record');
-    }
+    await assertCanAccessAgent(all, current, actor.id);
     if (current.formStatus !== 'pending_approval') {
       throw new BadRequestError('Only records pending approval can be approved');
     }
@@ -624,7 +1011,7 @@ export class FreelancerAgentService {
     assertNoDuplicates(current, current.id);
 
     const agentId = uniqueAgentId(current.id);
-    const updated = jsonDb.update(COLLECTION, { id: trimmed }, {
+    const updated = await jsonDb.updateAwaited(COLLECTION, { id: trimmed }, {
       agentId,
       formStatus: 'approved',
       status: 'active',
@@ -646,11 +1033,26 @@ export class FreelancerAgentService {
       }),
     });
     if (!updated) throw new NotFoundError('Freelancer / growing partner record not found');
-    return toPublicDetail(buildRecord(updated), true);
+
+    // Provision Agent login (mirrors Dealer afterPersist).
+    let record = buildRecord(updated);
+    if (isAgentApproved(record)) {
+      const result = await provisionAgentAccount(record);
+      if (result?.userId && record.userId !== result.userId) {
+        const linked = await jsonDb.updateAwaited(COLLECTION, { id: record.id }, {
+          userId: result.userId,
+        });
+        record = linked ? buildRecord(linked) : { ...record, userId: result.userId };
+      }
+    }
+    return toPublicDetail(record, true);
   }
 
   async reject(id: string, body: RejectFreelancerAgentBody, actor: ActorContext) {
     await ensureReady();
+    if (isDealerUserId(actor.id) || isAgentUserId(actor.id)) {
+      throw new ForbiddenError('Dealers and Agents cannot reject agents');
+    }
     const trimmed = str(id);
     if (!trimmed) throw new BadRequestError('Freelancer agent id is required');
     const existing = jsonDb.findOne(COLLECTION, { id: trimmed });
@@ -658,10 +1060,7 @@ export class FreelancerAgentService {
 
     const current = buildRecord(existing);
     const all = loadAllRecords();
-    const viewer = await resolveFreelancerViewer(actor.id);
-    if (!canViewAgent(all, viewer, current.id)) {
-      throw new ForbiddenError('You do not have access to this freelancer record');
-    }
+    await assertCanAccessAgent(all, current, actor.id);
     if (current.formStatus !== 'pending_approval') {
       throw new BadRequestError('Only records pending approval can be rejected');
     }
@@ -698,11 +1097,23 @@ export class FreelancerAgentService {
 
     const current = buildRecord(existing);
     const all = loadAllRecords();
-    const viewer = await resolveFreelancerViewer(actorUserId);
-    if (!canViewAgent(all, viewer, current.id)) {
-      throw new ForbiddenError('You do not have access to this freelancer record');
-    }
-    if (current.formStatus === 'approved') {
+    await assertCanAccessAgent(all, current, actorUserId);
+
+    const fieldCtx = await resolveFieldAgentActorContext(actorUserId);
+    if (fieldCtx?.kind === 'dealer') {
+      // Dealers may delete any agent they own (draft / pending / approved).
+      if (!isDealerOwnedAgent(current, fieldCtx.dealerId, actorUserId)) {
+        throw new ForbiddenError('Dealers can only delete their own agents');
+      }
+    } else if (fieldCtx?.kind === 'agent') {
+      // Agents may delete only self-created draft/pending — not approved/protected.
+      if (!isAgentOwnedAgent(current, actorUserId, fieldCtx.agentId)) {
+        throw new ForbiddenError('Agents can only delete their own agents');
+      }
+      if (current.formStatus === 'approved') {
+        throw new ForbiddenError('Approved agents cannot be deleted');
+      }
+    } else if (current.formStatus === 'approved') {
       throw new BadRequestError('Approved freelancer / growing partner records cannot be deleted');
     }
 

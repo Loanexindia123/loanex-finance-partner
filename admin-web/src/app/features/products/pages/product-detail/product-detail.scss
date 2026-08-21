@@ -132,6 +132,13 @@
   line-height: 1.55;
 }
 
+.summary__lock-hint {
+  margin: 0.5rem 0 0;
+  color: var(--admin-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
 .summary__actions {
   display: flex;
   flex-wrap: wrap;

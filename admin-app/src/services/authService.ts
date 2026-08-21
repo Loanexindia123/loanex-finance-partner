@@ -6,12 +6,13 @@ export interface User {
   id: string;
   phone: string;
   email?: string;
-  role: 'customer' | 'admin' | 'dealer';
+  role: 'customer' | 'admin' | 'dealer' | 'agent';
   roleId?: string | null;
   roleName?: string | null;
   permissions?: string[];
   mustChangePassword?: boolean;
   dealerId?: string;
+  agentId?: string;
   created_at: string;
   updated_at: string;
 }
@@ -22,16 +23,25 @@ function isDealerPayload(raw: any): boolean {
   return roleName === 'dealer' || role === 'dealer';
 }
 
+function isAgentPayload(raw: any): boolean {
+  const roleName = String(raw?.roleName ?? '').trim().toLowerCase();
+  const role = String(raw?.role ?? '').trim().toLowerCase();
+  return roleName === 'agent' || role === 'agent';
+}
+
 function normalizeUser(raw: any, stored?: User | null): User {
   const permissions = Array.isArray(raw?.permissions)
     ? raw.permissions
     : stored?.permissions ?? [];
   const dealer = isDealerPayload(raw) || isDealerPayload(stored);
-  const role: User['role'] = dealer
-    ? 'dealer'
-    : raw?.role === 'customer' || raw?.role === 'admin'
-      ? raw.role
-      : stored?.role ?? 'admin';
+  const agent = isAgentPayload(raw) || isAgentPayload(stored);
+  const role: User['role'] = agent
+    ? 'agent'
+    : dealer
+      ? 'dealer'
+      : raw?.role === 'customer' || raw?.role === 'admin'
+        ? raw.role
+        : stored?.role ?? 'admin';
 
   return {
     id: String(raw?.id ?? stored?.id ?? ''),
@@ -39,12 +49,16 @@ function normalizeUser(raw: any, stored?: User | null): User {
     email: raw?.email ?? stored?.email,
     role,
     roleId: raw?.roleId ?? stored?.roleId ?? null,
-    roleName: raw?.roleName ?? stored?.roleName ?? (dealer ? 'Dealer' : null),
+    roleName:
+      raw?.roleName ??
+      stored?.roleName ??
+      (agent ? 'Agent' : dealer ? 'Dealer' : null),
     permissions,
     mustChangePassword: Boolean(
       raw?.mustChangePassword ?? raw?.mustChangePassword ?? stored?.mustChangePassword,
     ),
     dealerId: raw?.dealerId != null ? String(raw.dealerId) : stored?.dealerId,
+    agentId: raw?.agentId != null ? String(raw.agentId) : stored?.agentId,
     created_at: String(
       raw?.created_at ?? raw?.createdAt ?? stored?.created_at ?? new Date().toISOString(),
     ),
@@ -141,17 +155,37 @@ export const loginAsDealer = async (identifier: string, password: string): Promi
   return normalized;
 };
 
+export const loginAsAgent = async (identifier: string, password: string): Promise<User> => {
+  const response = await api.post('/auth/agent-login', { identifier, password });
+  const payload = response.data?.data ?? {};
+  const accessToken = payload.accessToken ?? payload.token;
+  if (!accessToken) {
+    throw new Error('Agent login did not return an access token.');
+  }
+  const normalized = normalizeUser(payload.user ?? {});
+  if (normalized.role !== 'agent') {
+    throw new Error('Access Denied: This login is for agent accounts only.');
+  }
+  await persistSession(accessToken, normalized, payload.refreshToken);
+  return normalized;
+};
+
 /**
- * Unified staff/dealer login for the existing admin-app.
- * Admin/Employee use admin-login; Dealer falls back to dealer-login on 403.
+ * Unified staff/dealer/agent login for the existing admin-app.
+ * Admin/Employee use admin-login; Dealer then Agent fall back on 403.
  */
 export const loginAsStaff = async (identifier: string, password: string): Promise<User> => {
   try {
     return await loginAsAdmin(identifier, password);
   } catch (err: any) {
-    if (err?.status === 403) {
+    if (err?.status !== 403) throw err;
+    try {
       return await loginAsDealer(identifier, password);
+    } catch (dealerErr: any) {
+      if (dealerErr?.status === 403 || dealerErr?.status === 401) {
+        return await loginAsAgent(identifier, password);
+      }
+      throw dealerErr;
     }
-    throw err;
   }
 };

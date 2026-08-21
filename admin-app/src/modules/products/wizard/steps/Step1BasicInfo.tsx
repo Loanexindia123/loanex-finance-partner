@@ -22,7 +22,7 @@ import { parseAboutThisItemText } from '../../utils/parse-about-this-item';
 import { parseBoxContentsText } from '../../utils/parse-box-contents';
 import { createEmptySupplier, TextListItem } from '../../types/product';
 import { normalizeTextListItems } from '../../utils/normalizeWizardLists';
-import { useRbac, isDealer } from '../../../../auth/rbacStore';
+import { useRbac, isFieldActor } from '../../../../auth/rbacStore';
 import { colors } from '../../../../theme/colors';
 import { radius, spacing } from '../../../../theme/spacing';
 
@@ -43,7 +43,7 @@ function fromTextList(items: TextListItem[]): string[] {
 export function Step1BasicInfo() {
   const { formData, updateForm } = useWizard();
   useRbac();
-  const dealerMode = isDealer();
+  const dealerMode = isFieldActor();
   const options = useOptionsRegistry();
   const {
     productTypes,

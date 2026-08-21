@@ -1,5 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { radius, shadow, spacing } from '../../theme/spacing';
 
@@ -9,8 +10,14 @@ interface FABProps {
 }
 
 export function FloatingActionButton({ onPress, label = 'Add Product' }: FABProps) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <TouchableOpacity style={[styles.fab, shadow.lg]} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity
+      style={[styles.fab, shadow.lg, { bottom: spacing.xxxl + Math.max(insets.bottom, 0) }]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
       <Text style={styles.icon}>+</Text>
       <Text style={styles.label}>{label}</Text>
     </TouchableOpacity>
@@ -20,7 +27,6 @@ export function FloatingActionButton({ onPress, label = 'Add Product' }: FABProp
 const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
-    bottom: spacing.xxxl,
     right: spacing.xxl,
     flexDirection: 'row',
     alignItems: 'center',

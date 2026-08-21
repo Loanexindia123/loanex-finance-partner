@@ -1,5 +1,9 @@
 import { Routes } from '@angular/router';
 import { permissionGuard } from '../../core/guards/permission.guard';
+import { denyRolesGuard } from '../../core/guards/deny-roles.guard';
+
+/** Logistics / storefront masters — Admin only (hidden from Employee portal). */
+const adminOnlyMasters = [denyRolesGuard(['employee', 'dealer', 'agent'], '/masters')];
 
 export const MASTERS_ROUTES: Routes = [
   {
@@ -28,24 +32,28 @@ export const MASTERS_ROUTES: Routes = [
   },
   {
     path: 'delivery-partners',
+    canActivate: adminOnlyMasters,
     loadComponent: () =>
       import('./pages/delivery-partner-list/delivery-partner-list').then((m) => m.DeliveryPartnerList),
     data: { title: 'Delivery Partners' },
   },
   {
     path: 'warehouses',
+    canActivate: adminOnlyMasters,
     loadComponent: () =>
       import('./pages/warehouse-list/warehouse-list').then((m) => m.WarehouseList),
     data: { title: 'Warehouses' },
   },
   {
     path: 'delivery-zones',
+    canActivate: adminOnlyMasters,
     loadComponent: () =>
       import('./pages/delivery-zone-list/delivery-zone-list').then((m) => m.DeliveryZoneList),
     data: { title: 'Delivery Zones' },
   },
   {
     path: 'banners',
+    canActivate: adminOnlyMasters,
     loadComponent: () =>
       import('./pages/banner-list/banner-list').then((m) => m.BannerList),
     data: { title: 'Banners' },

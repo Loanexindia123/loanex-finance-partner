@@ -1,5 +1,6 @@
 import React, { useMemo, useSyncExternalStore } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
   getUnreadCount,
@@ -22,6 +23,7 @@ export function DashboardAppBar({
   onNotificationsPress,
 }: DashboardAppBarProps) {
   const colors = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const unreadCount = useSyncExternalStore(
     subscribeNotifications,
@@ -35,7 +37,7 @@ export function DashboardAppBar({
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + spacing.md }]}>
       <View style={styles.left}>
         <Image source={logoSource} style={styles.logo} resizeMode="contain" />
         <View style={styles.welcomeBlock}>
@@ -75,7 +77,7 @@ function createStyles(colors: ReturnType<typeof useTheme>) {
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
+      paddingBottom: spacing.md,
       backgroundColor: colors.surface,
       borderBottomWidth: 3,
       borderBottomColor: colors.goldLine,

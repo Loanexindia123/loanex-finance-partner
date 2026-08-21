@@ -1,21 +1,23 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Colors, Fonts, Spacing, Radius, Shadow } from '../../constants/theme';
 import { Product } from '../../types';
 import { APP_CONFIG } from '../../constants/config';
+import { AppImage } from '../ui/AppImage';
+import { withMediaSize } from '../../utils/mediaUrl';
 
 export const ProductCard = memo(({ product, horizontal }: { product: Product; horizontal?: boolean }) => {
   const router = useRouter();
   const disc = Math.round((1 - product.price / product.originalPrice) * 100);
+  const imageUri = withMediaSize(product.image, 'card');
   return (
     <Pressable
       onPress={() => router.push(`/product/${product.id}`)}
       style={({ pressed }) => [styles.card, horizontal ? styles.cardH : styles.cardV, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
     >
       <View style={horizontal ? styles.imgH : styles.imgV}>
-        <Image source={{ uri: product.image }} style={styles.img} contentFit="cover" transition={200} />
+        <AppImage uri={imageUri} style={styles.img} contentFit="cover" transition={200} />
         {disc > 0 && <View style={styles.discBadge}><Text style={styles.discText}>{disc}% OFF</Text></View>}
         {product.emiAvailable && <View style={styles.emiBadge}><Text style={styles.emiText}>EMI</Text></View>}
       </View>

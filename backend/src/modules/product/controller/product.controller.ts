@@ -5,6 +5,7 @@ import type { AuthenticatedRequest } from '../../../common/middleware/authentica
 import { ForbiddenError, UnauthorizedError } from '../../../common/errors/app-error';
 import { rolesService } from '../../rbac/roles.service';
 import { resolveIsDealerUserId } from '../../admin/dealer/dealer-account';
+import { resolveIsAgentUserId } from '../../admin/freelancer-agent/agent-account';
 import { jsonDb } from '../../../config/json-db';
 
 import type {
@@ -16,7 +17,7 @@ import type {
 
 import { productService } from '../service/product.service';
 import { storeProductImage, streamProductImage } from '../service/product-image.service';
-import { isDealerUser, isEmployeeUser, isRestrictedCatalogUser } from '../utils/product-emi';
+import { isAgentUser, isDealerUser, isEmployeeUser, isRestrictedCatalogUser } from '../utils/product-emi';
 
 async function resolveIsEmployeeUserId(userId: string): Promise<boolean> {
   if (isEmployeeUser(userId)) return true;
@@ -38,7 +39,11 @@ async function resolveIsEmployeeUserId(userId: string): Promise<boolean> {
 async function canViewHiddenProducts(req: AuthenticatedRequest): Promise<boolean> {
   const userId = req.user?.sub;
   if (!userId) return false;
-  if ((await resolveIsDealerUserId(userId)) || (await resolveIsEmployeeUserId(userId))) {
+  if (
+    (await resolveIsDealerUserId(userId)) ||
+    (await resolveIsAgentUserId(userId)) ||
+    (await resolveIsEmployeeUserId(userId))
+  ) {
     return true;
   }
   try {
@@ -62,7 +67,7 @@ function assertOptionalAuth(req: AuthenticatedRequest): void {
   }
 }
 
-/** Employees and Dealers may save for approval but cannot publish/approve products. */
+/** Employees, Dealers, and Agents may save for approval but cannot publish/approve products. */
 function assertEmployeeCannotPublish(userId: string | undefined, status: unknown): void {
   if (!userId) return;
   const next = String(status ?? '').trim().toLowerCase();
@@ -153,6 +158,7 @@ export class ProductController {
     const permissions = await rolesService.resolveUserPermissions(userId);
     const canUpload =
       isDealerUser(userId) ||
+      isAgentUser(userId) ||
       permissions.some(
         (p) =>
           p === 'products.create' ||
@@ -170,7 +176,8 @@ export class ProductController {
 
   streamImage = async (req: AuthenticatedRequest, res: Response) => {
     const { imageId } = req.validatedParams as ProductImageIdParam;
-    await streamProductImage(imageId, res);
+    // Optional ?w=200|400|800 — cached WebP variant; originals unchanged.
+    await streamProductImage(imageId, res, req.query?.w);
   };
 }
 

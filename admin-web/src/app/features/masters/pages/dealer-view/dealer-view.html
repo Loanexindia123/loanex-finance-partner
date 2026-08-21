@@ -8,10 +8,9 @@
     [text]="true"
     (click)="back()"
   ></button>
-  @if (dealer()) {
+  @if (dealer() && canEditRecord()) {
     <button
       actions
-      *appCan="'masters.edit'"
       pButton
       type="button"
       icon="pi pi-pencil"
@@ -39,7 +38,11 @@
           <div class="hero__badges">
             <span class="status-chip">
               <span class="status-chip__label">Form</span>
-              <app-status-badge [status]="d.formStatus || 'draft'" />
+              @if (isApprovedLocked()) {
+                <p-tag value="Approved (Locked)" severity="success" />
+              } @else {
+                <app-status-badge [status]="d.formStatus || 'draft'" />
+              }
             </span>
                         <span class="status-chip">
               <span class="status-chip__label">Verification</span>
@@ -81,6 +84,9 @@
             </span>
           </div>
           <h2>{{ d.dealerName }}</h2>
+          @if (isApprovedLocked()) {
+            <p class="hero__lock-hint">This dealer has been approved and can no longer be edited.</p>
+          }
           <p class="hero__contact">
             @if (d.mobile) {
               {{ d.mobile }}
@@ -104,8 +110,11 @@
           } @else {
             <p class="hero__owner hero__owner--missing">
               <i class="pi pi-info-circle" aria-hidden="true"></i>
-              Owner name not set —
-              <button type="button" class="link-btn" *appCan="'masters.edit'" (click)="edit()">complete profile</button>
+              Owner name not set
+              @if (canEditRecord()) {
+                —
+                <button type="button" class="link-btn" (click)="edit()">complete profile</button>
+              }
             </p>
           }
         </div>
