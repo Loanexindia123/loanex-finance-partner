@@ -74,7 +74,7 @@
         </div>
         <div class="field">
           <label>Dealer Code</label>
-          <input pInputText formControlName="dealerCode" placeholder="Auto-generated if left blank" />
+          <input pInputText formControlName="dealerCode" placeholder="Assigned automatically once approved" [readOnly]="true" />
           <span class="field-hint">Used on Product Dealer selection. Leave blank to auto-generate.</span>
         </div>
         <div class="field">
@@ -379,7 +379,7 @@
             [showClear]="true"
           />
         </div>
-        <div class="field" [class.field--invalid]="isInvalid('verificationStatus')">
+        <!-- <div class="field" [class.field--invalid]="isInvalid('verificationStatus')">
           <label>Verification Status *</label>
           <p-select
             formControlName="verificationStatus"
@@ -390,7 +390,7 @@
             styleClass="dealer-select"
             panelStyleClass="catalog-filter-panel"
           />
-        </div>
+        </div> -->
         <div class="field">
           <label>Dealer Agreement</label>
           <label

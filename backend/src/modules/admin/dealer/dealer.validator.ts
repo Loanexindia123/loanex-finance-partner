@@ -13,7 +13,7 @@ const dealerCoreSchema = z.object({
   creatorType: optionalString,
   creatorId: optionalString,
   creatorName: optionalString,
-  dealerCode: nonEmpty('Dealer Code'),
+  dealerCode: optionalString,
   dealerName: nonEmpty('Dealer Name'),
   ownerName: optionalString,
   businessType: optionalString,

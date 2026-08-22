@@ -60,30 +60,29 @@ const SUBMIT_REQUIRED_FIELDS: ReadonlyArray<{
   label: string;
   array?: boolean;
 }> = [
-  { key: 'creatorType', label: 'Creator Type' },
-  { key: 'creatorName', label: 'Search Creator' },
-  { key: 'dealerName', label: 'Dealer Name' },
-  { key: 'ownerName', label: 'Owner Name' },
-  { key: 'businessType', label: 'Business Type' },
-  { key: 'mobile', label: 'Mobile Number' },
-  { key: 'dealerType', label: 'Dealer Type' },
-  { key: 'categoryDepartments', label: 'Category / Department', array: true },
-  { key: 'shopAddress', label: 'Complete Shop Address' },
-  { key: 'pincode', label: 'Pincode' },
-  { key: 'googleLocation', label: 'Google Location' },
-  { key: 'deliveryArea', label: 'Delivery Area' },
-  { key: 'panCard', label: 'PAN Card' },
-  { key: 'shopAddressProof', label: 'Shop Address Proof' },
-  { key: 'cancelledCheque', label: 'Cancelled Cheque' },
-  { key: 'shopPhotos', label: 'Shop Photos' },
-  { key: 'accountHolderName', label: 'Account Holder Name' },
-  { key: 'accountNumber', label: 'Account Number' },
-  { key: 'ifscCode', label: 'IFSC Code' },
-  { key: 'paymentCycle', label: 'Payment Cycle' },
-  { key: 'productDeliveryBy', label: 'Product Delivery By' },
-  { key: 'assignedB2BManager', label: 'Assigned B2B Manager' },
-  { key: 'verificationStatus', label: 'Verification Status' },
-];
+    { key: 'creatorType', label: 'Creator Type' },
+    { key: 'creatorName', label: 'Search Creator' },
+    { key: 'dealerName', label: 'Dealer Name' },
+    { key: 'ownerName', label: 'Owner Name' },
+    { key: 'businessType', label: 'Business Type' },
+    { key: 'mobile', label: 'Mobile Number' },
+    { key: 'dealerType', label: 'Dealer Type' },
+    { key: 'categoryDepartments', label: 'Category / Department', array: true },
+    { key: 'shopAddress', label: 'Complete Shop Address' },
+    { key: 'pincode', label: 'Pincode' },
+    { key: 'googleLocation', label: 'Google Location' },
+    { key: 'deliveryArea', label: 'Delivery Area' },
+    { key: 'panCard', label: 'PAN Card' },
+    { key: 'shopAddressProof', label: 'Shop Address Proof' },
+    { key: 'cancelledCheque', label: 'Cancelled Cheque' },
+    { key: 'shopPhotos', label: 'Shop Photos' },
+    { key: 'accountHolderName', label: 'Account Holder Name' },
+    { key: 'accountNumber', label: 'Account Number' },
+    { key: 'ifscCode', label: 'IFSC Code' },
+    { key: 'paymentCycle', label: 'Payment Cycle' },
+    { key: 'productDeliveryBy', label: 'Product Delivery By' },
+    { key: 'assignedB2BManager', label: 'Assigned B2B Manager' },
+  ];
 
 @Component({
   selector: 'app-dealer-form',
@@ -453,8 +452,7 @@ export class DealerForm {
 
     const raw = this.form.getRawValue();
     const dealerName = String(raw.dealerName).trim();
-    const dealerCode =
-      String(raw.dealerCode ?? '').trim() || this.generateDealerCode(dealerName);
+    const dealerCode = String(raw.dealerCode ?? '').trim();
     const categoryDepartment = this.joinCategories(raw.categoryDepartments);
     const payload: DealerPayload = this.toPayload(raw, {
       dealerName,

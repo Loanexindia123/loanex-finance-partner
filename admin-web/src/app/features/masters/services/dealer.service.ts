@@ -41,10 +41,17 @@ export class DealerService {
       .pipe(unwrapApi());
   }
 
-    updateVerificationStatus(dealer: Dealer, status: 'approved' | 'rejected'): Observable<Dealer> {
+  updateVerificationStatus(dealer: Dealer, status: 'approved' | 'rejected'): Observable<Dealer> {
     const payload: DealerPayload = { ...dealer, verificationStatus: status };
     return this.update(dealer.id, payload);
   }
+
+  approve(id: string): Observable<Dealer> {
+    return this.http
+      .post<ApiEnvelope<unknown>>(apiUrl(`/admin/dealers/${id}/approve`), {})
+      .pipe(unwrapApi(), map((raw) => normalizeDealer(raw)));
+  }
+
 }
 
 function unwrapDealerList(raw: unknown): Dealer[] {

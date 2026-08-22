@@ -193,13 +193,16 @@ export class DealerView {
     this.verificationConfirmTarget.set(null);
   }
 
-  confirmUpdateVerification(): void {
+    confirmUpdateVerification(): void {
     const status = this.verificationConfirmTarget();
     const d = this.dealer();
     if (!status || !d || this.savingVerification()) return;
 
     this.savingVerification.set(true);
-    this.dealers.updateVerificationStatus(d, status).subscribe({
+    const request$ =
+      status === 'approved' ? this.dealers.approve(d.id) : this.dealers.updateVerificationStatus(d, status);
+
+    request$.subscribe({
       next: (updated) => {
         this.savingVerification.set(false);
         this.verificationConfirmTarget.set(null);

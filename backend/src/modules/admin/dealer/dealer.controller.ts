@@ -30,6 +30,12 @@ export class DealerController {
     return sendSuccess(res, data, 'Dealer fetched');
   };
 
+  approve = async (req: Request, res: Response) => {
+    const data = await dealerService.approve(String(req.params.id ?? ''), actorId(req));
+    return sendSuccess(res, data, 'Dealer approved');
+  };
+
+
   create = async (req: Request, res: Response) => {
     const data = await dealerService.create(req.body as CreateDealerBody, actorId(req));
     return sendSuccess(res, data, 'Dealer created', 201);

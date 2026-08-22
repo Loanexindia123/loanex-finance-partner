@@ -9,6 +9,7 @@ import { jsonDb } from '../../../config/json-db';
 import { hasOrgWideEmployeeAccess } from '../employee/employee-hierarchy';
 import type { CreateDealerBody, UpdateDealerBody } from './dealer.validator';
 import { isDealerApproved, isDealerAuthUser, provisionDealerAccount } from './dealer-account';
+import { generateDealerCode } from './dealer.util';
 
 const COLLECTION = 'dealers';
 
@@ -135,8 +136,8 @@ function buildRecord(row: any): DealerRecord {
     assignedB2BManager: String(row.assignedB2BManager ?? '').trim(),
     verificationStatus:
       verificationStatus === 'approved' ||
-      verificationStatus === 'rejected' ||
-      verificationStatus === 'hold'
+        verificationStatus === 'rejected' ||
+        verificationStatus === 'hold'
         ? verificationStatus
         : 'pending',
     dealerAgreement: String(row.dealerAgreement ?? '').trim(),
@@ -146,9 +147,9 @@ function buildRecord(row: any): DealerRecord {
     status: row.status === 'inactive' ? 'inactive' : 'active',
     formStatus:
       formStatus === 'pending' ||
-      formStatus === 'approved' ||
-      formStatus === 'rejected' ||
-      formStatus === 'hold'
+        formStatus === 'approved' ||
+        formStatus === 'rejected' ||
+        formStatus === 'hold'
         ? formStatus
         : 'draft',
     dealer_address: shopAddress,
@@ -184,7 +185,7 @@ function bodyToPayload(body: CreateDealerBody | UpdateDealerBody): Omit<DealerRe
 
   return {
     name: body.name?.trim() || dealerName,
-    dealerCode: body.dealerCode.trim(),
+    dealerCode: body.dealerCode?.trim() || '',
     dealerName,
     ownerName: body.ownerName?.trim() || '',
     businessType: body.businessType?.trim() || '',
@@ -332,13 +333,51 @@ export class DealerService {
     return record;
   }
 
+  async approve(id: string, actorUserId: string): Promise<DealerRecord> {
+    await ensureReady();
+    const trimmed = String(id ?? '').trim();
+    if (!trimmed) {
+      throw new BadRequestError('Dealer id is required');
+    }
+    const existing = jsonDb.findOne(COLLECTION, { id: trimmed });
+    if (!existing) {
+      throw new NotFoundError('Dealer not found');
+    }
+
+    const current = buildRecord(existing);
+    assertCanAccess(current, resolveActor(actorUserId));
+
+    if (current.verificationStatus !== 'pending') {
+      throw new BadRequestError('Only dealers pending verification can be approved');
+    }
+
+    let dealerCode = current.dealerCode;
+    if (!dealerCode) {
+      for (let i = 0; i < 12; i += 1) {
+        const candidate = generateDealerCode();
+        if (!findDuplicateCode(candidate)) {
+          dealerCode = candidate;
+          break;
+        }
+      }
+    }
+
+    const updated = jsonDb.update(COLLECTION, { id: trimmed }, {
+      dealerCode,
+      verificationStatus: 'approved',
+      formStatus: 'approved',
+    });
+    if (!updated) throw new NotFoundError('Dealer not found');
+    return this.afterPersist(buildRecord(updated));
+  }
+
   async create(body: CreateDealerBody, actorUserId: string): Promise<DealerRecord> {
     await ensureReady();
     const actorUser = jsonDb.findOne('users', { id: actorUserId }) as any;
     if (isDealerAuthUser(actorUser)) {
       throw new ForbiddenError('Dealers cannot create dealer accounts');
     }
-    if (findDuplicateCode(body.dealerCode)) {
+    if (body.dealerCode && findDuplicateCode(body.dealerCode)) {
       throw new ConflictError('Dealer Code already exists');
     }
 

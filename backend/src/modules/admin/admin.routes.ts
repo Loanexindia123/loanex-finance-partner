@@ -249,6 +249,12 @@ adminRouter.get(
   requirePermission('masters.view'),
   asyncHandler(dealerController.getById),
 );
+
+adminRouter.post(
+  '/dealers/:id/approve',
+  requirePermission('masters.edit'),
+  asyncHandler(dealerController.approve),
+);
 adminRouter.put(
   '/dealers/:id',
   requirePermission('masters.edit'),
