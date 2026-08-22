@@ -32,7 +32,7 @@ import { ConfirmationService, MessageService } from 'primeng/api';
 import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
 import { isStoredImageRef, resolveMediaUrl } from '../../../../core/config/api.config';
-import { AuthService } from '../../../../core/services/auth.service';
+import { RbacService } from '../../../../core/services/rbac.service';
 import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
 import { ManageableSelect } from '../../components/manageable-select/manageable-select';
 import { ProductService } from '../../services/product.service';
@@ -130,7 +130,7 @@ export class ProductForm {
   readonly options = inject(WizardOptionsService);
   private readonly dealerService = inject(DealerService);
   private readonly staffUsers = inject(StaffUserService);
-  private readonly auth = inject(AuthService);
+  private readonly rbac = inject(RbacService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly messages = inject(MessageService);
@@ -144,12 +144,9 @@ export class ProductForm {
   readonly deliveryStepIndex = 5;
   readonly activeStep = signal(0);
   readonly currentStep = computed(() => this.stepMeta[this.activeStep()]);
-  readonly isEmployee = computed(
-    () =>
-      String(this.auth.user()?.roleName ?? '')
-        .trim()
-        .toLowerCase() === 'employee',
-  );
+  readonly isEmployee = this.rbac.isEmployee;
+  /** Employee / Dealer / Agent share approved-product edit lock. */
+  readonly isRestrictedCatalogUser = this.rbac.isRestrictedCatalogUser;
   /** Same gate as EMI — Employee (and Dealer on admin-app) must not configure delivery. */
   readonly hideEmiStep = computed(() => this.isEmployee());
   readonly seoStepIndex = 7;
@@ -157,11 +154,7 @@ export class ProductForm {
   readonly visibleStepMeta = computed(() =>
     this.stepMeta
       .map((step, index) => ({ ...step, index }))
-      .filter(
-        (step) =>
-          !(this.hideEmiStep() && step.index === this.emiStepIndex) &&
-          !(this.hideSeoStep() && step.index === this.seoStepIndex),
-      ),
+      .filter((step) => !this.isHiddenWizardStep(step.index)),
   );
   readonly showPublishButton = computed(() => this.isEdit && !this.isEmployee());
   readonly showSaveForApproval = computed(() => {
@@ -550,6 +543,19 @@ export class ProductForm {
     if (this.productId) {
       this.products.getById(this.productId).subscribe({
         next: (product) => {
+          const status = String(product.status ?? '')
+            .trim()
+            .toLowerCase();
+          if (this.isRestrictedCatalogUser() && status === 'active') {
+            this.loading.set(false);
+            this.messages.add({
+              severity: 'warn',
+              summary: 'Product locked',
+              detail: 'This product has been approved and can no longer be edited.',
+            });
+            void this.router.navigate(['/products', this.productId, 'view']);
+            return;
+          }
           this.patchFromProduct(product);
           this.loading.set(false);
         },
@@ -2549,28 +2555,30 @@ export class ProductForm {
     return fallbackName || raw;
   }
 
-    goToStep(index: number): void {
-    if (this.hideEmiStep() && index === this.emiStepIndex) return;
-    if (this.hideSeoStep() && index === this.seoStepIndex) return;
+  goToStep(index: number): void {
+    if (this.isHiddenWizardStep(index)) return;
     this.activeStep.set(index);
   }
   next(): void {
     this.activeStep.update((i) => {
-      let next = Math.min(i + 1, this.steps.length - 1);
-      if (this.hideEmiStep() && next === this.emiStepIndex) next += 1;
-      if (this.hideSeoStep() && next === this.seoStepIndex) next += 1;
+      let next = i + 1;
+      while (next < this.steps.length && this.isHiddenWizardStep(next)) {
+        next += 1;
+      }
       return Math.min(next, this.steps.length - 1);
     });
   }
   back(): void {
     this.activeStep.update((i) => {
-      let prev = Math.max(i - 1, 0);
-      if (this.hideEmiStep() && prev === this.emiStepIndex) prev -= 1;
-      if (this.hideSeoStep() && prev === this.seoStepIndex) prev -= 1;
+      let prev = i - 1;
+      while (prev >= 0 && this.isHiddenWizardStep(prev)) {
+        prev -= 1;
+      }
       return Math.max(prev, 0);
     });
   }
-  
+
+
   backToList(): void {
     this.router.navigate(['/products']);
   }
@@ -2624,6 +2632,18 @@ export class ProductForm {
   save(status: 'draft' | 'active' | 'pending_approval'): void {
     if (this.submitting()) return;
     if (status === 'active' && this.isEmployee()) return;
+    if (
+      this.isEdit &&
+      this.isRestrictedCatalogUser() &&
+      String(this.loadedStatus()).toLowerCase() === 'active'
+    ) {
+      this.messages.add({
+        severity: 'warn',
+        summary: 'Product locked',
+        detail: 'Approved products cannot be edited.',
+      });
+      return;
+    }
     if (this.form.get('productName')!.invalid || this.form.get('sellingPrice')!.invalid || this.form.get('mrp')!.invalid) {
       this.form.markAllAsTouched();
       this.activeStep.set(0);
@@ -2879,10 +2899,13 @@ export class ProductForm {
   }
 
   private isHiddenWizardStep(index: number): boolean {
-    return (
-      this.hideEmiStep() &&
-      (index === this.emiStepIndex || index === this.deliveryStepIndex)
-    );
+    if (this.hideEmiStep() && (index === this.emiStepIndex || index === this.deliveryStepIndex)) {
+      return true;
+    }
+    if (this.hideSeoStep() && index === this.seoStepIndex) {
+      return true;
+    }
+    return false;
   }
 
   /** Preserve admin-configured wizard fields when Employee saves (same pattern as EMI). */

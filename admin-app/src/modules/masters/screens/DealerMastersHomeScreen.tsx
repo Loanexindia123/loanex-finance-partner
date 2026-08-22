@@ -6,6 +6,7 @@ import { CompositeNavigationProp, useNavigation } from '@react-navigation/native
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Card } from '../../../components/ui/Card';
+import { SafeHeader } from '../../../components/layout/SafeHeader';
 import { colors } from '../../../theme/colors';
 import { radius, spacing } from '../../../theme/spacing';
 import { DealerTabParamList, RootStackParamList } from '../../../navigation/types';
@@ -59,10 +60,10 @@ export function DealerMastersHomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.container} edges={[]}>
+      <SafeHeader style={styles.header}>
         <Text style={styles.headerTitle}>Masters</Text>
-      </View>
+      </SafeHeader>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.subtitle}>

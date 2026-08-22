@@ -15,6 +15,7 @@ import { EmptyState } from '../../../../shared/components/empty-state/empty-stat
 import { StatCard } from '../../../../shared/components/stat-card/stat-card';
 import { StatusBadge } from '../../../../shared/components/status-badge/status-badge';
 import { CanDirective } from '../../../../shared/directives/can.directive';
+import { RbacService } from '../../../../core/services/rbac.service';
 import { EmployeeService } from '../../services/employee.service';
 import { Employee, FORM_STATUS_OPTIONS } from '../../models/employee.models';
 
@@ -49,6 +50,7 @@ const AVATAR_TONES = [
 })
 export class EmployeeList {
   private readonly employees = inject(EmployeeService);
+  private readonly rbac = inject(RbacService);
   private readonly router = inject(Router);
   private readonly messages = inject(MessageService);
 
@@ -162,6 +164,11 @@ export class EmployeeList {
 
   edit(employee: Employee): void {
     this.router.navigate(['/employees', employee.id, 'edit']);
+  }
+
+  /** Hide Edit for Employee/Dealer/Agent when the record is approved. */
+  canEditEmployee(employee: Employee): boolean {
+    return this.rbac.can('users.edit') && !this.rbac.isApprovedFormLocked(employee.formStatus);
   }
 
   confirmDelete(employee: Employee): void {

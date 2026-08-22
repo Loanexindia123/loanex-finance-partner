@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { AppImage } from '../../components/ui/AppImage';
+import { withMediaSize } from '../../utils/mediaUrl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Fonts, Spacing, Radius, Shadow } from '../../constants/theme';
 import { APP_CONFIG } from '../../constants/config';
@@ -308,7 +309,7 @@ export default function OrderDetailScreen() {
             <Text style={st.cardTitle}>Order Items ({order.items.length})</Text>
             {order.items.map((item, idx) => (
               <View key={item.productId} style={[st.itemRow, idx > 0 && st.itemBorder]}>
-                <Image source={{ uri: item.image }} style={st.itemImg} contentFit="cover" transition={200} />
+                <AppImage uri={withMediaSize(item.image, 'card')} style={st.itemImg} contentFit="cover" transition={200} />
                 <View style={{ flex: 1 }}>
                   <Text style={st.itemName} numberOfLines={2}>{item.productName}</Text>
                   <Text style={st.itemQty}>Qty: {item.quantity}</Text>

@@ -16,7 +16,8 @@ import {
   resolveViewerIdentity,
   type OnboarderOption,
 } from './employee-hierarchy';
-import { provisionEmployeeAccount } from './employee-account';
+import { isEmployeeRoleUser, provisionEmployeeAccount } from './employee-account';
+import { isRestrictedCatalogUser } from '../../product/utils/product-emi';
 
 const COLLECTION = 'employees';
 
@@ -404,9 +405,15 @@ export class EmployeeService {
       str(body.onboardedBy),
     );
 
+    // Employees cannot approve — Admin/Super Admin only provisions login.
+    let formStatus = body.formStatus ?? 'draft';
+    if (isEmployeeRoleUser(actorUserId) && formStatus === 'approved') {
+      formStatus = 'pending';
+    }
+
     const payload = {
       id: str(body.id) || randomUUID(),
-      ...bodyToPayload(body),
+      ...bodyToPayload({ ...body, formStatus }),
       onboardedById: onboarded.onboardedById,
       onboardedBy: onboarded.onboardedBy,
       userId: '',
@@ -444,7 +451,31 @@ export class EmployeeService {
       throw new ForbiddenError('You do not have access to this employee onboarding record');
     }
 
-    const updates = bodyToPayload(body);
+    // Approved records are read-only for Employee / Dealer / Agent (product-style lock).
+    if (
+      isRestrictedCatalogUser(actorUserId) &&
+      String(existingRecord.formStatus ?? '')
+        .trim()
+        .toLowerCase() === 'approved'
+    ) {
+      throw new ForbiddenError('Approved employees cannot be edited.');
+    }
+
+    // Employees cannot approve peer employees — only Admin/Super Admin.
+    if (
+      isEmployeeRoleUser(actorUserId) &&
+      body.formStatus === 'approved' &&
+      existingRecord.formStatus !== 'approved'
+    ) {
+      throw new ForbiddenError('Only Admin can approve employees');
+    }
+
+    let formStatus = body.formStatus ?? existingRecord.formStatus;
+    if (isEmployeeRoleUser(actorUserId) && formStatus === 'approved' && existingRecord.formStatus !== 'approved') {
+      formStatus = 'pending';
+    }
+
+    const updates = bodyToPayload({ ...body, formStatus });
     // Edit / approval must never silently re-parent the onboarding chain.
     updates.onboardedById = existingRecord.onboardedById;
     updates.onboardedBy = existingRecord.onboardedBy;

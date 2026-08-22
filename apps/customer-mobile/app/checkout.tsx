@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Platform, Modal, FlatList, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { AppImage } from '../components/ui/AppImage';
+import { withMediaSize } from '../utils/mediaUrl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useCart } from '../hooks/useCart';
@@ -606,7 +607,7 @@ export default function CheckoutScreen() {
           <Text style={s.cardTitle}>Order Items ({displayItems.length})</Text>
           {displayItems.map(ci => (
             <View key={ci.product.id} style={s.itemRow}>
-              <Image source={{ uri: ci.product.image }} style={s.itemImg} contentFit="cover" />
+              <AppImage uri={withMediaSize(ci.product.image, 'card')} style={s.itemImg} contentFit="cover" />
               <View style={{ flex: 1 }}>
                 <Text style={s.itemName} numberOfLines={2}>{ci.product.name}</Text>
                 <Text style={s.itemQty}>Qty: {ci.quantity}</Text>
@@ -661,7 +662,7 @@ export default function CheckoutScreen() {
           </View>
           {displayItems.map((item, idx) => (
             <View key={item.product.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: idx === displayItems.length - 1 ? 0 : Spacing.md }}>
-              <Image source={{ uri: item.product.image }} style={{ width: 50, height: 50, borderRadius: Radius.sm, backgroundColor: Colors.surfaceAlt }} />
+              <AppImage uri={withMediaSize(item.product.image, 'card')} style={{ width: 50, height: 50, borderRadius: Radius.sm, backgroundColor: Colors.surfaceAlt }} />
               <View style={{ flex: 1, marginLeft: Spacing.md }}>
                 <Text style={{ fontSize: Fonts.sm, fontWeight: Fonts.medium, color: Colors.textPrimary }} numberOfLines={2}>{item.product.name}</Text>
                 <Text style={{ fontSize: Fonts.xs, color: Colors.textTertiary }}>Qty: {item.quantity}</Text>

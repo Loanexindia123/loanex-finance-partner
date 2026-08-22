@@ -23,12 +23,6 @@ import { resolveMediaUrl } from '../../../../shared/utils/media-url';
 import { PopularProduct } from '../../models/catalog.models';
 import { HomeDataCacheService } from '../../services/home-data-cache.service';
 
-/**
- * Confirmed empty against production catalog (categories API returns
- * Mobiles / Laptops / TVs; product rows use category "Mobiles").
- */
-const EMPTY_HOME_CATEGORY_QUERIES = new Set(['Smartphone', 'Laptop', 'Smart TV']);
-
 @Component({
   selector: 'app-popular-products',
   imports: [RouterLink],
@@ -49,8 +43,8 @@ export class PopularProducts {
   readonly category = input<string | null>(null);
   readonly limit = input<number>(6);
   /**
-   * When true (New Arrivals), reuse the shared Home catalog / featured slice
-   * (same source as Popular on EMI — no extra HTTP).
+   * When true (New Arrivals), reuse the shared Home catalog and show the
+   * newest rows (no featured filter — avoids a second HTTP call).
    */
   readonly reuseFeaturedCache = input(false);
 
@@ -72,30 +66,16 @@ export class PopularProducts {
 
       const category = this.category()?.trim() || null;
       const limit = this.limit();
+      const preferLatest = this.reuseFeaturedCache();
 
-      if (category && EMPTY_HOME_CATEGORY_QUERIES.has(category)) {
-        // Performance: empty category API call.
-        // Production categories are Mobiles / Laptops / TVs; these query values
-        // return 0 products. Keep this code commented for easy rollback.
-        // this.productsApi
-        //   .list({ limit, category })
-        //   .pipe(takeUntilDestroyed(this.destroyRef))
-        //   .subscribe({ ... });
-        this.loading.set(false);
-        this.products.set([]);
-        return;
-      }
-
-      // Featured Home rails (Popular on EMI + New Arrivals): one shared
-      // catalog request with Categories. Server `featured=true` filtering is
-      // equivalent to `isFeatured` on list rows for the Home window (limit 50).
+      // Home rails share one catalog request with Categories.
+      // Popular on EMI: prefer featured, fall back to latest when none are flagged.
+      // New Arrivals: always show latest from the same payload.
       if (!category) {
         this.homeCache
           .getCatalog(50)
           .pipe(
-            map((data) =>
-              data.items.filter((item) => item.isFeatured).slice(0, limit),
-            ),
+            map((data) => this.pickHomeRailItems(data.items, limit, preferLatest)),
             takeUntilDestroyed(this.destroyRef),
           )
           .subscribe({
@@ -127,6 +107,19 @@ export class PopularProducts {
           },
         });
     });
+  }
+
+  /** Featured-first for Popular; latest for New Arrivals; never return an empty rail when catalog has items. */
+  private pickHomeRailItems(
+    items: CatalogProduct[],
+    limit: number,
+    preferLatest: boolean,
+  ): CatalogProduct[] {
+    if (!items.length) return [];
+    if (preferLatest) return items.slice(0, limit);
+
+    const featured = items.filter((item) => item.isFeatured);
+    return (featured.length > 0 ? featured : items).slice(0, limit);
   }
 
   toggleWishlist(product: PopularProduct, event: Event): void {

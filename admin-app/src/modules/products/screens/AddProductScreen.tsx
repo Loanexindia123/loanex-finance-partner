@@ -9,11 +9,12 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useWizard, WizardProvider } from '../wizard/WizardContext';
 import { StepProgress, WIZARD_STEPS } from '../../../components/ui/StepProgress';
 import { Button } from '../../../components/ui/Button';
+import { SafeHeader } from '../../../components/layout/SafeHeader';
 import { Step1BasicInfo } from '../wizard/steps/Step1BasicInfo';
 import { Step2Category } from '../wizard/steps/Step2Category';
 import { Step3Variants } from '../wizard/steps/Step3Variants';
@@ -26,7 +27,7 @@ import { Step11Review } from '../wizard/steps/Step11Review';
 import { colors } from '../../../theme/colors';
 import { shadow, spacing } from '../../../theme/spacing';
 import { RootStackParamList } from '../../../navigation/types';
-import { useRbac } from '../../../auth/rbacStore';
+import { useRbac, isApprovedProductLocked } from '../../../auth/rbacStore';
 import { getProductById, createProduct, updateProduct, uploadProductImage } from '../../../services/productService';
 import { ProductFormData, ProductVariant, TextListItem } from '../types/product';
 import {
@@ -119,6 +120,7 @@ async function flushPendingProductImages(data: ProductFormData): Promise<Product
 }
 
 function AddProductContent({ navigation, route }: Props) {
+  const insets = useSafeAreaInsets();
   const { currentStep, setCurrentStep, resetForm, formData, updateForm } = useWizard();
   const { roleName } = useRbac();
   const roleKey = String(roleName ?? '').trim().toLowerCase();
@@ -152,7 +154,17 @@ function AddProductContent({ navigation, route }: Props) {
       const fetchProduct = async () => {
         try {
           const p = await getProductById(productId);
-          setProductStatus(String((p as any).status ?? ''));
+          const status = String((p as any).status ?? '');
+          if (isApprovedProductLocked(status)) {
+            Alert.alert(
+              'Product Locked',
+              'This product has been approved and can no longer be edited.',
+              [{ text: 'OK', onPress: () => navigation.goBack() }],
+            );
+            setLoading(false);
+            return;
+          }
+          setProductStatus(status);
           const wizardDataRaw = ((p as any).wizardData || {}) as Record<string, unknown>;
           const wizardData = Object.fromEntries(
             Object.entries(wizardDataRaw).filter(([, v]) => v !== undefined),
@@ -445,7 +457,7 @@ function AddProductContent({ navigation, route }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <SafeAreaView style={styles.safe} edges={[]}>
         <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
           <Text>Loading product data...</Text>
         </View>
@@ -454,9 +466,9 @@ function AddProductContent({ navigation, route }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <View style={styles.container}>
-        <View style={styles.topBar}>
+        <SafeHeader style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
@@ -464,7 +476,7 @@ function AddProductContent({ navigation, route }: Props) {
           <TouchableOpacity onPress={handleSaveDraft} style={styles.draftBtn} disabled={savingDraft}>
             <Text style={styles.draftText}>{savingDraft ? 'Saving...' : 'Save Draft'}</Text>
           </TouchableOpacity>
-        </View>
+        </SafeHeader>
 
         <StepProgress currentStep={displayStep} steps={visibleSteps} />
 
@@ -481,7 +493,7 @@ function AddProductContent({ navigation, route }: Props) {
           </ScrollView>
         </View>
 
-        <View style={[styles.footer, shadow.md]}>
+        <View style={[styles.footer, shadow.md, { paddingBottom: Math.max(insets.bottom, spacing.xl) }]}>
           {currentStep === WIZARD_STEPS.length ? (
             <View style={styles.reviewActions}>
               <Button title="Back" onPress={goPrev} variant="outline" style={{ flex: 1 }} />

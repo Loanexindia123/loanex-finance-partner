@@ -22,8 +22,8 @@ export class HomeDataCacheService {
 
   /**
    * Shared Home product list (`limit` matches the former Categories request).
-   * Popular on EMI / New Arrivals derive featured rows client-side from this
-   * same payload so Home does not fire a second `/products` call.
+   * Popular on EMI / New Arrivals slice this same payload client-side so Home
+   * does not fire a second `/products` call.
    */
   getCatalog(limit = 50): Observable<ProductListResponse> {
     const now = Date.now();

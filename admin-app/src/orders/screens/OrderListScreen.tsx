@@ -8,10 +8,10 @@ import {
   TouchableOpacity,
   Modal,
   useWindowDimensions,
-  SafeAreaView,
   BackHandler,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -126,7 +126,7 @@ export function OrderListScreen({ navigation }: Props) {
     filterStatus !== 'all' || filterPayment !== 'all' || sortBy !== 'date';
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.container}>
         <View style={styles.header}>
           <View style={styles.headerRow}>

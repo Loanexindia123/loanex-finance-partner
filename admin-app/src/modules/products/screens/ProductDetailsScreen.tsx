@@ -15,10 +15,12 @@ import { getProductById, updateProduct } from '../../../services/productService'
 import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
+import { SafeHeader } from '../../../components/layout/SafeHeader';
 import { colors } from '../../../theme/colors';
 import { radius, spacing } from '../../../theme/spacing';
 import { RootStackParamList } from '../../../navigation/types';
-import { isDealer } from '../../../auth/rbacStore';
+import { isApprovedProductLocked, isFieldActor } from '../../../auth/rbacStore';
+import { resolveMediaUrl, resolveProductImageUrl } from '../../../utils/resolveMediaUrl';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProductDetails'>;
 
@@ -43,7 +45,7 @@ export function ProductDetailsScreen({ navigation, route }: Props) {
           mrp: Number(data.mrp) || Number(data.price) || 0,
           stock: data.stock || 0,
           status: (data.status || 'active') as Product['status'],
-          imageUrl: data.image || undefined,
+          imageUrl: resolveProductImageUrl(data as any) || undefined,
           featured: Boolean(data.featured),
           trending: Boolean(data.trending),
           recommended: Boolean(data.recommended),
@@ -60,14 +62,14 @@ export function ProductDetailsScreen({ navigation, route }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={styles.container} edges={[]}>
+        <SafeHeader style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Product Details</Text>
           <View style={styles.backBtn} />
-        </View>
+        </SafeHeader>
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>Loading...</Text>
         </View>
@@ -77,14 +79,14 @@ export function ProductDetailsScreen({ navigation, route }: Props) {
 
   if (!product) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={styles.container} edges={[]}>
+        <SafeHeader style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Product Details</Text>
           <View style={styles.backBtn} />
-        </View>
+        </SafeHeader>
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>Product not found</Text>
         </View>
@@ -93,6 +95,7 @@ export function ProductDetailsScreen({ navigation, route }: Props) {
   }
 
   const formatPrice = (price: number) => `₹${price.toLocaleString('en-IN')}`;
+  const editLocked = isApprovedProductLocked(product.status);
 
   const toggleFlag = async (key: 'featured' | 'trending' | 'recommended') => {
     const next = !product[key];
@@ -107,31 +110,48 @@ export function ProductDetailsScreen({ navigation, route }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.container} edges={[]}>
+      <SafeHeader style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Product Details</Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('AddProduct', { mode: 'edit', productId: product.id })}
-          style={styles.backBtn}
-        >
-          <Text style={[styles.backText, { color: colors.primary }]}>Edit</Text>
-        </TouchableOpacity>
-      </View>
+        {editLocked ? (
+          <View style={styles.backBtn} />
+        ) : (
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate('AddProduct', { mode: 'edit', productId: product.id })
+            }
+            style={styles.backBtn}
+          >
+            <Text style={[styles.backText, { color: colors.primary }]}>Edit</Text>
+          </TouchableOpacity>
+        )}
+      </SafeHeader>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, isTablet && styles.heroTablet]}>
           {product.imageUrl ? (
-            <Image source={{ uri: product.imageUrl }} style={styles.heroImage} />
+            <Image
+              source={{ uri: resolveMediaUrl(product.imageUrl) }}
+              style={styles.heroImage}
+            />
           ) : (
             <View style={styles.heroPlaceholder}>
               <Text style={{ fontSize: 64 }}>📦</Text>
             </View>
           )}
           <View style={styles.heroInfo}>
-            <Badge status={product.status} />
+            <Badge
+              status={product.status}
+              label={editLocked ? 'Approved (Locked)' : undefined}
+            />
+            {editLocked ? (
+              <Text style={styles.lockHint}>
+                This product has been approved and can no longer be edited.
+              </Text>
+            ) : null}
             <Text style={styles.productName}>{product.name}</Text>
             <Text style={styles.sku}>SKU: {product.sku}</Text>
             <View style={styles.priceBlock}>
@@ -165,7 +185,7 @@ export function ProductDetailsScreen({ navigation, route }: Props) {
           />
         </Card>
 
-        {isDealer() ? null : (
+        {isFieldActor() ? null : (
         <Card style={styles.section}>
           <SectionTitle title="Marketing & Visibility" />
           <DetailRow label="EMI Available" value={product.emiAvailable ? 'Yes' : 'No'} />
@@ -208,12 +228,16 @@ export function ProductDetailsScreen({ navigation, route }: Props) {
 
       <View style={styles.footer}>
         <Button title="Back" onPress={() => navigation.goBack()} variant="outline" style={{ flex: 1 }} />
-        <Button
-          title="Edit Product"
-          onPress={() => navigation.navigate('AddProduct', { mode: 'edit', productId: product.id })}
-          variant="primary"
-          style={{ flex: 1 }}
-        />
+        {editLocked ? null : (
+          <Button
+            title="Edit Product"
+            onPress={() =>
+              navigation.navigate('AddProduct', { mode: 'edit', productId: product.id })
+            }
+            variant="primary"
+            style={{ flex: 1 }}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -265,6 +289,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroInfo: { marginTop: spacing.lg },
+  lockHint: {
+    marginTop: spacing.sm,
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
   productName: { fontSize: 22, fontWeight: '800', color: colors.text, marginTop: spacing.sm },
   sku: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
   priceBlock: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md },

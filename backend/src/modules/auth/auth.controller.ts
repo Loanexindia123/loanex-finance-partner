@@ -63,6 +63,12 @@ export class AuthController {
     sendSuccess(res, data, data.message);
   };
 
+  agentLogin = async (req: Request, res: Response): Promise<void> => {
+    const data = await authService.agentLogin(req.body as DealerLoginBody);
+    maybeSetRefreshCookie(res, data as unknown as Record<string, unknown>);
+    sendSuccess(res, data, data.message);
+  };
+
   sendOtp = async (req: Request, res: Response): Promise<void> => {
     const data = await authService.sendOtp(req.body as SendOtpBody);
     sendSuccess(res, data, data.message);

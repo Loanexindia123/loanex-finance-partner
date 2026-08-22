@@ -1,4 +1,5 @@
 import { SERVER_URL } from '../constants/config';
+import { Image } from 'expo-image';
 
 /**
  * Resolve backend media refs for React Native Image URIs.
@@ -24,6 +25,60 @@ export function resolveMediaUrlList(
   urls: Array<string | null | undefined> | null | undefined,
 ): string[] {
   return (urls ?? []).map((u) => resolveMediaUrl(u)).filter(Boolean);
+}
+
+/** Display sizes mapped to backend resize widths (`?w=`). */
+export type MediaDisplaySize = 'thumb' | 'card' | 'banner' | 'full';
+
+const DISPLAY_WIDTH: Record<MediaDisplaySize, number | null> = {
+  thumb: 200,
+  card: 400,
+  banner: 800,
+  full: null,
+};
+
+/** Matches LoanEx GridFS product/banner image URLs (any host). */
+const PRODUCT_IMAGE_RE = /\/api\/v1\/products\/images\/[a-f0-9]{24}/i;
+
+function isLoanexProductImageUrl(url: string): boolean {
+  return PRODUCT_IMAGE_RE.test(url);
+}
+
+/**
+ * Append a resize width for LoanEx GridFS images only.
+ * - Product cards → ?w=400
+ * - Thumbnails → ?w=200
+ * - Home banners → ?w=800
+ * - Product detail hero → full (no ?w)
+ * External URLs (Unsplash, etc.) are returned unchanged.
+ */
+export function withMediaSize(
+  url: string | null | undefined,
+  size: MediaDisplaySize = 'full',
+): string {
+  const resolved = resolveMediaUrl(url);
+  if (!resolved) return '';
+  const width = DISPLAY_WIDTH[size];
+  if (width == null || !isLoanexProductImageUrl(resolved)) return resolved;
+
+  try {
+    const parsed = new URL(resolved);
+    // Strip any prior size so cards/banners always hit the resize endpoint cleanly.
+    parsed.searchParams.delete('w');
+    parsed.searchParams.set('w', String(width));
+    return parsed.toString();
+  } catch {
+    const cleaned = resolved.replace(/([?&])w=\d+/g, '').replace(/\?&/, '?').replace(/[?&]$/, '');
+    const join = cleaned.includes('?') ? '&' : '?';
+    return `${cleaned}${join}w=${width}`;
+  }
+}
+
+/** Prefetch unique URIs into expo-image memory+disk cache. */
+export function prefetchMediaUrls(urls: Array<string | null | undefined>): void {
+  const unique = [...new Set(urls.map((u) => (u ?? '').trim()).filter(Boolean))];
+  if (!unique.length) return;
+  void Image.prefetch(unique, { cachePolicy: 'memory-disk' });
 }
 
 /** Map common product image fields from a backend product payload. */
@@ -64,12 +119,14 @@ export function withResolvedProductImages<T extends Record<string, unknown>>(pro
     }));
   }
 
-  const variants = (next as { productVariants?: Array<Record<string, unknown>>; variants?: Array<Record<string, unknown>> });
+  const variants = (next as {
+    productVariants?: Array<Record<string, unknown>>;
+    variants?: Array<Record<string, unknown>>;
+  });
   if (Array.isArray(variants.productVariants)) {
     variants.productVariants = variants.productVariants.map((v) => withResolvedProductImages(v));
   }
   if (Array.isArray(variants.variants)) {
-    // Only resolve when variant rows look like media-bearing product variants.
     variants.variants = variants.variants.map((v) =>
       'images' in v || 'image' in v || 'imageUrl' in v ? withResolvedProductImages(v) : v,
     );

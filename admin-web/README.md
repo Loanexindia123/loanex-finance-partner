@@ -1,59 +1,50 @@
-# AdminWeb
+# LoanEx Admin Web
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.3.33.
+Angular 20 admin portal for LoanEx (staff / dealers / agents).
 
-## Development server
+Production API: `https://loanex-api.vercel.app`  
+Vercel project: `loanex-admin-web` (already linked via `.vercel/`)
 
-To start a local development server, run:
-
-```bash
-ng serve
-```
-
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## Scripts
 
 ```bash
-ng generate component component-name
+npm start              # local dev (proxies /api → deployed API)
+npm run build          # production build → dist/admin-web/browser
+npm run preview        # serve the production build locally on :4300
+npm run deploy:preview # Vercel preview URL
+npm run deploy         # production deploy to Vercel
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Fast deploy (Vercel)
+
+From this folder (`admin-web/`):
 
 ```bash
-ng generate --help
+npm install
+npm run deploy
 ```
 
-## Building
-
-To build the project run:
+First time on a new machine only:
 
 ```bash
-ng build
+npx vercel login
+npx vercel link   # pick existing project: loanex-admin-web
+npm run deploy
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+After deploy, open the URL Vercel prints (e.g. `https://loanex-admin-web.vercel.app`).  
+CORS for that origin is already allowed on the API.
 
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+## Local production check
 
 ```bash
-ng test
+npm run build
+npm run preview
+# → http://localhost:4300
 ```
 
-## Running end-to-end tests
+## Notes
 
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+- SPA routes are handled by `vercel.json` rewrite → `index.html`.
+- Hashed assets get long-cache headers; `index.html` is always revalidated.
+- Env: `src/environments/environment.ts` (prod) points at the shared LoanEx API.

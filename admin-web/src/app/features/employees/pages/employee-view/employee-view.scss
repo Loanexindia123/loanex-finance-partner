@@ -21,6 +21,13 @@
     color: var(--admin-text-muted);
     font-size: 0.8125rem;
   }
+
+  .lock-hint {
+    margin-top: 0.5rem;
+    color: var(--admin-text-muted);
+    font-size: 0.875rem;
+    line-height: 1.45;
+  }
 }
 
 .review-grid {

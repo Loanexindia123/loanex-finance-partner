@@ -129,7 +129,8 @@ export const SEED_ROLES: SeedRole[] = [
   },
   {
     name: 'Employee',
-    description: 'Employee portal: products, product masters and own dealers',
+    description:
+      'Employee portal: own products, dealers, employees, agents and product masters (no approvals)',
     permissions: [
       'products.view',
       'products.create',
@@ -137,6 +138,12 @@ export const SEED_ROLES: SeedRole[] = [
       'masters.view',
       'masters.create',
       'masters.edit',
+      'users.view',
+      'users.create',
+      'users.edit',
+      'freelancers.view',
+      'freelancers.create',
+      'freelancers.edit',
     ],
     isSystem: false,
   },
@@ -149,6 +156,12 @@ export const SEED_ROLES: SeedRole[] = [
   {
     name: 'Dealer',
     description: 'Dealer app login: no Admin Web permissions',
+    permissions: [],
+    isSystem: false,
+  },
+  {
+    name: 'Agent',
+    description: 'Agent app login: no Admin Web permissions',
     permissions: [],
     isSystem: false,
   },

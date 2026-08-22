@@ -1,8 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
+  "installCommand": "npm install",
   "outputDirectory": "dist/LoanEx/browser",
   "framework": null,
+  "regions": ["bom1"],
   "rewrites": [
     {
       "source": "/(.*)",

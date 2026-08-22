@@ -68,6 +68,12 @@ authRouter.post(
 );
 
 authRouter.post(
+  '/agent-login',
+  validateRequest(dealerLoginBodySchema),
+  asyncHandler(authController.agentLogin),
+);
+
+authRouter.post(
   '/send-otp',
   validateRequest(sendOtpBodySchema),
   asyncHandler(authController.sendOtp),

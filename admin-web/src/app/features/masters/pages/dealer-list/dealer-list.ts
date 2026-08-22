@@ -16,6 +16,7 @@ import { EmptyState } from '../../../../shared/components/empty-state/empty-stat
 import { StatCard } from '../../../../shared/components/stat-card/stat-card';
 import { StatusBadge } from '../../../../shared/components/status-badge/status-badge';
 import { CanDirective } from '../../../../shared/directives/can.directive';
+import { RbacService } from '../../../../core/services/rbac.service';
 import { DealerService } from '../../services/dealer.service';
 import { Dealer, FORM_STATUS_OPTIONS } from '../../models/dealer.models';
 
@@ -53,6 +54,7 @@ const AVATAR_TONES = [
 })
 export class DealerList {
   private readonly dealers = inject(DealerService);
+  private readonly rbac = inject(RbacService);
   private readonly router = inject(Router);
   private readonly messages = inject(MessageService);
 
@@ -236,6 +238,11 @@ export class DealerList {
 
   edit(dealer: Dealer): void {
     this.router.navigate(['/masters/dealers', dealer.id, 'edit']);
+  }
+
+  /** Hide Edit for Employee/Dealer/Agent when the dealer is approved. */
+  canEditDealer(dealer: Dealer): boolean {
+    return this.rbac.can('masters.edit') && !this.rbac.isApprovedFormLocked(dealer.formStatus);
   }
 
   confirmDelete(dealer: Dealer): void {

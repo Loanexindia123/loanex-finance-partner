@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, ReactNode } from 'react';
 import api from '../../services/api';
 import { getStoredUser, type User } from '../../services/authService';
-import { getRbacState, isDealer, subscribeRbac } from '../../auth/rbacStore';
+import { getRbacState, isFieldActor, subscribeRbac } from '../../auth/rbacStore';
 import {
   BrandMaster,
   CategoryMaster,
@@ -30,11 +30,16 @@ import {
   seedWholesalers,
 } from '../data/masterSeeds';
 
-function isDealerAccount(user: Pick<User, 'role' | 'roleName'> | null | undefined): boolean {
+function isFieldAccount(user: Pick<User, 'role' | 'roleName'> | null | undefined): boolean {
   if (!user) return false;
   const roleName = String(user.roleName ?? '').trim().toLowerCase();
   const role = String(user.role ?? '').trim().toLowerCase();
-  return roleName === 'dealer' || role === 'dealer';
+  return (
+    roleName === 'dealer' ||
+    role === 'dealer' ||
+    roleName === 'agent' ||
+    role === 'agent'
+  );
 }
 
 type NameDraft = { name: string };
@@ -214,7 +219,7 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
 
     const loadAdminMasters = () => {
       // Dealers must not hit /admin/* masters (403). Categories stay available above.
-      if (cancelled || adminMastersLoaded || isDealer()) return;
+      if (cancelled || adminMastersLoaded || isFieldActor()) return;
       adminMastersLoaded = true;
 
       Promise.allSettled([
@@ -286,7 +291,7 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
       // Provider mounts before Splash sets RBAC — check stored session first.
       const stored = await getStoredUser();
       if (cancelled) return;
-      if (isDealerAccount(stored) || isDealer()) {
+      if (isFieldAccount(stored) || isFieldActor()) {
         return;
       }
 
@@ -300,7 +305,7 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     const unsubscribe = subscribeRbac(() => {
       if (cancelled) return;
       const { user } = getRbacState();
-      if (!user || isDealer()) return;
+      if (!user || isFieldActor()) return;
       loadAdminMasters();
     });
 

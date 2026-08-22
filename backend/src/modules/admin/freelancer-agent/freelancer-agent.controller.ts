@@ -30,7 +30,10 @@ function actorContext(req: Request): { id: string; name: string } {
 }
 
 async function canSeePayout(req: Request): Promise<boolean> {
-  const permissions = await rolesService.resolveUserPermissions(actorId(req));
+  const id = actorId(req);
+  const { resolveIsDealerUserId } = await import('../dealer/dealer-account');
+  if (await resolveIsDealerUserId(id)) return true;
+  const permissions = await rolesService.resolveUserPermissions(id);
   return (
     permissions.includes('freelancers.payout') ||
     permissions.includes('freelancers.approve') ||

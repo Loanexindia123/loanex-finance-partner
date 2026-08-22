@@ -20,7 +20,7 @@ import { PasswordInput } from '../../authentication/components/PasswordInput';
 import { SectionTitle } from '../../components/ui/SectionTitle';
 import api from '../../services/api';
 import { clearAuth } from '../../services/authService';
-import { clearRbac, isDealer } from '../../auth/rbacStore';
+import { clearRbac, homeRouteName } from '../../auth/rbacStore';
 import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/useTheme';
 import { radius, spacing } from '../../theme/spacing';
@@ -50,11 +50,7 @@ export function ChangePasswordScreen({ navigation, route }: Props) {
       navigation.goBack();
       return;
     }
-    if (isDealer()) {
-      navigation.navigate('DealerTabs');
-      return;
-    }
-    navigation.navigate('Dashboard');
+    navigation.navigate(homeRouteName());
   }, [forced, navigation]);
 
   const resetToLogin = useCallback(() => {

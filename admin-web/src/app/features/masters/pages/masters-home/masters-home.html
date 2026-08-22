@@ -1,17 +1,17 @@
-<app-page-header
-  title="Master Data"
-  subtitle="Catalogue, logistics, and storefront configuration"
-/>
-
-<div class="master-grid">
-  @for (card of cards; track card.route) {
-    <a *appCan="card.permission ?? 'masters.view'" class="master-card master-card--active" [routerLink]="card.route">
-      <i [class]="card.icon"></i>
-      <div>
-        <h2>{{ card.title }}</h2>
-        <p>{{ card.description }}</p>
-      </div>
-      <span class="master-card__cta">Open →</span>
-    </a>
-  }
-</div>
+<app-page-header
+  title="Master Data"
+  subtitle="Catalogue, logistics, and storefront configuration"
+/>
+
+<div class="master-grid">
+  @for (card of cards(); track card.route) {
+    <a *appCan="card.permission ?? 'masters.view'" class="master-card master-card--active" [routerLink]="card.route">
+      <i [class]="card.icon"></i>
+      <div>
+        <h2>{{ card.title }}</h2>
+        <p>{{ card.description }}</p>
+      </div>
+      <span class="master-card__cta">Open →</span>
+    </a>
+  }
+</div>

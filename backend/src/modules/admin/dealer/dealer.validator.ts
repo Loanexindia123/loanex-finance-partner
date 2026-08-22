@@ -86,6 +86,22 @@ const dealerBodySchema = dealerCoreSchema.superRefine((data, ctx) => {
   // Backward compatible with admin-app minimal dealer master CRUD (no full onboarding).
   const status = data.formStatus ?? 'draft';
   if (status === 'draft') return;
+
+  // Agent/Dealer-app "Save for Approval": require identity + contact only.
+  // Full onboarding checklist remains for Admin Web approve/hold paths.
+  if (status === 'pending') {
+    const mobile = String(data.mobile ?? data.dealerMobile ?? '').trim();
+    const email = String(data.email ?? '').trim();
+    if (!mobile && !email) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Mobile or Email is required',
+        path: ['mobile'],
+      });
+    }
+    return;
+  }
+
   for (const [key, label] of requiredWhenNotDraft) {
     const value = data[key as keyof typeof data];
     if (typeof value !== 'string' || !value.trim()) {

@@ -181,7 +181,12 @@ export class FreelancerAgentList {
   }
 
   canEdit(row: FreelancerAgent): boolean {
-    return this.rbac.can('freelancers.edit') && (row.formStatus === 'draft' || row.formStatus === 'rejected');
+    // Approved is locked for Employee/Dealer/Agent; draft/rejected stay editable.
+    // Admin uses the same draft/rejected gate (approve is a separate action).
+    return (
+      this.rbac.can('freelancers.edit') &&
+      (row.formStatus === 'draft' || row.formStatus === 'rejected')
+    );
   }
 
   canApprove(row: FreelancerAgent): boolean {
@@ -239,7 +244,7 @@ export class FreelancerAgentList {
         this.messages.add({
           severity: 'success',
           summary: 'Approved',
-          detail: `Agent ID ${updated.agentId} generated.`,
+          detail: `Agent ID ${updated.agentId} generated. Agent login is ready (welcome@123).`,
         });
       },
       error: (err) => {

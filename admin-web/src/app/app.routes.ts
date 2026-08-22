@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
 import { permissionGuard } from './core/guards/permission.guard';
+import { denyRolesGuard } from './core/guards/deny-roles.guard';
 
 export const routes: Routes = [
   {
@@ -65,7 +66,7 @@ export const routes: Routes = [
       },
       {
         path: 'users',
-        canActivate: [permissionGuard('users.view')],
+        canActivate: [permissionGuard('users.view'), denyRolesGuard('employee')],
         loadChildren: () => import('./features/users/users.routes').then((m) => m.USERS_ROUTES),
       },
       {

@@ -39,9 +39,15 @@ export class Sidebar {
       .subscribe((event) => this.currentUrl.set(this.pathOnly(event.urlAfterRedirects)));
   }
 
-  readonly items = computed(() =>
-    NAV_ITEMS.filter((item) => !item.permissions?.length || this.rbac.canAny(...item.permissions)),
-  );
+  readonly items = computed(() => {
+    const role = this.rbac.roleKey();
+    return NAV_ITEMS.filter((item) => {
+      if (item.hideForRoles?.some((r) => r.trim().toLowerCase() === role)) {
+        return false;
+      }
+      return !item.permissions?.length || this.rbac.canAny(...item.permissions);
+    });
+  });
 
   readonly groups = computed(() => {
     const visible = this.items();

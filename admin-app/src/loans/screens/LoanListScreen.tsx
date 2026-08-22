@@ -7,10 +7,10 @@ import {
   TextInput,
   TouchableOpacity,
   Modal,
-  SafeAreaView,
   BackHandler,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -115,7 +115,7 @@ export function LoanListScreen({ navigation }: Props) {
   const activeCount = loans.filter((l) => l.loanStatus === 'ACTIVE').length;
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.container}>
         <View style={styles.header}>
           <View style={styles.headerRow}>

@@ -4,15 +4,16 @@
   backLink="/employees"
   backLabel="Back to Employees"
 >
-  <button
-    actions
-    *appCan="'users.edit'"
-    pButton
-    type="button"
-    icon="pi pi-pencil"
-    label="Continue Onboarding"
-    (click)="edit()"
-  ></button>
+  @if (canEditRecord()) {
+    <button
+      actions
+      pButton
+      type="button"
+      icon="pi pi-pencil"
+      label="Continue Onboarding"
+      (click)="edit()"
+    ></button>
+  }
 </app-page-header>
 
 @if (loading()) {
@@ -24,8 +25,15 @@
     <div>
       <h2>{{ emp.fullName || 'Untitled draft' }}</h2>
       <p>{{ emp.employeeId }} · {{ emp.designation || 'No designation' }} · {{ emp.department || 'No department' }}</p>
+      @if (isApprovedLocked()) {
+        <p class="lock-hint">This employee has been approved and can no longer be edited.</p>
+      }
     </div>
-    <app-status-badge [status]="emp.formStatus" />
+    @if (isApprovedLocked()) {
+      <p-tag value="Approved (Locked)" severity="success" />
+    } @else {
+      <app-status-badge [status]="emp.formStatus" />
+    }
   </div>
 
   <div class="review-grid">

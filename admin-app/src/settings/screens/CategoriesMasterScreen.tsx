@@ -27,7 +27,7 @@ import { Card } from '../../components/ui/Card';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 import { RootStackParamList } from '../../navigation/types';
-import { isDealer } from '../../auth/rbacStore';
+import { isFieldActor } from '../../auth/rbacStore';
 import { resolveMasterImageUri } from '../utils/resolveMasterImage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CategoriesMaster'>;
@@ -80,7 +80,7 @@ export function CategoriesMasterScreen({ navigation }: Props) {
       navigation.goBack();
       return;
     }
-    if (isDealer()) {
+    if (isFieldActor()) {
       navigation.navigate('DealerTabs', { screen: 'Masters' });
       return;
     }

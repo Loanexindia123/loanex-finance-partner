@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
+import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
 
 interface ImagePlaceholderProps {
   label?: string;
@@ -30,7 +31,11 @@ export function ImagePlaceholder({
       activeOpacity={0.7}
     >
       {imageUri ? (
-        <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
+        <Image
+          source={{ uri: resolveMediaUrl(imageUri) }}
+          style={styles.image}
+          resizeMode="cover"
+        />
       ) : (
         <View style={styles.placeholder}>
           <Text style={styles.icon}>📷</Text>

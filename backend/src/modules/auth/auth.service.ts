@@ -47,6 +47,12 @@ import {
   isDealerAuthUser,
   isDealerRoleName,
 } from '../admin/dealer/dealer-account';
+import {
+  findLinkedAgentByUserId,
+  isAgentApproved,
+  isAgentAuthUser,
+  isAgentRoleName,
+} from '../admin/freelancer-agent/agent-account';
 
 /**
  * Enrich a user row with RBAC role info (roleId / roleName / permissions).
@@ -70,10 +76,10 @@ function resolveRbacInfo(user: any) {
   return { roleId: null, roleName: null, permissions: [] };
 }
 
-/** Staff portal accounts only — excludes customers, dealers, and app-only users. */
+/** Staff portal accounts only — excludes customers, dealers, agents, and app-only users. */
 function isStaffAccount(user: any): boolean {
   if (!user) return false;
-  if (isDealerAuthUser(user)) return false;
+  if (isDealerAuthUser(user) || isAgentAuthUser(user)) return false;
   return String(user.role ?? '') === 'admin' || Boolean(user.role_id ?? user.roleId);
 }
 
@@ -101,6 +107,12 @@ async function resolveLoginRbacInfo(user: any) {
       }
     }
     if (role) {
+      // Keep Employee portal permissions current (dealers/agents/employees create; no approve).
+      if (String(role.name ?? '').trim().toLowerCase() === 'employee') {
+        const { ensureEmployeeRole } = await import('../admin/employee/employee-account');
+        await ensureEmployeeRole();
+        role = jsonDb.findOne('roles', { id: roleId }) ?? role;
+      }
       return { roleId, roleName: role.name, permissions: effectivePermissionsForRole(role) };
     }
     return { roleId, roleName: null, permissions: [] };
@@ -182,7 +194,31 @@ export class AuthService {
       throw new NotFoundError('User not found.');
     }
     const rbac = await resolveLoginRbacInfo(user);
-    return { user: toPublicUser(user, rbac) };
+    const publicUser = toPublicUser(user, rbac);
+    if (isDealerAuthUser(user) || isDealerRoleName(rbac.roleName)) {
+      await jsonDb.ensureCollection('dealers');
+      const dealer = findLinkedDealerByUserId(user.id);
+      return {
+        user: {
+          ...publicUser,
+          dealerId: dealer?.id ? String(dealer.id) : undefined,
+          role: 'dealer',
+        },
+      };
+    }
+    if (isAgentAuthUser(user) || isAgentRoleName(rbac.roleName)) {
+      await jsonDb.ensureCollection('freelancer_agents');
+      const agent = findLinkedAgentByUserId(user.id);
+      return {
+        user: {
+          ...publicUser,
+          dealerId: agent?.dealerId ? String(agent.dealerId) : undefined,
+          agentId: agent?.id ? String(agent.id) : undefined,
+          role: 'agent',
+        },
+      };
+    }
+    return { user: publicUser };
   }
 
   /**
@@ -263,6 +299,9 @@ export class AuthService {
     if (isDealerAuthUser(user)) {
       throw new ForbiddenError('Access denied: use the dealer login');
     }
+    if (isAgentAuthUser(user)) {
+      throw new ForbiddenError('Access denied: use the agent login');
+    }
 
     const tokens = await this.issueTokenPair(user);
 
@@ -288,7 +327,13 @@ export class AuthService {
     const rbac = await resolveLoginRbacInfo(user);
     const isStaff =
       String(user.role ?? '') === 'admin' || Boolean(user.role_id ?? user.roleId ?? rbac.roleId);
-    if (!isStaff || isDealerAuthUser(user) || isDealerRoleName(rbac.roleName)) {
+    if (
+      !isStaff ||
+      isDealerAuthUser(user) ||
+      isDealerRoleName(rbac.roleName) ||
+      isAgentAuthUser(user) ||
+      isAgentRoleName(rbac.roleName)
+    ) {
       throw new ForbiddenError('Access denied: only admin users can log in to the admin portal');
     }
 
@@ -426,6 +471,80 @@ export class AuthService {
       },
       ...tokens,
       message: 'Dealer login successful',
+    };
+  }
+
+  /**
+   * Agent APK login. Mirrors dealerLogin — customer-style access + refresh tokens.
+   * Rejects customers, employees, admins, and dealers.
+   */
+  async agentLogin(input: LoginBody) {
+    const user = await authRepository.findByIdentifier(input.identifier);
+
+    if (!user) {
+      throw new UnauthorizedError('Invalid credentials');
+    }
+
+    const passwordHash = user.encryptedPassword ?? user.password ?? '';
+    if (!passwordHash) {
+      throw new UnauthorizedError('Invalid credentials');
+    }
+
+    let valid = false;
+    try {
+      valid = await comparePassword(input.password, passwordHash);
+    } catch {
+      throw new UnauthorizedError('Invalid credentials');
+    }
+    if (!valid) {
+      throw new UnauthorizedError('Invalid credentials');
+    }
+
+    const status = resolveStatus(user);
+    if (status === UserStatus.BLOCKED) {
+      throw new ForbiddenError('Your account has been blocked. Contact support.');
+    }
+    if (status !== UserStatus.ACTIVE) {
+      throw new ForbiddenError('Agent account is not active.');
+    }
+
+    const rbac = await resolveLoginRbacInfo(user);
+    if (!isAgentAuthUser(user) && !isAgentRoleName(rbac.roleName)) {
+      if (isStaffAccount(user)) {
+        throw new ForbiddenError('Access denied: use the admin portal login');
+      }
+      if (isDealerAuthUser(user) || isDealerRoleName(rbac.roleName)) {
+        throw new ForbiddenError('Access denied: use the dealer login');
+      }
+      throw new UnauthorizedError('Invalid credentials');
+    }
+
+    await jsonDb.ensureCollection('freelancer_agents');
+    const agent = findLinkedAgentByUserId(user.id);
+    const linkedUserId = String(agent?.userId ?? agent?.user_id ?? '').trim();
+    if (!agent || linkedUserId !== String(user.id).trim()) {
+      throw new ForbiddenError('No agent profile is linked to this account');
+    }
+    if (String(agent.status ?? '').toLowerCase() === 'inactive') {
+      throw new ForbiddenError('Agent account is inactive');
+    }
+    if (!isAgentApproved(agent)) {
+      throw new ForbiddenError('Agent account is not approved');
+    }
+
+    const tokens = await this.issueTokenPair(user);
+    const publicUser = toPublicUser(user, rbac);
+
+    return {
+      requiresOtp: false as const,
+      user: {
+        ...publicUser,
+        dealerId: String(agent.dealerId ?? ''),
+        agentId: String(agent.id),
+        role: 'agent',
+      },
+      ...tokens,
+      message: 'Agent login successful',
     };
   }
 

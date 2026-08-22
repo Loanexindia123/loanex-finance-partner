@@ -5,6 +5,11 @@ export interface MasterNavCard {
   route: string;
   permission?: string;
   soon?: boolean;
+  /**
+   * Shown to Employee / Dealer / Agent (matches admin-app DealerMastersHomeScreen).
+   * Admin / Super Admin always see every card.
+   */
+  restrictedCatalog?: boolean;
 }
 
 export const MASTER_NAV_CARDS: MasterNavCard[] = [
@@ -13,18 +18,21 @@ export const MASTER_NAV_CARDS: MasterNavCard[] = [
     description: 'Product brands used in catalogue and filters',
     icon: 'pi pi-tag',
     route: '/masters/brands',
+    restrictedCatalog: true,
   },
   {
     title: 'Product Types',
     description: 'Product type options for create and edit product forms',
     icon: 'pi pi-box',
     route: '/masters/product-types',
+    restrictedCatalog: true,
   },
   {
     title: 'Categories & Subcategories',
     description: 'Catalogue hierarchy for products and dealers',
     icon: 'pi pi-sitemap',
     route: '/masters/categories',
+    restrictedCatalog: true,
   },
   {
     title: 'Delivery Partners',
@@ -51,6 +59,13 @@ export const MASTER_NAV_CARDS: MasterNavCard[] = [
     route: '/masters/banners',
   },
 ];
+
+/** Masters routes Employees/Dealers/Agents may open (admin-app parity). */
+export const RESTRICTED_CATALOG_MASTER_ROUTES = new Set([
+  '/masters/brands',
+  '/masters/product-types',
+  '/masters/categories',
+]);
 
 export interface NamedMasterRouteConfig {
   title: string;

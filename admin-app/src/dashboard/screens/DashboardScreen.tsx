@@ -16,11 +16,11 @@ import {
 } from '../components/GlobalSearchResults';
 import { ProfileMenu } from '../components/ProfileMenu';
 import { quickActions } from '../data/quickActions';
-import { getDashboardStats, getDealerDashboardStats, DashboardStats } from '../../services/dashboardService';
+import { getDashboardStats, getDealerDashboardStats, getEmployeeDashboardStats, DashboardStats } from '../../services/dashboardService';
 import { loadNotifications } from '../data/notificationStore';
 import { useTheme } from '../../theme/useTheme';
 import { authCardStyle, spacing } from '../../theme/spacing';
-import { useRbac, can, clearRbac, isDealer } from '../../auth/rbacStore';
+import { useRbac, can, clearRbac, isEmployee, isFieldActor } from '../../auth/rbacStore';
 import { logout as apiLogout } from '../../services/authService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
@@ -29,7 +29,8 @@ export function DashboardScreen({ navigation }: Props) {
   const colors = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   useRbac();
-  const dealerMode = isDealer();
+  const dealerMode = isFieldActor();
+  const employeeMode = isEmployee();
   const [searchQuery, setSearchQuery] = useState('');
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -39,7 +40,11 @@ export function DashboardScreen({ navigation }: Props) {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        const data = isDealer() ? await getDealerDashboardStats() : await getDashboardStats();
+        const data = isFieldActor()
+          ? await getDealerDashboardStats()
+          : isEmployee()
+            ? await getEmployeeDashboardStats()
+            : await getDashboardStats();
         setStats(data);
       } catch (err) {
         console.warn('Dashboard fetch error', err);
@@ -48,8 +53,8 @@ export function DashboardScreen({ navigation }: Props) {
       }
     };
     fetchStats();
-    // Dealers have no notifications UI/permission — skip admin notifications fetch (avoids 403).
-    if (!isDealer()) {
+    // Field actors / employees have no notifications UI — skip admin notifications fetch.
+    if (!isFieldActor() && !isEmployee()) {
       loadNotifications();
     }
   }, []);
@@ -99,20 +104,23 @@ export function DashboardScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    // Top inset lives on DashboardAppBar so the header clears the status bar.
+    <SafeAreaView style={styles.safeArea} edges={[]}>
       <DashboardAppBar
-        onNotificationsPress={dealerMode ? undefined : () => navigation.navigate('Notifications')}
+        onNotificationsPress={
+          dealerMode || employeeMode ? undefined : () => navigation.navigate('Notifications')
+        }
         onProfilePress={() => setProfileMenuVisible(true)}
       />
 
       <View style={styles.body}>
-        {!dealerMode ? (
+        {!dealerMode && !employeeMode ? (
         <View style={styles.searchWrap}>
           <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
         </View>
         ) : null}
 
-        {isSearching && !dealerMode ? (
+        {isSearching && !dealerMode && !employeeMode ? (
           <View style={styles.searchResults}>
             <GlobalSearchResults query={searchQuery} onSelect={handleSearchSelect} />
           </View>
@@ -124,13 +132,21 @@ export function DashboardScreen({ navigation }: Props) {
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.summaryGrid}>
-              {dealerMode ? (
+              {employeeMode ? (
                 <>
                   <SummaryCard title="Total Products" value={String(stats?.totalProducts || 0)} icon="cube-outline" />
+                  <SummaryCard title="Total Dealers" value={String(stats?.totalDealers || 0)} icon="storefront-outline" />
+                  <SummaryCard title="Total Employees" value={String(stats?.totalEmployees || 0)} icon="badge-outline" />
+                  <SummaryCard title="Total Agents" value={String(stats?.totalAgents || 0)} icon="people-outline" />
+                </>
+              ) : dealerMode ? (
+                <>
+                  <SummaryCard title="Total Products" value={String(stats?.totalProducts || 0)} icon="cube-outline" />
+                  <SummaryCard title="Total Agents" value={String(stats?.totalAgents || 0)} icon="people-outline" />
+                  <SummaryCard title="Total Dealers" value={String(stats?.totalDealers || 0)} icon="storefront-outline" />
+                  <SummaryCard title="Total Leads" value={String(stats?.totalLeads || 0)} icon="clipboard-outline" />
                   <SummaryCard title="Draft" value={String(stats?.draftProducts || 0)} icon="document-outline" />
                   <SummaryCard title="Pending Approval" value={String(stats?.pendingApprovalProducts || 0)} icon="time-outline" />
-                  <SummaryCard title="Approved" value={String(stats?.approvedProducts || 0)} icon="checkmark-circle-outline" />
-                  <SummaryCard title="Rejected" value={String(stats?.rejectedProducts || 0)} icon="close-circle-outline" />
                 </>
               ) : (
                 <>
@@ -146,7 +162,19 @@ export function DashboardScreen({ navigation }: Props) {
               <SectionHeader title="Quick Actions" />
               <View style={styles.actionsGrid}>
                 {quickActions
-                  .filter((action) => can(action.permission))
+                  .filter((action) => {
+                    if (!can(action.permission)) return false;
+                    // Employee shell: hide Admin-only modules even if permission keys overlap.
+                    if (
+                      employeeMode &&
+                      ['Orders', 'Customers', 'EMI', 'Loans', 'Reports', 'Users', 'Roles', 'Settings'].includes(
+                        action.title,
+                      )
+                    ) {
+                      return false;
+                    }
+                    return true;
+                  })
                   .map((action) => (
                     <QuickActionButton
                       key={action.id}
@@ -154,10 +182,34 @@ export function DashboardScreen({ navigation }: Props) {
                       icon={action.icon}
                       onPress={() => {
                         if (action.title === 'Products') {
-                          if (dealerMode) {
+                          if (dealerMode || employeeMode) {
                             navigation.navigate('Products' as never);
                           } else {
                             navigation.navigate('ProductList');
+                          }
+                          return;
+                        }
+                        if (action.title === 'Agents') {
+                          if (dealerMode || employeeMode) {
+                            navigation.navigate('Agents' as never);
+                          } else {
+                            navigation.navigate('AgentList');
+                          }
+                          return;
+                        }
+                        if (action.title === 'Employees') {
+                          if (employeeMode) {
+                            navigation.navigate('Employees' as never);
+                          } else {
+                            navigation.navigate('EmployeeList');
+                          }
+                          return;
+                        }
+                        if (action.title === 'Dealers') {
+                          if (dealerMode || employeeMode) {
+                            navigation.navigate('Dealers' as never);
+                          } else {
+                            navigation.navigate('DealerList');
                           }
                           return;
                         }
@@ -194,7 +246,11 @@ export function DashboardScreen({ navigation }: Props) {
                           return;
                         }
                         if (action.title === 'Masters') {
-                          navigation.navigate('MastersHome');
+                          if (dealerMode || employeeMode) {
+                            navigation.navigate('Masters' as never);
+                          } else {
+                            navigation.navigate('MastersHome');
+                          }
                           return;
                         }
                         navigation.navigate('ModulePlaceholder', { title: action.title });
@@ -204,7 +260,7 @@ export function DashboardScreen({ navigation }: Props) {
               </View>
             </View>
 
-            {dealerMode ? null : (
+            {dealerMode || employeeMode ? null : (
             <View style={styles.sectionCard}>
               <SectionHeader title="Recent Activity" />
               {stats?.recentOrders?.length ? (
@@ -231,7 +287,7 @@ export function DashboardScreen({ navigation }: Props) {
         visible={profileMenuVisible}
         onClose={() => setProfileMenuVisible(false)}
         onMyProfile={() => {
-          if (dealerMode) {
+          if (dealerMode || employeeMode) {
             navigation.navigate('Profile' as never);
           } else {
             navigation.navigate('MyProfile');

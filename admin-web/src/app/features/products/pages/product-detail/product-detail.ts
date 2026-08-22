@@ -3,13 +3,13 @@ import { CurrencyPipe, NgTemplateOutlet } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ButtonModule } from 'primeng/button';
+import { TagModule } from 'primeng/tag';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { PageHeader } from '../../../../shared/components/page-header/page-header';
 import { BrandedLoader } from '../../../../shared/components/branded-loader/branded-loader';
 import { ErrorState } from '../../../../shared/components/error-state/error-state';
 import { StatusBadge } from '../../../../shared/components/status-badge/status-badge';
 import { CanDirective } from '../../../../shared/directives/can.directive';
-import { AuthService } from '../../../../core/services/auth.service';
 import { RbacService } from '../../../../core/services/rbac.service';
 import { ProductService } from '../../services/product.service';
 import { ProductEmiConfig } from '../../components/product-emi-config/product-emi-config';
@@ -43,6 +43,7 @@ interface DetailSection {
     CurrencyPipe,
     NgTemplateOutlet,
     ButtonModule,
+    TagModule,
     PageHeader,
     BrandedLoader,
     ErrorState,
@@ -56,7 +57,6 @@ interface DetailSection {
 })
 export class ProductDetail {
   private readonly products = inject(ProductService);
-  private readonly auth = inject(AuthService);
   private readonly rbac = inject(RbacService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -79,14 +79,18 @@ export class ProductDetail {
     () => String(this.product()?.status ?? '').toLowerCase() === 'pending_approval',
   );
 
-  readonly canApproveProducts = computed(() => {
-    const role = String(this.auth.user()?.roleName ?? '')
-      .trim()
-      .toLowerCase();
-    return role !== 'employee';
-  });
+  readonly canApproveProducts = computed(() => !this.rbac.isEmployee());
 
-  readonly canEditProducts = computed(() => this.rbac.can('products.edit'));
+  /** Employee / Dealer / Agent — same catalog restriction trio as backend. */
+  readonly isRestrictedCatalogUser = this.rbac.isRestrictedCatalogUser;
+
+  readonly isApprovedLocked = computed(() =>
+    this.rbac.isApprovedProductLocked(this.product()?.status),
+  );
+
+  readonly canEditProducts = computed(
+    () => this.rbac.can('products.edit') && !this.isApprovedLocked(),
+  );
 
   readonly showEmiDecision = computed(
     () => this.isPendingApproval() && this.canApproveProducts(),

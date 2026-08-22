@@ -8,6 +8,9 @@ export interface QuickAction {
 
 export const quickActions: QuickAction[] = [
   { id: '1', title: 'Products', icon: 'cube-outline', permission: 'products.view' },
+  { id: '1b', title: 'Agents', icon: 'people-outline', permission: 'freelancers.view' },
+  { id: '1c', title: 'Dealers', icon: 'storefront-outline', permission: 'masters.view' },
+  { id: '1d', title: 'Employees', icon: 'badge-outline', permission: 'users.view' },
   { id: '2', title: 'Orders', icon: 'cart-outline', permission: 'orders.view' },
   { id: '3', title: 'Customers', icon: 'people-outline', permission: 'customers.view' },
   { id: '4', title: 'EMI', icon: 'document-text-outline', permission: 'emi.view' },

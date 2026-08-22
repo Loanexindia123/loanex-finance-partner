@@ -3,7 +3,8 @@ import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, ActivityIndicator, Alert, Modal,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { AppImage } from '../components/ui/AppImage';
+import { withMediaSize } from '../utils/mediaUrl';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -346,7 +347,7 @@ export default function EmiApplyScreen() {
         {/* Product Summary */}
         <View style={s.productCard}>
           {params.productImage ? (
-            <Image source={{ uri: params.productImage }} style={s.productImg} contentFit="cover" />
+            <AppImage uri={withMediaSize(params.productImage, 'card')} style={s.productImg} contentFit="cover" />
           ) : (
             <View style={[s.productImg, { backgroundColor: Colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }]}>
               <MaterialIcons name="inventory-2" size={32} color={Colors.border} />

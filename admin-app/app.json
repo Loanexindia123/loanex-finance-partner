@@ -29,7 +29,8 @@
         {
           "photosPermission": "Allow LoanEx Super Admin to access your photos for product images."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {

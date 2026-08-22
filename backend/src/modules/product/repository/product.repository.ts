@@ -44,6 +44,9 @@ export class ProductRepository {
       forceCustomerVisible?: boolean;
       /** When set, restrict to these creatorIds before search/pagination. */
       allowedCreatorIds?: Set<string>;
+      /** Dealer profile id — include products stamped with this dealerId when allowDealerIdMatch. */
+      dealerId?: string;
+      allowDealerIdMatch?: boolean;
     },
   ) {
     const effectiveQuery: ListProductsQuery = options?.forceCustomerVisible
@@ -57,6 +60,8 @@ export class ProductRepository {
       ...effectiveQuery,
       forceCustomerVisible: !!options?.forceCustomerVisible,
       allowedCreatorIds: creatorKey,
+      dealerId: options?.dealerId ?? '',
+      allowDealerIdMatch: Boolean(options?.allowDealerIdMatch),
     });
     await jsonDb.refreshCatalogThrottled();
     const cached = listCache.get(cacheKey);
@@ -70,13 +75,17 @@ export class ProductRepository {
 
     let rows = jsonDb.getCollection('products').slice();
 
-    // Employee hierarchy scope: apply BEFORE search / filters / pagination.
+    // Employee/Dealer/Agent hierarchy scope: apply BEFORE search / filters / pagination.
     // Customer catalog (forceCustomerVisible) never receives this option.
     if (options?.allowedCreatorIds) {
       const allowed = options.allowedCreatorIds;
+      const dealerId = String(options.dealerId ?? '').trim();
+      const allowDealerIdMatch = Boolean(options.allowDealerIdMatch) && !!dealerId;
       rows = rows.filter((p: any) => {
         const owner = String(p.creatorId ?? '').trim();
-        return !!owner && allowed.has(owner);
+        if (owner && allowed.has(owner)) return true;
+        if (allowDealerIdMatch && String(p.dealerId ?? '').trim() === dealerId) return true;
+        return false;
       });
     }
 

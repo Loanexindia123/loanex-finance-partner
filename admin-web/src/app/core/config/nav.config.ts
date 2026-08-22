@@ -6,6 +6,11 @@ export interface NavItem {
   route: string;
   /** Item is shown if the user has ANY of these permissions. Empty = always shown. */
   permissions?: Permission[];
+  /**
+   * Hide for these role names (case-insensitive), even if permissions match.
+   * Used so Employees can keep users.* for onboarding without seeing Staff Users.
+   */
+  hideForRoles?: string[];
   /** When true, active only on exact route match (e.g. Masters hub vs child routes). */
   exact?: boolean;
 }
@@ -29,7 +34,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'EMI Applications', icon: 'pi pi-credit-card', route: '/emi', permissions: ['emi.view'] },
   { label: 'Loans', icon: 'pi pi-wallet', route: '/loans', permissions: ['emi.view'] },
   { label: 'FI Cases', icon: 'pi pi-map-marker', route: '/fi', permissions: ['fi.view'] },
-  { label: 'Users', icon: 'pi pi-user', route: '/users', permissions: ['users.view'] },
+  { label: 'Users', icon: 'pi pi-user', route: '/users', permissions: ['users.view'], hideForRoles: ['employee'] },
   {
     label: 'Employee Onboarding',
     icon: 'pi pi-id-card',

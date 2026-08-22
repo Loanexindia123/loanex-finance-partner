@@ -4,7 +4,7 @@ import { useWizard } from '../WizardContext';
 import { useOptionsRegistry } from '../OptionsRegistryContext';
 import { ManageableDropdown } from '../../components/ManageableDropdown';
 import { Card } from '../../../../components/ui/Card';
-import { useRbac, isDealer } from '../../../../auth/rbacStore';
+import { useRbac, isFieldActor } from '../../../../auth/rbacStore';
 import { colors } from '../../../../theme/colors';
 import { spacing } from '../../../../theme/spacing';
 
@@ -12,7 +12,7 @@ export function Step2Category() {
   const { formData, updateForm } = useWizard();
   const options = useOptionsRegistry();
   useRbac();
-  const dealerMode = isDealer();
+  const dealerMode = isFieldActor();
 
   const categoryOptions = useMemo(() => Object.keys(options.categories), [options.categories]);
   const subCategoryOptions = useMemo(

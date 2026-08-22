@@ -141,17 +141,18 @@
                 <i class="pi pi-eye" aria-hidden="true"></i>
                 <span class="act__label">View</span>
               </button>
-              <button
-                *appCan="'masters.edit'"
-                type="button"
-                class="act act--edit"
-                pTooltip="Edit dealer"
-                [tooltipOptions]="actionTooltip"
-                (click)="edit(dealer)"
-              >
-                <i class="pi pi-pencil" aria-hidden="true"></i>
-                <span class="act__label">Edit</span>
-              </button>
+              @if (canEditDealer(dealer)) {
+                <button
+                  type="button"
+                  class="act act--edit"
+                  pTooltip="Edit dealer"
+                  [tooltipOptions]="actionTooltip"
+                  (click)="edit(dealer)"
+                >
+                  <i class="pi pi-pencil" aria-hidden="true"></i>
+                  <span class="act__label">Edit</span>
+                </button>
+              }
               <button
                 *appCan="'masters.delete'"
                 type="button"

@@ -18,7 +18,7 @@ import { useMasterData } from '../context/MasterDataContext';
 import { MasterStatus } from '../types/masterData';
 import { MasterFormModal } from '../components/MasterFormModal';
 import { MasterStatusBadge } from '../components/MasterStatusBadge';
-import { isDealer } from '../../auth/rbacStore';
+import { isFieldActor } from '../../auth/rbacStore';
 import {
   BrandFormFields,
   BrandFormState,
@@ -169,7 +169,7 @@ export function MasterListScreen({ navigation, route }: Props) {
       navigation.goBack();
       return;
     }
-    if (isDealer()) {
+    if (isFieldActor()) {
       navigation.navigate('DealerTabs', { screen: 'Masters' });
       return;
     }

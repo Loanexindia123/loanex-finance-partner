@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Fonts, Spacing, Radius, Shadow } from '../../constants/theme';
 import { ProductCard } from '../../components/feature/ProductCard';
+import { AppImage } from '../../components/ui/AppImage';
 import { useAuth } from '../../hooks/useAuth';
 import { getCategories } from '../../services/categoryService';
 import { getProducts } from '../../services/productService';
 import { getBanners } from '../../services/bannerService';
 import { getUnreadCount } from '../../services/notificationService';
+import { prefetchMediaUrls, withMediaSize } from '../../utils/mediaUrl';
 import { Banner as BannerType, Category, Product } from '../../types';
 
 const W = Dimensions.get('window').width;
@@ -48,13 +49,19 @@ export default function HomeScreen() {
       getProducts().catch(() => [] as Product[]),
       getBanners().catch(() => [] as BannerType[]),
     ]).then(([cats, products, b]) => {
+      const bannerList = b.length ? b : FALLBACK_BANNERS;
       setCategories(cats);
       setFeatured(products);
       setDeals(products.slice(0, 3));
-      setBanners(b.length ? b : FALLBACK_BANNERS);
+      setBanners(bannerList);
       setTrending(products);
       setRecommended(products);
       setNewArrivals(products);
+      // Warm disk+memory cache once so duplicate home sections / later screens reuse bytes.
+      prefetchMediaUrls([
+        ...bannerList.map((banner) => withMediaSize(banner.imageUrl, 'banner')),
+        ...products.map((product) => withMediaSize(product.image, 'card')),
+      ]);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -83,11 +90,18 @@ export default function HomeScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={{ height: 195 }}>
-          {(banners.length ? banners : []).map(b => (
+          {(banners.length ? banners : []).map((b, index) => (
             <View key={b.id} style={[styles.banner, { width: W }]}>
-              <Image
-                source={{ uri: b.imageUrl || 'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=800&q=80' }}
-                style={styles.bannerImg} contentFit="cover" transition={300} />
+              <AppImage
+                uri={withMediaSize(
+                  b.imageUrl || 'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=800&q=80',
+                  'banner',
+                )}
+                style={styles.bannerImg}
+                contentFit="cover"
+                transition={300}
+                priority={index === 0 ? 'high' : 'normal'}
+              />
               <View style={styles.bannerOverlay} />
               <View style={styles.bannerContent}>
                 {b.badgeText ? <View style={styles.bannerBadge}><Text style={styles.bannerBadgeTxt}>{b.badgeText}</Text></View> : null}

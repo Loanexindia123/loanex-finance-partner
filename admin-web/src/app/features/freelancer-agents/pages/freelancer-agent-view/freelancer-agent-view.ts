@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
+import { TagModule } from 'primeng/tag';
 import { FormsModule } from '@angular/forms';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { PageHeader } from '../../../../shared/components/page-header/page-header';
@@ -27,6 +28,7 @@ const BASE_PATH = '/employees/freelancer-onboarding';
     FormsModule,
     ButtonModule,
     DialogModule,
+    TagModule,
     PageHeader,
     BrandedLoader,
     ErrorState,
@@ -59,8 +61,16 @@ export class FreelancerAgentView {
   });
   readonly canEditRecord = computed(() => {
     const row = this.record();
-    return !!row && this.rbac.can('freelancers.edit') && (row.formStatus === 'draft' || row.formStatus === 'rejected');
+    return (
+      !!row &&
+      this.rbac.can('freelancers.edit') &&
+      (row.formStatus === 'draft' || row.formStatus === 'rejected')
+    );
   });
+
+  readonly isApprovedLocked = computed(() =>
+    this.rbac.isApprovedFormLocked(this.record()?.formStatus),
+  );
   readonly canApproveRecord = computed(() => {
     const row = this.record();
     return !!row && this.rbac.can('freelancers.approve') && row.formStatus === 'pending_approval';
@@ -124,7 +134,7 @@ export class FreelancerAgentView {
         this.messages.add({
           severity: 'success',
           summary: 'Approved',
-          detail: `Agent ID ${updated.agentId} generated.`,
+          detail: `Agent ID ${updated.agentId} generated. Agent login is ready (welcome@123).`,
         });
       },
       error: (err) => {

@@ -1,45 +1,52 @@
-# LoanEx
+# LoanEx Customer Web
 
-Premium FinTech + eCommerce platform foundation (Angular 20).
+Angular 20 customer storefront for LoanEx (browse, EMI, checkout, orders).
 
-This repository currently contains **application foundation only** — no feature UI, pages, APIs, authentication, or business logic.
-
-## Stack
-
-- Angular 20 (standalone components & routing)
-- TypeScript (strict mode)
-- SCSS
-- Angular Signals + RxJS
-- SSR + client hydration
-- Tailwind CSS
-- PrimeNG / PrimeIcons / PrimeFlex
-- Angular CDK
-- Angular Animations
-
-## Architecture
-
-```
-src/app
-├── core/        # Config, guards, interceptors, services, state
-├── shared/      # Reusable components, directives, pipes, utils, validators
-├── layout/      # Navbar, footer, shell, auth-layout
-└── features/    # Lazy-loadable domains (empty placeholders)
-```
-
-Path aliases: `@core/*`, `@shared/*`, `@layout/*`, `@features/*`, `@env/*`, `@theme/*`.
+Production API: `https://loanex-api.vercel.app`  
+Vercel project: `customer-web` (already linked via `.vercel/`)
 
 ## Scripts
 
 ```bash
-npm start          # ng serve (development)
-npm run build      # production build with SSR
-npm test           # unit tests
-npm run serve:ssr:LoanEx  # serve SSR build
+npm start              # local dev (proxies /api → deployed API)
+npm run build          # production build → dist/LoanEx/browser
+npm run preview        # serve the production build locally on :4400
+npm run deploy:preview # Vercel preview URL
+npm run deploy         # production deploy to Vercel
+npm run serve:ssr:LoanEx  # optional local SSR server (Node)
+```
+
+## Fast deploy (Vercel)
+
+From this folder (`customer-web/`):
+
+```bash
+npm install
+npm run deploy
+```
+
+First time on a new machine only:
+
+```bash
+npx vercel login
+npx vercel link   # pick existing project: customer-web
+npm run deploy
+```
+
+After deploy, open the URL Vercel prints (e.g. `https://www.mrloanex.com` / your Vercel domain).  
+CORS for production customer origins is already allowed on the API.
+
+## Local production check
+
+```bash
+npm run build
+npm run preview
+# → http://localhost:4400
 ```
 
 ## Notes
 
-- Routes are prepared for future lazy loading; none are registered yet.
-- Environments live in `src/environments`.
-- Global styles: `src/styles.scss` + `src/styles/` + Design System in `src/theme/`.
-- Design System: tokens, utilities, pattern classes (`lx-*`), and PrimeNG `LoanExPreset`.
+- Build includes SSR artifacts; Vercel serves the **browser** output statically.
+- SPA routes rewrite to `index.csr.html` (Angular CSR entry for static hosts).
+- Hashed assets get long-cache headers; `index.csr.html` is always revalidated.
+- Env: `src/environments/environment.ts` (prod) points at the shared LoanEx API.

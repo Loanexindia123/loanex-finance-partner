@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Product, ProductStatus } from '../types/product';
 import { colors } from '../../../theme/colors';
 import { radius, shadow, spacing } from '../../../theme/spacing';
+import { resolveMediaUrl } from '../../../utils/resolveMediaUrl';
 
 interface ProductCardProps {
   product: Product;
@@ -35,6 +36,12 @@ const STATUS_STYLE: Record<ProductStatus, { label: string; bg: string; text: str
 export function ProductCard({ product, onEdit, onDelete, onView }: ProductCardProps) {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const imageUri = resolveMediaUrl(product.imageUrl);
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUri]);
 
   const formatPrice = (price: number) => `₹${price.toLocaleString('en-IN')}`;
   // Sold out reads clearly even when an admin hasn't flipped the status field.
@@ -43,13 +50,19 @@ export function ProductCard({ product, onEdit, onDelete, onView }: ProductCardPr
       ? STATUS_STYLE.out_of_stock
       : STATUS_STYLE[product.status] || { label: product.status || 'Unknown', bg: colors.borderLight, text: colors.textSecondary };
   const lowStock = product.stock > 0 && product.stock <= 5;
+  const showImage = Boolean(imageUri) && !imageFailed;
 
   return (
     <View style={[styles.card, shadow.sm, isTablet && styles.cardTablet]}>
       <View style={styles.content}>
         <View style={styles.thumb}>
-          {product.imageUrl ? (
-            <Image source={{ uri: product.imageUrl }} style={styles.image} resizeMode="cover" />
+          {showImage ? (
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.image}
+              resizeMode="cover"
+              onError={() => setImageFailed(true)}
+            />
           ) : (
             <View style={styles.imagePlaceholder}>
               <Ionicons name="cube-outline" size={28} color={colors.textMuted} />
