@@ -390,7 +390,7 @@ export class DealerService {
     return record;
   }
 
-  async approve(id: string, actorUserId: string): Promise<DealerRecord> {
+    async approve(id: string, actorUserId: string): Promise<DealerRecord> {
     await ensureReady();
     const trimmed = String(id ?? '').trim();
     if (!trimmed) {
@@ -402,7 +402,15 @@ export class DealerService {
     }
 
     const current = buildRecord(existing);
-    assertCanAccess(current, resolveActor(actorUserId));
+    await assertCanAccessForActor(current, actorUserId); // CHANGED: was assertCanAccess(current, resolveActor(actorUserId))
+
+    // NEW: same rule create()/update() already enforce — Agents/Employees cannot approve.
+    const actorUser = jsonDb.findOne('users', { id: actorUserId }) as any;
+    const field = await resolveFieldActor(actorUserId);
+    const isAgent = Boolean(field?.kind === 'agent') || isAgentAuthUser(actorUser);
+    if (isAgent || isEmployeeRoleUser(actorUserId)) {
+      throw new ForbiddenError('Only Admin can approve dealers');
+    }
 
     if (current.verificationStatus !== 'pending') {
       throw new BadRequestError('Only dealers pending verification can be approved');

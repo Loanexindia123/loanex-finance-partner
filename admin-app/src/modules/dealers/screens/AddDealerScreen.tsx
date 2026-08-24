@@ -23,8 +23,7 @@ export function AddDealerScreen({ navigation, route }: Props) {
   const isEdit = route.params?.mode === 'edit';
   const dealerId = route.params?.dealerId;
 
-  const [dealerCode, setDealerCode] = useState('');
-  const [dealerName, setDealerName] = useState('');
+  const [dealerName, setDealerName] = useState(''); // CHANGED: removed dealerCode state
   const [ownerName, setOwnerName] = useState('');
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
@@ -37,8 +36,7 @@ export function AddDealerScreen({ navigation, route }: Props) {
     if (!isEdit || !dealerId) return;
     getDealerById(dealerId)
       .then((d) => {
-        setDealerCode(d.dealerCode);
-        setDealerName(d.dealerName);
+        setDealerName(d.dealerName); // CHANGED: removed setDealerCode(d.dealerCode)
         setOwnerName(d.ownerName);
         setMobile(d.mobile);
         setEmail(d.email);
@@ -48,15 +46,14 @@ export function AddDealerScreen({ navigation, route }: Props) {
   }, [isEdit, dealerId]);
 
   const save = async (formStatus: 'draft' | 'pending') => {
-    if (!dealerCode.trim() || !dealerName.trim()) {
-      Alert.alert('Required', 'Dealer Code and Dealer Name are required');
+    if (!dealerName.trim()) { // CHANGED: dropped dealerCode check
+      Alert.alert('Required', 'Dealer Name is required'); // CHANGED: message
       return;
     }
     try {
       setSaving(true);
       const payload = {
-        dealerCode: dealerCode.trim(),
-        dealerName: dealerName.trim(),
+        dealerName: dealerName.trim(), // CHANGED: dropped dealerCode from payload
         ownerName: ownerName.trim(),
         mobile: mobile.trim(),
         email: email.trim(),
@@ -90,7 +87,6 @@ export function AddDealerScreen({ navigation, route }: Props) {
           <Text style={styles.loading}>Loading…</Text>
         ) : (
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-            <Input label="Dealer Code *" value={dealerCode} onChangeText={setDealerCode} />
             <Input label="Dealer Name *" value={dealerName} onChangeText={setDealerName} />
             <Input label="Owner Name" value={ownerName} onChangeText={setOwnerName} />
             <Input

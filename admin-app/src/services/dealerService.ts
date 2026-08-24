@@ -17,7 +17,7 @@ export interface AppDealer {
 }
 
 export interface DealerPayload {
-  dealerCode: string;
+  dealerCode?: string; // CHANGED: was required — backend now generates this on approval
   dealerName: string;
   ownerName?: string;
   mobile?: string;
