@@ -223,7 +223,7 @@ export default function SearchScreen() {
       {activeFilterCount > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillsScroll} contentContainerStyle={styles.pillsContainer}>
           {selectedCats.map(cid => {
-            const cat = categories.find(c => c.id === cid);
+            const cat = categories.find(c => c.name === cid);
             return cat ? (
               <View key={cid} style={styles.pill}>
                 <Text style={styles.pillTxt}>{cat.name}</Text>
@@ -325,10 +325,10 @@ export default function SearchScreen() {
                   {categories.map(cat => (
                     <Pressable
                       key={cat.id}
-                      style={[styles.chip, selectedCats.includes(cat.id) && styles.chipSelected]}
-                      onPress={() => toggleCat(cat.id)}
+                      style={[styles.chip, selectedCats.includes(cat.name) && styles.chipSelected]}
+                      onPress={() => toggleCat(cat.name)}
                     >
-                      <Text style={[styles.chipTxt, selectedCats.includes(cat.id) && styles.chipTxtSelected]}>
+                      <Text style={[styles.chipTxt, selectedCats.includes(cat.name) && styles.chipTxtSelected]}>
                         {cat.name}
                       </Text>
                     </Pressable>
