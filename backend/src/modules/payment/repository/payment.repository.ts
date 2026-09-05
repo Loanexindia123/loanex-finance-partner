@@ -5,6 +5,7 @@ import {
   PaymentType,
 } from '@prisma/client';
 import { jsonDb } from '../../../config/json-db';
+import { getMongoDb } from '../../../config/mongo';
 import { decrementStockDurable } from '../../../common/utils/inventory';
 
 const PAYABLE_STATUSES: EmiApplicationStatus[] = [
@@ -116,8 +117,77 @@ export class PaymentRepository {
     return local.length > 0 ? local[0] : null;
   }
 
-  findByRazorpayOrderId(razorpayOrderId: string) {
-    return jsonDb.findOne('paymentTransaction', { razorpayOrderId });
+  /**
+   * Always hit Mongo — serverless instances do not share in-memory jsonDb.
+   * findOneFromMongo also hydrates local memory so updateAwaited can succeed.
+   */
+  async findByRazorpayOrderId(razorpayOrderId: string) {
+    return jsonDb.findOneFromMongo('paymentTransaction', { razorpayOrderId });
+  }
+
+  /**
+   * Open (not yet SUCCESS) lifetime KYC fee rows for this user — for Razorpay reconcile.
+   * Queries Mongo directly so serverless instances see orders created elsewhere.
+   */
+  async findOpenKycVerifications(userId: string) {
+    const openStatuses = [
+      PaymentStatus.CREATED,
+      PaymentStatus.PENDING,
+      'CREATED',
+      'PENDING',
+    ];
+
+    try {
+      const db = await getMongoDb();
+      const docs = await db
+        .collection('paymentTransaction')
+        .find({
+          userId,
+          $or: [
+            { paymentType: PaymentType.KYC_VERIFICATION },
+            { paymentType: 'KYC_VERIFICATION' },
+            { purpose: 'KYC_VERIFICATION' },
+          ],
+          $and: [
+            {
+              $or: [
+                { paymentStatus: { $in: openStatuses } },
+                { status: { $in: openStatuses } },
+              ],
+            },
+          ],
+        })
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .toArray();
+
+      const open: any[] = [];
+      for (const doc of docs) {
+        if (!doc?.id) continue;
+        // Hydrate via findOneFromMongo so local row matches Mongo (updateAwaited-safe).
+        const hydrated = await jsonDb.findOneFromMongo('paymentTransaction', {
+          id: String(doc.id),
+        });
+        if (hydrated) open.push(hydrated);
+      }
+      if (open.length > 0) return open;
+    } catch {
+      /* fall through to memory */
+    }
+
+    return jsonDb
+      .findMany('paymentTransaction', { userId })
+      .filter(
+        (p: any) =>
+          (p.purpose === 'KYC_VERIFICATION' ||
+            p.paymentType === 'KYC_VERIFICATION' ||
+            p.paymentType === PaymentType.KYC_VERIFICATION) &&
+          openStatuses.includes(p.paymentStatus ?? p.status),
+      )
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
   }
 
   listByApplicationId(applicationId: string, userId: string) {
@@ -173,6 +243,14 @@ export class PaymentRepository {
     razorpayPaymentId: string;
     razorpaySignature: string;
   }) {
+    // Hydrate from Mongo first — updateAwaited only mutates in-memory rows.
+    const existing =
+      jsonDb.findOne('paymentTransaction', { id: input.transactionId }) ??
+      (await jsonDb.findOneFromMongo('paymentTransaction', { id: input.transactionId }));
+    if (!existing) {
+      return null;
+    }
+
     const paidAt = new Date().toISOString();
     await jsonDb.updateAwaited(
       'paymentTransaction',
@@ -188,7 +266,10 @@ export class PaymentRepository {
         updatedAt: paidAt,
       },
     );
-    return jsonDb.findOne('paymentTransaction', { id: input.transactionId });
+    return (
+      jsonDb.findOne('paymentTransaction', { id: input.transactionId }) ??
+      (await jsonDb.findOneFromMongo('paymentTransaction', { id: input.transactionId }))
+    );
   }
 
   markPending(id: string) {

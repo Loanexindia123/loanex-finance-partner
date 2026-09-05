@@ -155,6 +155,39 @@ export async function fetchRazorpayOrder(orderId: string): Promise<{
   };
 }
 
+/** Payments attached to a Razorpay order (used to reconcile stuck CREATED KYC rows). */
+export async function fetchRazorpayOrderPayments(orderId: string): Promise<
+  Array<{
+    id: string;
+    status: string;
+    orderId: string | null;
+    amount: number;
+    currency: string;
+  }>
+> {
+  if (isPaymentDevBypass()) {
+    return [
+      {
+        id: `pay_dev_${crypto.randomBytes(6).toString('hex')}`,
+        status: 'captured',
+        orderId,
+        amount: 0,
+        currency: env.RAZORPAY_CURRENCY,
+      },
+    ];
+  }
+
+  const result = await getClient().orders.fetchPayments(orderId);
+  const items = Array.isArray((result as any)?.items) ? (result as any).items : [];
+  return items.map((payment: any) => ({
+    id: String(payment.id),
+    status: String(payment.status ?? ''),
+    orderId: payment.order_id ? String(payment.order_id) : orderId,
+    amount: Number(payment.amount ?? 0),
+    currency: String(payment.currency ?? env.RAZORPAY_CURRENCY),
+  }));
+}
+
 export async function createRazorpayRefund(input: {
   paymentId: string;
   amountPaise?: number;

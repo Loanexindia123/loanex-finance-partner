@@ -19,7 +19,7 @@ import {
 } from '../../loan/service/emi-calculator.service';
 import type { CreateEmiApplicationBody } from '../dto/emi-application.dto';
 import { emiApplicationRepository } from '../repository/emi-application.repository';
-import { paymentRepository } from '../../payment/repository/payment.repository';
+import { paymentService } from '../../payment/service/payment.service';
 import {
   KYC_FEE_AMOUNT_INR,
   KYC_VERIFICATION_PURPOSE,
@@ -359,9 +359,9 @@ export class EmiApplicationService {
       );
     }
 
-    // Lifetime ₹399 KYC fee — Mongo-backed SUCCESS payment required before EMI create.
-    const kycFeePaid = await paymentRepository.findSuccessKycVerification(userId);
-    if (!kycFeePaid) {
+    // Lifetime ₹399 KYC fee — Mongo SUCCESS required (reconciles stuck CREATED via Razorpay).
+    const kycFeeStatus = await paymentService.getKycFeeStatus(userId);
+    if (!kycFeeStatus.paid) {
       throw new ConflictError('KYC verification fee must be paid before submitting an EMI application.', {
         code: 'KYC_FEE_REQUIRED',
         paid: false,

@@ -166,6 +166,31 @@ export function createApp() {
     }),
   );
 
+  // Hotfix: reconcile KYC fees stuck in CREATED after Razorpay capture.
+  app.post(
+    `${env.API_PREFIX}/internal/reconcile-kyc-fees`,
+    asyncHandler(async (req, res) => {
+      const auth = String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+      if (env.NODE_ENV === 'production' && !env.CRON_SECRET) {
+        res.status(503).json({ success: false, message: 'Cron not configured' });
+        return;
+      }
+      if (env.CRON_SECRET && auth !== env.CRON_SECRET) {
+        res.status(403).json({ success: false, message: 'Forbidden' });
+        return;
+      }
+      const { paymentService } = await import('./modules/payment/service/payment.service');
+      const userId = typeof req.body?.userId === 'string' ? req.body.userId.trim() : '';
+      if (userId) {
+        const before = await paymentService.getKycFeeStatus(userId);
+        res.json({ success: true, data: { mode: 'user', userId, status: before } });
+        return;
+      }
+      const result = await paymentService.reconcileAllOpenKycFees();
+      res.json({ success: true, data: { mode: 'all', ...result } });
+    }),
+  );
+
   // Catalog + cart/wishlist only need critical hydrate (jsonDb.ready).
   app.use(`${env.API_PREFIX}/auth`, authRouter);
   app.use(`${env.API_PREFIX}/cart`, cartRouter);

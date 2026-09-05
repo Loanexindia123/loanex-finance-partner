@@ -18,6 +18,8 @@ import { paymentRepository } from '../repository/payment.repository';
 import {
   createRazorpayOrder,
   createRazorpayRefund,
+  fetchRazorpayOrder,
+  fetchRazorpayOrderPayments,
   fetchRazorpayPayment,
   getRazorpayKeyId,
   isPaymentDevBypass,
@@ -823,18 +825,139 @@ export class PaymentService {
 
   // ── Lifetime one-time KYC verification fee (₹399) ─────────────────────────
 
+  /**
+   * If Mongo still shows CREATED/PENDING but Razorpay already captured the fee,
+   * mark SUCCESS. Prevents re-charging after serverless verify/webhook misses.
+   */
+  async reconcileOpenKycFeeWithRazorpay(userId: string) {
+    const openRows = await paymentRepository.findOpenKycVerifications(userId);
+    for (const row of openRows) {
+      const orderId = row.razorpayOrderId ? String(row.razorpayOrderId) : '';
+      if (!orderId || orderId.startsWith('order_dev_')) continue;
+
+      try {
+        const remoteOrder = await fetchRazorpayOrder(orderId);
+        const orderPaid = String(remoteOrder.status).toLowerCase() === 'paid';
+        const payments = await fetchRazorpayOrderPayments(orderId);
+        const captured = payments.find((p) =>
+          ['captured', 'authorized'].includes(String(p.status).toLowerCase()),
+        );
+
+        if (!orderPaid && !captured) continue;
+
+        const paymentId =
+          captured?.id ??
+          row.razorpayPaymentId ??
+          `reconcile_${orderId}`;
+
+        // Amount guard — never promote a wrong-amount order to SUCCESS.
+        const amountOk =
+          Number(row.amount) === KYC_FEE_AMOUNT_INR ||
+          (captured?.amount != null && captured.amount === KYC_FEE_AMOUNT_INR * 100) ||
+          (remoteOrder.amount != null && remoteOrder.amount === KYC_FEE_AMOUNT_INR * 100);
+        if (!amountOk) continue;
+
+        const payment = await paymentRepository.completeKycVerificationPayment({
+          transactionId: row.id,
+          razorpayPaymentId: String(paymentId),
+          razorpaySignature: row.razorpaySignature ?? 'reconciled_from_razorpay',
+        });
+
+        await auditLogService.log({
+          userId,
+          action: 'KYC_FEE_RECONCILED_FROM_RAZORPAY',
+          entity: 'payment_transactions',
+          metadata: {
+            razorpayOrderId: orderId,
+            razorpayPaymentId: String(paymentId),
+            transactionId: row.id,
+            previousStatus: row.paymentStatus ?? row.status,
+            timestamp: new Date().toISOString(),
+          },
+        });
+
+        return payment ?? row;
+      } catch {
+        // Continue other open rows — one bad order must not block reconcile.
+      }
+    }
+    return null;
+  }
+
+  /** Ops/hotfix: reconcile every user who still has open KYC fee rows. */
+  async reconcileAllOpenKycFees() {
+    const { getMongoDb } = await import('../../../config/mongo');
+    const db = await getMongoDb();
+    const docs = await db
+      .collection('paymentTransaction')
+      .find({
+        $or: [
+          { paymentType: PaymentType.KYC_VERIFICATION },
+          { paymentType: 'KYC_VERIFICATION' },
+          { purpose: 'KYC_VERIFICATION' },
+        ],
+        $and: [
+          {
+            $or: [
+              { paymentStatus: { $in: [PaymentStatus.CREATED, PaymentStatus.PENDING, 'CREATED', 'PENDING'] } },
+              { status: { $in: [PaymentStatus.CREATED, PaymentStatus.PENDING, 'CREATED', 'PENDING'] } },
+            ],
+          },
+        ],
+      })
+      .project({ userId: 1 })
+      .limit(500)
+      .toArray();
+
+    const userIds = Array.from(
+      new Set(docs.map((d) => String(d.userId || '')).filter(Boolean)),
+    );
+
+    const recovered: Array<{ userId: string; paymentId: string }> = [];
+    const unpaid: string[] = [];
+
+    for (const userId of userIds) {
+      const existing = await paymentRepository.findSuccessKycVerification(userId);
+      if (existing) {
+        recovered.push({ userId, paymentId: existing.id });
+        continue;
+      }
+      const row = await this.reconcileOpenKycFeeWithRazorpay(userId);
+      if (row?.id) {
+        recovered.push({ userId, paymentId: String(row.id) });
+      } else {
+        unpaid.push(userId);
+      }
+    }
+
+    return {
+      scannedUsers: userIds.length,
+      recovered: recovered.length,
+      unpaid: unpaid.length,
+      recoveredUsers: recovered,
+      unpaidUsers: unpaid,
+    };
+  }
+
+  private toKycFeePaidResponse(existing: any) {
+    return {
+      paid: true as const,
+      amount: KYC_FEE_AMOUNT_INR,
+      purpose: KYC_VERIFICATION_PURPOSE,
+      paymentId: existing.id,
+      razorpayOrderId: existing.razorpayOrderId ?? null,
+      razorpayPaymentId: existing.razorpayPaymentId ?? null,
+      paidAt: existing.paidAt ?? existing.updatedAt ?? existing.createdAt ?? null,
+    };
+  }
+
   async getKycFeeStatus(userId: string) {
-    const existing = await paymentRepository.findSuccessKycVerification(userId);
+    let existing = await paymentRepository.findSuccessKycVerification(userId);
+    if (!existing) {
+      existing = await this.reconcileOpenKycFeeWithRazorpay(userId);
+    }
     if (existing) {
-      return {
-        paid: true as const,
-        amount: KYC_FEE_AMOUNT_INR,
-        purpose: KYC_VERIFICATION_PURPOSE,
-        paymentId: existing.id,
-        razorpayOrderId: existing.razorpayOrderId ?? null,
-        razorpayPaymentId: existing.razorpayPaymentId ?? null,
-        paidAt: existing.paidAt ?? existing.updatedAt ?? existing.createdAt ?? null,
-      };
+      return this.toKycFeePaidResponse(existing);
     }
     return {
       paid: false as const,
@@ -851,7 +974,10 @@ export class PaymentService {
     userId: string,
     meta?: { ipAddress?: string | null; userAgent?: string | null },
   ) {
-    const alreadyPaid = await paymentRepository.findSuccessKycVerification(userId);
+    let alreadyPaid = await paymentRepository.findSuccessKycVerification(userId);
+    if (!alreadyPaid) {
+      alreadyPaid = await this.reconcileOpenKycFeeWithRazorpay(userId);
+    }
     if (alreadyPaid) {
       throw new ConflictError('KYC verification fee already paid for this account.', {
         code: 'KYC_FEE_ALREADY_PAID',
@@ -935,7 +1061,10 @@ export class PaymentService {
     meta?: { ipAddress?: string | null; userAgent?: string | null },
   ) {
     // Lifetime check first — never double-charge / double-mark.
-    const alreadyPaid = await paymentRepository.findSuccessKycVerification(userId);
+    let alreadyPaid = await paymentRepository.findSuccessKycVerification(userId);
+    if (!alreadyPaid) {
+      alreadyPaid = await this.reconcileOpenKycFeeWithRazorpay(userId);
+    }
     if (alreadyPaid) {
       return {
         paymentStatus: 'SUCCESS' as const,
@@ -1038,6 +1167,13 @@ export class PaymentService {
       razorpaySignature: input.razorpaySignature,
     });
 
+    if (!payment || payment.paymentStatus !== PaymentStatus.SUCCESS) {
+      throw new BadRequestError('Failed to persist KYC fee payment success.', {
+        code: 'KYC_FEE_PERSIST_FAILED',
+        transactionId: transaction.id,
+      });
+    }
+
     await auditLogService.log({
       userId,
       action: 'KYC_FEE_PAYMENT_SUCCESS',
@@ -1058,10 +1194,10 @@ export class PaymentService {
       alreadyProcessed: false,
       purpose: KYC_VERIFICATION_PURPOSE,
       amount: KYC_FEE_AMOUNT_INR,
-      transactionId: payment?.id ?? transaction.id,
+      transactionId: payment.id ?? transaction.id,
       razorpayOrderId: input.razorpayOrderId,
       razorpayPaymentId: input.razorpayPaymentId,
-      paidAt: payment?.paidAt ?? new Date().toISOString(),
+      paidAt: payment.paidAt ?? new Date().toISOString(),
     };
   }
 
