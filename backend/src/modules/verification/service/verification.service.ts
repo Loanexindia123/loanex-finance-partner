@@ -438,7 +438,8 @@ export class VerificationService {
 
     // Keep bank-verification gates in sync (they read users/customerVerification.panVerified).
     // Does not change Experian verification logic — only mirrors the success flag.
-    panVerificationRepository.markUserPanVerified(userId);
+    // panVerificationRepository.markUserPanVerified(userId);
+    await panVerificationRepository.markUserPanVerified(userId);
     await panVerificationRepository.upsertCustomerPanVerified(userId);
 
     return {
