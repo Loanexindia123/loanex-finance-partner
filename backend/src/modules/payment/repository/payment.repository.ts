@@ -76,28 +76,20 @@ export class PaymentRepository {
    * Uses a targeted Mongo query instead of refreshing the whole payment table.
    */
   async findSuccessKycVerification(userId: string) {
-    const primary = await jsonDb.findLatestFromMongo(
-      'paymentTransaction',
-      {
-        userId,
-        paymentType: PaymentType.KYC_VERIFICATION,
-        paymentStatus: PaymentStatus.SUCCESS,
-      },
-      'paidAt',
-    );
-    if (primary) return primary;
-
-    // Fallback: older rows may use purpose/status field names.
-    const byPurpose = await jsonDb.findLatestFromMongo(
-      'paymentTransaction',
-      { userId, purpose: 'KYC_VERIFICATION' },
-      'paidAt',
-    );
-    if (
-      byPurpose &&
-      (byPurpose.paymentStatus === PaymentStatus.SUCCESS || byPurpose.status === 'SUCCESS')
-    ) {
-      return byPurpose;
+    // STRICT: ask Mongo directly. If Mongo has a problem this THROWS (instead of
+    // quietly answering "not paid"), so a customer is never asked to pay the
+    // lifetime fee again just because the database had a hiccup.
+    const db = await getMongoDb();
+    const paidDoc: any = await db.collection('paymentTransaction').findOne({
+      userId,
+      $and: [
+        { $or: [{ paymentType: 'KYC_VERIFICATION' }, { purpose: 'KYC_VERIFICATION' }] },
+        { $or: [{ paymentStatus: 'SUCCESS' }, { status: 'SUCCESS' }] },
+      ],
+    });
+    if (paidDoc) {
+      const { _id, ...row } = paidDoc;
+      return { ...row, id: row.id ?? String(_id) };
     }
 
     // Last resort: local memory scan (covers recent writes not yet queryable).
@@ -135,6 +127,7 @@ export class PaymentRepository {
       PaymentStatus.PENDING,
       'CREATED',
       'PENDING',
+      'FAILED',
     ];
 
     try {
@@ -171,7 +164,8 @@ export class PaymentRepository {
         if (hydrated) open.push(hydrated);
       }
       if (open.length > 0) return open;
-    } catch {
+    } catch (err) {
+      console.error('[KYC] findOpenKycVerifications Mongo query failed:', err);
       /* fall through to memory */
     }
 

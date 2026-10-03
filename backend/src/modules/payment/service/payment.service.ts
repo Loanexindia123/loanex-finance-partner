@@ -430,12 +430,12 @@ export class PaymentService {
       status: app.status,
       order: order
         ? {
-            id: order.id,
-            orderNumber: order.orderNumber,
-            orderStatus: order.orderStatus,
-            productId: order.productId,
-            createdAt: order.createdAt,
-          }
+          id: order.id,
+          orderNumber: order.orderNumber,
+          orderStatus: order.orderStatus,
+          productId: order.productId,
+          createdAt: order.createdAt,
+        }
         : null,
       payments: payments.map((p) => ({
         id: p.id,
@@ -455,10 +455,10 @@ export class PaymentService {
     const order = orderNumber
       ? await paymentRepository.findOrderByNumber(orderNumber, userId)
       : await (async () => {
-    const app = await paymentRepository.findLatestApplicationForUser(userId);
-    if (!app?.order) return null;
-          return paymentRepository.findOrderByApplication(app.id, userId);
-        })();
+        const app = await paymentRepository.findLatestApplicationForUser(userId);
+        if (!app?.order) return null;
+        return paymentRepository.findOrderByApplication(app.id, userId);
+      })();
 
     const latestOrder = order ?? (await paymentRepository.findLatestOrderForUser(userId));
 
@@ -877,8 +877,9 @@ export class PaymentService {
         });
 
         return payment ?? row;
-      } catch {
+      } catch (err) {
         // Continue other open rows — one bad order must not block reconcile.
+        console.error('[KYC reconcile] failed for order', orderId, err);
       }
     }
     return null;
@@ -899,8 +900,8 @@ export class PaymentService {
         $and: [
           {
             $or: [
-              { paymentStatus: { $in: [PaymentStatus.CREATED, PaymentStatus.PENDING, 'CREATED', 'PENDING'] } },
-              { status: { $in: [PaymentStatus.CREATED, PaymentStatus.PENDING, 'CREATED', 'PENDING'] } },
+              { paymentStatus: { $in: [PaymentStatus.CREATED, PaymentStatus.PENDING, 'CREATED', 'PENDING', 'FAILED'] } },
+              { status: { $in: [PaymentStatus.CREATED, PaymentStatus.PENDING, 'CREATED', 'PENDING', 'FAILED'] } },
             ],
           },
         ],

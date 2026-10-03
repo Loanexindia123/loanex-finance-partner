@@ -15,11 +15,11 @@ type BankVerificationStatusValue =
 
 export class BankVerificationRepository {
   findUserById(userId: string) {
-    return jsonDb.findOne('users', { id: userId });
+      return jsonDb.findOneFromMongo('users', { id: userId });
   }
 
   findCustomerVerification(userId: string) {
-    return jsonDb.findOne('customerVerification', { userId });
+      return jsonDb.findOneFromMongo('customerVerification', { userId });
   }
 
   findLatestByUserId(userId: string) {
