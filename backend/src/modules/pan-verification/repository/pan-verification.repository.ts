@@ -42,16 +42,17 @@ export class PanVerificationRepository {
     });
   }
 
-  markUserPanVerified(userId: string) {
-    jsonDb.update('users', { id: userId }, { panVerified: true });
+  async markUserPanVerified(userId: string) {
+    await jsonDb.findOneFromMongo('users', { id: userId });
+    await jsonDb.updateAwaited('users', { id: userId }, { panVerified: true });
     return jsonDb.findOne('users', { id: userId });
   }
 
   async upsertCustomerPanVerified(userId: string) {
-    const existing = jsonDb.findOne('customerVerification', { userId });
+    const existing = await jsonDb.findOneFromMongo('customerVerification', { userId });
 
     if (!existing) {
-      return jsonDb.insert('customerVerification', {
+      return jsonDb.insertAwaited('customerVerification', {
         userId,
         mobileVerified: true,
         aadhaarVerified: true,
@@ -75,7 +76,7 @@ export class PanVerificationRepository {
           ? VerificationStatus.NOT_STARTED
           : VerificationStatus.IN_PROGRESS;
 
-    jsonDb.update('customerVerification', { userId }, {
+    await jsonDb.updateAwaited('customerVerification', { userId }, {
       panVerified: true,
       verificationStatus,
     });
