@@ -93,7 +93,7 @@ export class BankVerificationService {
     }
 
     const customer = await bankVerificationRepository.findCustomerVerification(userId);
-    const kyc = jsonDb.findOne('customer_kyc', { userId });
+    const kyc = jsonDb.findOneFromMongo('customer_kyc', { userId });
     const panVerified = Boolean(
       customer?.panVerified || user.panVerified || kyc?.pan_verified,
     );

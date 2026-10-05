@@ -9,11 +9,12 @@ import {
 /** Local mock data for the application shell (no APIs). */
 export const LAYOUT_COMPANY = {
   name: 'LoanEx',
+  legalName: 'Loanex India Private Limited',
   tagline: 'Unlock Your Financial Freedom',
   logoSrc: 'assets/images/loanex-logo.png',
   logoAlt: 'LoanEx — Unlock Your Financial Freedom',
   description:
-    'LoanEx is a premium FinTech shopping experience that helps you buy what you need with flexible EMI plans — clear pricing, transparent tenure, and a polished checkout journey.',
+    'LoanEx is a premium FinTech shopping experience that helps you buy what you need with flexible EMI plans — clear pricing, transparent tenure, and a polished checkout journey. LoanEx is a brand of Loanex India Private Limited.',
   email: 'hello@loanex.com',
   phone: '+91 1800 123 4567',
   address: 'Financial District, Bengaluru, India',
